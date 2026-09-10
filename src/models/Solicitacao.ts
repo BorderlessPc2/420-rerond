@@ -131,6 +131,16 @@ export interface Solicitacao {
   analiseErroCodigo?: string | null
   documentosProcessados?: string[] | null
   documentosOmitidos?: string[] | null
+  /** Telemetria da última análise (Sprint 9/13). */
+  analiseTelemetry?: {
+    durationMs?: number
+    totalBytes?: number
+    tokensUsed?: number | null
+    filesIncluded?: number
+    filesOmitted?: number
+    failedStage?: string | null
+    errorCode?: string | null
+  } | null
   /** Histórico leve de edições manuais (P11). */
   historicoEdicoes?: Array<{
     em: string

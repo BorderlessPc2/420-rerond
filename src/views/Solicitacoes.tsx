@@ -80,6 +80,12 @@ export default function Solicitacoes() {
                   analiseJobStatus: job.state,
                   analiseJobProgress: job.progress,
                   activeAnaliseJobId: job.id,
+                  analiseErroMensagem:
+                    job.state === 'failed'
+                      ? humanizeAnaliseErrorMessage(
+                          job.error?.message ?? 'Falha na análise.',
+                        )
+                      : item.analiseErroMensagem,
                 }
               : item,
           ),
@@ -104,15 +110,15 @@ export default function Solicitacoes() {
           setActiveJob(null)
         }
 
-        if (job.state === 'failed') {
-          setAnalisandoId(null)
-          setActiveJobId(null)
-        }
+        // Em falha: mantém overlay até o usuário dispensar (P9).
       },
       (error) => {
-        setJobError(error.message)
-        setAnalisandoId(null)
-        setActiveJobId(null)
+        setJobError(humanizeAnaliseErrorMessage(error.message))
+        setActiveJob((prev) =>
+          prev
+            ? { ...prev, state: 'failed', progress: 0 }
+            : prev,
+        )
       },
     )
 
@@ -255,7 +261,6 @@ export default function Solicitacoes() {
 
     const solicitacaoId = modalReanaliseAberto.id
     setJobError(null)
-    setModalReanaliseAberto(null)
 
     try {
       const { jobId } = await iniciarAnaliseSolicitacao(
@@ -266,6 +271,7 @@ export default function Solicitacoes() {
         escopoAnalise,
       )
 
+      setModalReanaliseAberto(null)
       setAnalisandoId(solicitacaoId)
       setActiveJobId(jobId)
       setActiveJob({
@@ -284,16 +290,36 @@ export default function Solicitacoes() {
                 analiseJobStatus: 'queued',
                 analiseJobProgress: 12,
                 activeAnaliseJobId: jobId,
+                analiseErroMensagem: null,
               }
             : item,
         ),
       )
     } catch (error: unknown) {
       console.error('Erro ao iniciar análise:', error)
-      const message = error instanceof Error ? error.message : 'Erro ao iniciar análise.'
+      const message = humanizeAnaliseErrorMessage(
+        error instanceof Error ? error.message : 'Erro ao iniciar análise.',
+      )
       setJobError(message)
-      throw error
+      setSolicitacoes((prev) =>
+        prev.map((item) =>
+          item.id === solicitacaoId
+            ? {
+                ...item,
+                analiseJobStatus: 'failed',
+                analiseErroMensagem: message,
+              }
+            : item,
+        ),
+      )
+      throw new Error(message)
     }
+  }
+
+  const dismissAnaliseOverlay = () => {
+    setAnalisandoId(null)
+    setActiveJobId(null)
+    setActiveJob(null)
   }
 
   const handleAprovar = async (solicitacao: SolicitacaoWithFiles) => {
@@ -353,7 +379,7 @@ export default function Solicitacoes() {
     ? solicitacoes.find((s) => s.id === analisandoId) ?? null
     : null
 
-  const overlayActive = Boolean(analisandoId && activeJobId)
+  const overlayActive = Boolean(analisandoId && (activeJobId || activeJob?.state === 'failed'))
 
   return (
     <div className="solicitacoes-container">
@@ -365,6 +391,11 @@ export default function Solicitacoes() {
         jobState={activeJob?.state ?? solicitacaoEmAnalise?.analiseJobStatus ?? null}
         progress={activeJob?.progress ?? solicitacaoEmAnalise?.analiseJobProgress ?? null}
         errorMessage={jobError}
+        onDismiss={
+          activeJob?.state === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'failed'
+            ? dismissAnaliseOverlay
+            : undefined
+        }
       />
       <div className="solicitacoes-header">
         <h1>Solicitações</h1>
@@ -387,6 +418,15 @@ export default function Solicitacoes() {
         </div>
       )}
 
+      {jobError && !overlayActive && (
+        <div className="error-message" role="alert">
+          <AlertCircle size={20} />
+          <span>{jobError}</span>
+          <button type="button" onClick={() => setJobError(null)} className="btn-retry">
+            Dispensar
+          </button>
+        </div>
+      )}
       {solicitacoes.length === 0 && !error ? (
         <div className="empty-state">
           <FileText size={48} />

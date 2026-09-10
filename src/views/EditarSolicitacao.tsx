@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import { TIPOS_DOCUMENTO_OPTIONS, getFileKey } from '../config/tiposDocumento'
+import {
+  buildTiposDocumentoOptions,
+  getFileKey,
+  resolveTipoDocumentoSelection,
+} from '../config/tiposDocumento'
 import type { TipoDocumentoAnexo } from '../models/Solicitacao'
 import type { TipoAnalise } from '../models/TipoAnalise'
+import type { ConcessionariaPerfil } from '../models/ConcessionariaPerfil'
 import {
   addArquivosSolicitacao,
   getSolicitacaoById,
@@ -12,6 +17,7 @@ import {
   updateSolicitacao,
   appendHistoricoEdicao,
 } from '../services/solicitacao/solicitacaoService'
+import { getConcessionariaPerfilById } from '../services/concessionaria/concessionariaService'
 import { listTiposAnalise } from '../services/tipoAnalise/tipoAnaliseService'
 import './NovaSolicitacao.css'
 
@@ -51,7 +57,14 @@ export default function EditarSolicitacao() {
 
   const [novosFiles, setNovosFiles] = useState<File[]>([])
   const [novosTipos, setNovosTipos] = useState<Record<string, TipoDocumentoAnexo>>({})
+  const [novosSelectValues, setNovosSelectValues] = useState<Record<string, string>>({})
   const [novosLabels, setNovosLabels] = useState<Record<string, string>>({})
+  const [perfil, setPerfil] = useState<ConcessionariaPerfil | null>(null)
+
+  const tiposDocumentoOptions = useMemo(
+    () => buildTiposDocumentoOptions(perfil?.documentosCustom),
+    [perfil],
+  )
 
   useEffect(() => {
     if (!id) return
@@ -79,6 +92,10 @@ export default function EditarSolicitacao() {
         setObservacoes(sol.memorial || '')
         setArquivosMeta(sol.arquivosMeta ?? [])
         setHistorico(sol.historicoEdicoes ?? [])
+        if (sol.concessionariaId) {
+          const p = await getConcessionariaPerfilById(sol.concessionariaId)
+          if (!cancelled) setPerfil(p)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar solicitação.')
       } finally {
@@ -159,6 +176,7 @@ export default function EditarSolicitacao() {
       setHistorico(updated.historicoEdicoes ?? [])
       setNovosFiles([])
       setNovosTipos({})
+      setNovosSelectValues({})
       setNovosLabels({})
       if (fileInputRef.current) fileInputRef.current.value = ''
       setSuccess('Arquivos adicionados.')
@@ -344,23 +362,38 @@ export default function EditarSolicitacao() {
                 </div>
                 <div className="form-row" style={{ marginTop: 8 }}>
                   <select
-                    value={meta.tipoDocumento}
+                    value={
+                      (perfil?.documentosCustom ?? []).find(
+                        (d) =>
+                          meta.tipoDocumento === 'outro' &&
+                          d.label === meta.tipoDocumentoLabel,
+                      )?.id ?? meta.tipoDocumento
+                    }
                     onChange={(e) => {
-                      const value = e.target.value as TipoDocumentoAnexo
+                      const resolved = resolveTipoDocumentoSelection(
+                        e.target.value,
+                        perfil?.documentosCustom,
+                      )
                       void handleReclassify(
                         meta.url,
-                        value,
-                        value === 'outro' ? meta.tipoDocumentoLabel : undefined,
+                        resolved.tipoDocumento,
+                        resolved.tipoDocumentoLabel ??
+                          (resolved.tipoDocumento === 'outro'
+                            ? meta.tipoDocumentoLabel
+                            : undefined),
                       )
                     }}
                   >
-                    {TIPOS_DOCUMENTO_OPTIONS.map((opt) => (
+                    {tiposDocumentoOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {opt.fromPerfil ? `${opt.label} (perfil)` : opt.label}
                       </option>
                     ))}
                   </select>
-                  {meta.tipoDocumento === 'outro' && (
+                  {meta.tipoDocumento === 'outro' &&
+                    !(perfil?.documentosCustom ?? []).some(
+                      (d) => d.label === meta.tipoDocumentoLabel,
+                    ) && (
                     <input
                       defaultValue={meta.tipoDocumentoLabel || ''}
                       placeholder="Nome do tipo (Outro)"
@@ -386,10 +419,14 @@ export default function EditarSolicitacao() {
                 const selected = Array.from(e.target.files || [])
                 setNovosFiles(selected)
                 const tipos: Record<string, TipoDocumentoAnexo> = {}
+                const selects: Record<string, string> = {}
                 selected.forEach((file) => {
-                  tipos[getFileKey(file)] = 'desconhecido'
+                  const key = getFileKey(file)
+                  tipos[key] = 'desconhecido'
+                  selects[key] = 'desconhecido'
                 })
                 setNovosTipos(tipos)
+                setNovosSelectValues(selects)
               }}
             />
             {novosFiles.map((file) => {
@@ -398,21 +435,38 @@ export default function EditarSolicitacao() {
                 <div key={key} className="file-item" style={{ marginTop: 8 }}>
                   <span>{file.name}</span>
                   <select
-                    value={novosTipos[key] || 'desconhecido'}
-                    onChange={(e) =>
-                      setNovosTipos((prev) => ({
-                        ...prev,
-                        [key]: e.target.value as TipoDocumentoAnexo,
-                      }))
-                    }
+                    value={novosSelectValues[key] || novosTipos[key] || 'desconhecido'}
+                    onChange={(e) => {
+                      const resolved = resolveTipoDocumentoSelection(
+                        e.target.value,
+                        perfil?.documentosCustom,
+                      )
+                      setNovosSelectValues((prev) => ({ ...prev, [key]: e.target.value }))
+                      setNovosTipos((prev) => ({ ...prev, [key]: resolved.tipoDocumento }))
+                      if (resolved.tipoDocumentoLabel) {
+                        setNovosLabels((prev) => ({
+                          ...prev,
+                          [key]: resolved.tipoDocumentoLabel!,
+                        }))
+                      } else if (resolved.tipoDocumento !== 'outro') {
+                        setNovosLabels((prev) => {
+                          const next = { ...prev }
+                          delete next[key]
+                          return next
+                        })
+                      }
+                    }}
                   >
-                    {TIPOS_DOCUMENTO_OPTIONS.map((opt) => (
+                    {tiposDocumentoOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {opt.fromPerfil ? `${opt.label} (perfil)` : opt.label}
                       </option>
                     ))}
                   </select>
-                  {novosTipos[key] === 'outro' && (
+                  {novosTipos[key] === 'outro' &&
+                    !(perfil?.documentosCustom ?? []).some(
+                      (d) => d.id === novosSelectValues[key],
+                    ) && (
                     <input
                       placeholder="Nome do documento"
                       value={novosLabels[key] || ''}

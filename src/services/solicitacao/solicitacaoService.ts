@@ -344,6 +344,7 @@ export const createSolicitacao = async (
   solicitacao: Omit<Solicitacao, 'id' | 'createdAt' | 'updatedAt'>,
   files: File[] = [],
   fileDocumentTypes?: Record<string, TipoDocumentoAnexo>,
+  fileDocumentLabels?: Record<string, string>,
 ): Promise<string> => {
   let createdId: string | null = null
 
@@ -355,11 +356,18 @@ export const createSolicitacao = async (
       return created.id
     }
 
-    const { urls: arquivos, metas: arquivosMeta } = await uploadSolicitacaoFiles(
+    const { urls: arquivos, metas: arquivosMetaRaw } = await uploadSolicitacaoFiles(
       created.id,
       files,
       fileDocumentTypes,
     )
+    const arquivosMeta = arquivosMetaRaw.map((meta, index) => {
+      const file = files[index]
+      const key = file ? `${file.name}-${file.size}-${file.lastModified}` : ''
+      const label = key ? fileDocumentLabels?.[key]?.trim() : undefined
+      if (label) return { ...meta, tipoDocumentoLabel: label }
+      return meta
+    })
     await updateDoc(doc(db, COLLECTION_NAME, created.id), {
       arquivos,
       arquivosMeta,

@@ -125,6 +125,8 @@ const parsePerfil = (id: string, raw: Record<string, unknown>): ConcessionariaPe
   logoUrl: raw.logoUrl ? String(raw.logoUrl) : null,
   logoDataUrl: raw.logoDataUrl ? String(raw.logoDataUrl) : null,
   perfilCompleto: raw.perfilCompleto === true,
+  categoria: (raw.categoria as ConcessionariaPerfil['categoria']) || 'rodovia',
+  area: raw.area ? String(raw.area) : raw.rodovia ? String(raw.rodovia) : undefined,
   createdAt: toDate(raw.createdAt),
   updatedAt: toDate(raw.updatedAt),
 })
@@ -241,7 +243,15 @@ export async function updateConcessionariaPerfilFields(
   patch: Partial<
     Pick<
       ConcessionariaPerfil,
-      'nome' | 'rodovia' | 'tipoProjetoPadrao' | 'aliases' | 'modeloRelatorio'
+      | 'nome'
+      | 'rodovia'
+      | 'tipoProjetoPadrao'
+      | 'aliases'
+      | 'modeloRelatorio'
+      | 'categoria'
+      | 'area'
+      | 'normasCustom'
+      | 'requisitos'
     >
   >,
 ): Promise<ConcessionariaPerfil> {
@@ -259,6 +269,10 @@ export async function updateConcessionariaPerfilFields(
   if (patch.rodovia !== undefined) payload.rodovia = patch.rodovia.trim() || null
   if (patch.tipoProjetoPadrao !== undefined) payload.tipoProjetoPadrao = patch.tipoProjetoPadrao
   if (patch.aliases !== undefined) payload.aliases = patch.aliases
+  if (patch.categoria !== undefined) payload.categoria = patch.categoria
+  if (patch.area !== undefined) payload.area = patch.area.trim() || null
+  if (patch.normasCustom !== undefined) payload.normasCustom = patch.normasCustom
+  if (patch.requisitos !== undefined) payload.requisitos = patch.requisitos
   if (patch.modeloRelatorio !== undefined) {
     const current = snap.data().modeloRelatorio as Record<string, unknown> | undefined
     payload.modeloRelatorio = {

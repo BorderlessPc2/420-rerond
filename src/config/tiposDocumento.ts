@@ -27,6 +27,49 @@ export const TIPOS_DOCUMENTO_OPTIONS: Array<{
   { value: 'desconhecido', label: 'Desconhecido' },
 ]
 
+export type TipoDocumentoOption = {
+  value: string
+  label: string
+  /** Documento cadastrado no perfil da concessionária. */
+  fromPerfil?: boolean
+}
+
+/** Catálogo fixo + documentos custom do perfil (ids `custom_*`). */
+export function buildTiposDocumentoOptions(
+  documentosCustom?: Array<{ id: string; label: string }> | null,
+): TipoDocumentoOption[] {
+  const catalog = TIPOS_DOCUMENTO_OPTIONS.filter((o) => o.value !== 'desconhecido')
+  const known = new Set<string>(catalog.map((o) => o.value))
+  const customs: TipoDocumentoOption[] = []
+  for (const doc of documentosCustom ?? []) {
+    const id = (doc.id || '').trim()
+    const label = (doc.label || '').trim()
+    if (!id || !label || known.has(id)) continue
+    known.add(id)
+    customs.push({ value: id, label, fromPerfil: true })
+  }
+  const outro = catalog.find((o) => o.value === 'outro')
+  const semOutro = catalog.filter((o) => o.value !== 'outro')
+  return [
+    ...semOutro,
+    ...customs,
+    ...(outro ? [outro] : []),
+    { value: 'desconhecido', label: 'Desconhecido' },
+  ]
+}
+
+/** Custom do perfil → `outro` + label; catálogo → valor tipado. */
+export function resolveTipoDocumentoSelection(
+  value: string,
+  documentosCustom?: Array<{ id: string; label: string }> | null,
+): { tipoDocumento: TipoDocumentoAnexo; tipoDocumentoLabel?: string } {
+  const custom = (documentosCustom ?? []).find((d) => d.id === value)
+  if (custom) {
+    return { tipoDocumento: 'outro', tipoDocumentoLabel: custom.label }
+  }
+  return { tipoDocumento: value as TipoDocumentoAnexo }
+}
+
 export function getFileKey(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}`
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Building2, Upload } from 'lucide-react'
 import { createSolicitacao } from '../services/solicitacao/solicitacaoService'
@@ -28,7 +28,11 @@ import type { TipoAnalise } from '../models/TipoAnalise'
 import type { Cliente } from '../models/Cliente'
 import { getClienteDisplayName } from '../models/Cliente'
 import { listClientes } from '../services/cliente/clienteService'
-import { TIPOS_DOCUMENTO_OPTIONS, getFileKey } from '../config/tiposDocumento'
+import {
+  buildTiposDocumentoOptions,
+  getFileKey,
+  resolveTipoDocumentoSelection,
+} from '../config/tiposDocumento'
 import type { TipoDocumentoAnexo } from '../models/Solicitacao'
 import './NovaSolicitacao.css'
 import '../components/ConcessionariaPerfilResumo.css'
@@ -171,6 +175,12 @@ export default function NovaSolicitacao() {
   const [loadingPerfil, setLoadingPerfil] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [fileDocumentTypes, setFileDocumentTypes] = useState<Record<string, TipoDocumentoAnexo>>({})
+  /** Valor do <select> (pode ser id custom_* do perfil). */
+  const [fileDocumentSelectValues, setFileDocumentSelectValues] = useState<Record<string, string>>({})
+  const tiposDocumentoOptions = useMemo(
+    () => buildTiposDocumentoOptions(selectedPerfil?.documentosCustom),
+    [selectedPerfil],
+  )
   const [isDragging, setIsDragging] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -379,9 +389,20 @@ export default function NovaSolicitacao() {
     })
   }
 
-  const handleFileDocumentTypeChange = (file: File, tipoDocumento: TipoDocumentoAnexo) => {
+  const handleFileDocumentTypeChange = (file: File, value: string) => {
     const key = getFileKey(file)
-    setFileDocumentTypes((prev) => ({ ...prev, [key]: tipoDocumento }))
+    const resolved = resolveTipoDocumentoSelection(value, selectedPerfil?.documentosCustom)
+    setFileDocumentSelectValues((prev) => ({ ...prev, [key]: value }))
+    setFileDocumentTypes((prev) => ({ ...prev, [key]: resolved.tipoDocumento }))
+    if (resolved.tipoDocumentoLabel) {
+      setFileDocumentLabels((prev) => ({ ...prev, [key]: resolved.tipoDocumentoLabel! }))
+    } else if (resolved.tipoDocumento !== 'outro') {
+      setFileDocumentLabels((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+    }
   }
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
@@ -519,7 +540,8 @@ export default function NovaSolicitacao() {
           tipoRelatorio: (formData.tipoRelatorio || undefined) as any,
         },
         files,
-        fileDocumentTypes
+        fileDocumentTypes,
+        fileDocumentLabels,
       )
 
       if (formData.processoId) {
@@ -1018,18 +1040,23 @@ export default function NovaSolicitacao() {
                     <span className="file-name">{file.name}</span>
                     <select
                       className="file-type-select"
-                      value={fileDocumentTypes[fileKey] ?? 'desconhecido'}
-                      onChange={(e) =>
-                        handleFileDocumentTypeChange(file, e.target.value as TipoDocumentoAnexo)
+                      value={
+                        fileDocumentSelectValues[fileKey] ??
+                        fileDocumentTypes[fileKey] ??
+                        'desconhecido'
                       }
+                      onChange={(e) => handleFileDocumentTypeChange(file, e.target.value)}
                     >
-                      {TIPOS_DOCUMENTO_OPTIONS.map((opt) => (
+                      {tiposDocumentoOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
-                          {opt.label}
+                          {opt.fromPerfil ? `${opt.label} (perfil)` : opt.label}
                         </option>
                       ))}
                     </select>
-                    {fileDocumentTypes[fileKey] === 'outro' && (
+                    {fileDocumentTypes[fileKey] === 'outro' &&
+                      !(selectedPerfil?.documentosCustom ?? []).some(
+                        (d) => d.id === fileDocumentSelectValues[fileKey],
+                      ) && (
                       <input
                         className="file-type-select"
                         placeholder="Nome do documento"

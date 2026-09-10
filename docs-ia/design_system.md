@@ -109,7 +109,7 @@
 
 ## Componentes e padrões de tela
 
-- **Sidebar** com logo BaseInfra + navegação (Dashboard, Solicitações, Nova Solicitação, Nova Concessionária)
+- **Sidebar** com logo BaseInfra + navegação (Dashboard, Solicitações, Clientes, Processos, Nova Solicitação, Nova Concessionária, Ensinar a IA, Configurações)
 - **Cards** brancos com borda suave e sombra leve
 - **Status badges** com cores semânticas
 - **Overlay de análise** com etapas (preparando → normas → PDFs → checklist → parecer → final)

@@ -25,7 +25,7 @@ Tipos de análise continuam em **Configurações**.
 
 ## Como ensinar (caso completo)
 
-1. Escolha o **tipo** (ocupação, acesso, PAC…).
+1. Escolha o **tipo** (ocupação, acesso, PAC, POC, PPU, PAC viabilidade/executivo…).
 2. Cadastre **pares** errado × certo + justificativa.
 3. (Opcional) documentos de referência (nome/URL).
 4. Envie para **validação**.

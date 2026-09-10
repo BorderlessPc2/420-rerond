@@ -15,6 +15,8 @@ export type AnaliseProgressOverlayProps = {
   jobState?: AnaliseJobState | null
   progress?: number | null
   errorMessage?: string | null
+  /** Fecha o overlay (ex.: após falha). */
+  onDismiss?: () => void
 }
 
 type Stage = {
@@ -97,6 +99,7 @@ export default function AnaliseProgressOverlay({
   jobState,
   progress,
   errorMessage,
+  onDismiss,
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
@@ -239,6 +242,12 @@ export default function AnaliseProgressOverlay({
               ? 'A análise continua em segundo plano. Você pode navegar pelo sistema enquanto processamos os documentos.'
               : 'A análise pode levar alguns minutos conforme o volume de PDFs.'}
         </p>
+
+        {jobState === 'failed' && onDismiss && (
+          <button type="button" className="apo-dismiss" onClick={onDismiss}>
+            Fechar
+          </button>
+        )}
       </div>
     </div>
   )

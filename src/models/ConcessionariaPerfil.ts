@@ -1,3 +1,5 @@
+import type { OrganizacaoCategoria } from './Organizacao'
+
 export type PromptProfileId = 'eco101' | 'motiva' | 'arteris' | 'default' | 'custom'
 export type TipoProjetoPadrao = 'pit' | 'obra_per' | 'obra_nao_per'
 
@@ -42,6 +44,10 @@ export type ConcessionariaPerfil = {
   promptProfile: PromptProfileId
   templateId?: string | null
   rodovia?: string
+  /** Soft-migracão Organização: categoria (default rodovia). */
+  categoria?: OrganizacaoCategoria
+  /** Soft-migração Organização: área de atuação (pode espelhar rodovia). */
+  area?: string
   tipoProjetoPadrao: TipoProjetoPadrao
   normasFontes: string[]
   /** Metadados das normas custom referenciadas em `normasFontes`. */

@@ -212,6 +212,24 @@
   border-top: 1px solid #e8f0fb;
 }
 
+.apo-dismiss {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1px solid #c5d4eb;
+  border-radius: 10px;
+  background: #f5f8fd;
+  color: #1e3a6e;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apo-dismiss:hover {
+  background: #eaf1fb;
+}
+
 @keyframes apo-fade-in {
   from {
     opacity: 0;

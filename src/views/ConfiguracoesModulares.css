@@ -132,6 +132,26 @@
   color: #4b5563;
 }
 
+.config-modular-linkish {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.config-modular-btn-secondary {
+  align-self: flex-start;
+  margin-top: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
 .config-modular-row-actions {
   display: flex;
   gap: 8px;

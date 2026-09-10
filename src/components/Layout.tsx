@@ -104,7 +104,7 @@ export default function Layout() {
             onClick={closeMobileMenu}
           >
             <Building2 size={20} />
-            <span>Nova Concessionária</span>
+            <span>Nova Organização</span>
           </Link>
           <button type="button" className="nav-item nav-item-button" onClick={handleLogout}>
             <LogOut size={20} />

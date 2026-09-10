@@ -33,6 +33,14 @@ import {
   type ConferenciaInput,
   type DadosExtraidosAnalise,
 } from "./consistencyAnalyzer";
+import { planDocumentBatches, withRetry, isLikelyRateLimitError } from "./pipeline";
+import {
+  mergeChecklistItems,
+  mergeDadosExtraidos,
+  mergeConferenciaInputs,
+  consolidatePareceres,
+} from "./pipeline";
+import type { AnaliseTelemetry } from "./pipeline";
 import {
   buildCustomAnalysisPromptAddon,
   getConcessionariaPerfilFromFirestore,
@@ -452,6 +460,11 @@ export async function runAnaliseJob(params: {
   const jobRef = solicitacaoRef.collection("analiseJobs").doc(params.jobId);
 
   initOpenAI(params.apiKey);
+  const startedMs = Date.now();
+  let lastStage: AnaliseTelemetry["failedStage"] = "prep";
+  let totalBytes = 0;
+  let filesIncluded = 0;
+  let filesOmitted = 0;
 
   try {
     const jobSnap = await jobRef.get();
@@ -515,6 +528,12 @@ export async function runAnaliseJob(params: {
       }
     }
     const { incluidos: pdfBuffers, omitidos: pdfsOmitidos } = aplicarLimitesPdf(pdfBuffersRaw);
+    lastStage = "extract";
+
+    totalBytes = pdfBuffers.reduce((sum, pdf) => sum + pdf.buffer.length, 0);
+    filesIncluded = pdfBuffers.length;
+    filesOmitted = pdfsOmitidos.length;
+    lastStage = "chunk";
 
     let tipoBase: TipoRelatorio;
     if (isValidTipo(data.tipoRelatorio)) {
@@ -730,43 +749,150 @@ export async function runAnaliseJob(params: {
 
     await updateJob(jobRef, solicitacaoRef, "analyzing", 68, "checklist");
 
-    const parts: InputPart[] = [buildTextInput(systemPrompt)];
+    const sharedParts: InputPart[] = [buildTextInput(systemPrompt)];
     for (const norma of normasPDFs) {
-      parts.push(buildFileInput(norma.fonte.pdf, norma.buffer));
-      parts.push(
+      sharedParts.push(buildFileInput(norma.fonte.pdf, norma.buffer));
+      sharedParts.push(
         buildTextInput(`[NORMA DE REFERÊNCIA: ${norma.fonte.titulo} — ${norma.fonte.orgao}]`),
       );
     }
-    if (escopoAnalise.incluirDocumentosProjeto) {
-      for (const pdf of pdfBuffers) {
-        parts.push(buildFileInput(pdf.filename, pdf.buffer));
-        parts.push(
-          buildTextInput(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url)),
-        );
+    if (pdfsOmitidos.length > 0) {
+      sharedParts.push(
+        buildTextInput(`[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`),
+      );
+    }
+
+    const pdfItemsForPlan = pdfBuffers.map((pdf, index) => ({
+      id: String(index),
+      filename: pdf.filename,
+      sizeBytes: pdf.buffer.length,
+    }));
+    const plannedBatches =
+      escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0
+        ? planDocumentBatches(pdfItemsForPlan)
+        : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
+
+    await jobRef.update({
+      batchPlan: {
+        count: plannedBatches.length,
+        batches: plannedBatches.map((b) => ({
+          batchIndex: b.batchIndex,
+          filenames: b.items.map((it) => it.filename),
+          estimatedTokens: b.estimatedTokens,
+          totalBytes: b.totalBytes,
+        })),
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    type BatchParsed = {
+      batchIndex: number;
+      filenames: string[];
+      tokensUsed?: number;
+      checklist: unknown[];
+      parecerTecnico: string;
+      dadosExtraidos: DadosExtraidosAnalise | null;
+      conferenciaInputs: ConferenciaInput[];
+      rawContent: string;
+    };
+
+    const batchResults: BatchParsed[] = [];
+    lastStage = "analyze";
+    const maxOut = isProfile ? 16000 : 12000;
+
+    for (let i = 0; i < plannedBatches.length; i++) {
+      const batch = plannedBatches[i];
+      const pdfsInBatch =
+        batch.items.length > 0
+          ? batch.items
+              .map((it) => pdfBuffers[Number(it.id)])
+              .filter(Boolean)
+          : escopoAnalise.incluirDocumentosProjeto
+            ? []
+            : [];
+
+      const parts: InputPart[] = [...sharedParts];
+      if (escopoAnalise.incluirDocumentosProjeto) {
+        const sourcePdfs = pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers;
+        for (const pdf of sourcePdfs) {
+          parts.push(buildFileInput(pdf.filename, pdf.buffer));
+          parts.push(
+            buildTextInput(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url)),
+          );
+        }
       }
-      if (pdfsOmitidos.length > 0) {
+      if (plannedBatches.length > 1) {
+        const names = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
         parts.push(
           buildTextInput(
-            `[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`,
+            `[LOTE ${i + 1}/${plannedBatches.length} — analisar somente estes PDFs do projeto: ${names.join(", ")}. Outros lotes serão analisados em passagens separadas e consolidados depois.]`,
           ),
         );
       }
+      parts.push(buildTextInput(analysisPrompt));
+
+      const progress = Math.min(84, 68 + Math.round(((i + 1) / plannedBatches.length) * 16));
+      await updateJob(jobRef, solicitacaoRef, "analyzing", progress, "checklist");
+
+      const result = await withRetry(
+        () =>
+          analyze(parts, {
+            maxOutputTokens: maxOut,
+            temperature: 0.1,
+            jsonMode: true,
+          }),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 800,
+          isRetryable: isLikelyRateLimitError,
+        },
+      );
+
+      const parsedBatch = parseAIResponse(result.content);
+      const filenames = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
+      batchResults.push({
+        batchIndex: i,
+        filenames,
+        tokensUsed: result.tokensUsed,
+        checklist: parsedBatch.checklist,
+        parecerTecnico: parsedBatch.parecerTecnico,
+        dadosExtraidos: parsedBatch.dadosExtraidos,
+        conferenciaInputs: parsedBatch.conferenciaInputs,
+        rawContent: result.content,
+      });
+
+      await jobRef.update({
+        batchResults: batchResults.map((b) => ({
+          batchIndex: b.batchIndex,
+          filenames: b.filenames,
+          tokensUsed: b.tokensUsed ?? null,
+          checklist: b.checklist,
+          parecerTecnico: b.parecerTecnico,
+          dadosExtraidos: b.dadosExtraidos,
+          conferenciaInputs: b.conferenciaInputs,
+        })),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
-    parts.push(buildTextInput(analysisPrompt));
 
-    await updateJob(jobRef, solicitacaoRef, "generating_report", 85, "parecer");
+    await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
+    lastStage = "consolidate";
 
-    const result = await analyze(parts, {
-      maxOutputTokens: isProfile ? 16000 : 12000,
-      temperature: 0.1,
-      jsonMode: true,
-    });
+    const mergedChecklist = mergeChecklistItems(batchResults.map((b) => b.checklist));
+    const mergedDados = mergeDadosExtraidos(
+      batchResults.map((b) => b.dadosExtraidos as Record<string, unknown> | null),
+    ) as DadosExtraidosAnalise | null;
+    const mergedConferencia = mergeConferenciaInputs(
+      batchResults.map((b) => b.conferenciaInputs),
+    ) as ConferenciaInput[];
+    const mergedParecer = consolidatePareceres(
+      batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })),
+    );
 
-    const parsed = parseAIResponse(result.content);
-    const checklistFinal = escopoAnalise.gerarChecklistConformidade ? parsed.checklist : [];
-    const parecerFinal = escopoAnalise.gerarParecerTecnico ? parsed.parecerTecnico : "";
+    const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
+    const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
     const conferenciaFinal = complementarConferenciaDeterministica(
-      parsed.conferenciaInputs,
+      mergedConferencia,
       {
         interessado: dadosForm.interessado,
         rodovia: dadosForm.rodovia,
@@ -778,8 +904,26 @@ export async function runAnaliseJob(params: {
         responsavelTecnico: dadosForm.responsavelTecnico,
         tipoIntervencaoDetalhado: dadosForm.tipoIntervencaoDetalhado,
       },
-      parsed.dadosExtraidos,
+      mergedDados,
     );
+    const resultContent =
+      batchResults.length === 1
+        ? batchResults[0].rawContent
+        : JSON.stringify({
+            modo: "multi_lote",
+            lotes: batchResults.length,
+            consolidado: {
+              checklist: checklistFinal,
+              parecerTecnico: parecerFinal,
+              dadosExtraidos: mergedDados,
+              conferenciaInputs: conferenciaFinal,
+            },
+          });
+    const tokensUsedTotal = batchResults.reduce(
+      (sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0),
+      0,
+    );
+    const result = { content: resultContent, tokensUsed: tokensUsedTotal || undefined };
 
     // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai
     const snapAntes = await solicitacaoRef.get();
@@ -833,6 +977,18 @@ export async function runAnaliseJob(params: {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    lastStage = "consolidate";
+    const telemetry: AnaliseTelemetry = {
+      durationMs: Date.now() - startedMs,
+      totalBytes,
+      tokensUsed: result.tokensUsed ?? null,
+      filesIncluded,
+      filesOmitted,
+      batchCount: batchResults.length,
+      failedStage: null,
+      errorCode: null,
+    };
+
     await solicitacaoRef.update({
       status: "em_analise",
       tipoRelatorio: tipoBase,
@@ -841,7 +997,7 @@ export async function runAnaliseJob(params: {
       tipoAnaliseNomeUsado: tipoAnaliseDoc?.nome ?? null,
       escopoAnalise,
       relatorioIA: result.content,
-      dadosExtraidos: parsed.dadosExtraidos,
+      dadosExtraidos: mergedDados,
       conferenciaInputs: conferenciaFinal,
       checklistConformidade: escopoAnalise.gerarChecklistConformidade
         ? JSON.stringify(checklistFinal)
@@ -859,6 +1015,7 @@ export async function runAnaliseJob(params: {
       documentosOmitidos: pdfsOmitidos,
       analiseErroCodigo: null,
       analiseErroMensagem: null,
+      analiseTelemetry: telemetry,
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -866,6 +1023,7 @@ export async function runAnaliseJob(params: {
       state: "completed",
       progress: 100,
       stage: "final",
+      telemetry,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -904,11 +1062,22 @@ export async function runAnaliseJob(params: {
         "OPENAI_API_KEY ausente/inválida no ambiente das Cloud Functions. Configure o secret e faça o deploy.";
     }
 
+    const telemetry: AnaliseTelemetry = {
+      durationMs: Date.now() - startedMs,
+      totalBytes,
+      tokensUsed: null,
+      filesIncluded,
+      filesOmitted,
+      failedStage: lastStage,
+      errorCode: code,
+    };
+
     await jobRef.update({
       state: "failed",
       progress: 0,
       stage: "prep",
       error: { code, message },
+      telemetry,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -920,6 +1089,7 @@ export async function runAnaliseJob(params: {
       analiseJobProgress: 0,
       analiseErroCodigo: code,
       analiseErroMensagem: message,
+      analiseTelemetry: telemetry,
       updatedAt: FieldValue.serverTimestamp(),
     });
   }

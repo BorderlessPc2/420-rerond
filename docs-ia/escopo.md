@@ -55,38 +55,31 @@ O principal problema atual é a **qualidade do resultado produzido pela IA**: el
 - Memória entre revisões (contexto da revisão anterior na análise R01+) — código
 - Refinamento inicial da IA (taxonomia `NAO_CONFORME` × `INFORMACAO_AUSENTE`, conferência com evidência, labels de peça gráfica, exemplo ECO101)
 
-### Em evolução
+### Código pronto (aguarda deploy Firebase/Netlify + OpenAI)
 
-- Memória / consistência entre **análise e reanálise** (ainda há perda de contexto e resultados inconsistentes em testes)
-- Assertividade por **tipo de análise** (ocupação, acesso, PAC, etc.)
-- Análise visual de plantas / projetos geométricos (hoje melhor em texto do que em desenho)
-- Deploy produção Firebase (rules/functions) quando conta do projeto estiver disponível
-- Validação técnica com casos reais do cliente
-
-### Planejado (pós-reunião — ver sprints)
-
-- Feedback operacional que ensina a IA (base de conhecimento validada)
-- Análises modelo / golden cases
-- Base de conhecimento segmentada por tipo de análise
-- Pipeline documental escalável (chunking / RAG / rate limit / 429)
-- Organizações genéricas (concessionárias, água/esgoto, prefeituras, órgãos)
-- Normas, padrões de relatório, documentos e checklists **customizáveis**
-- Edição de solicitação e gestão de arquivos pós-criação
-- Métricas de assertividade e observabilidade
-
-### Em implementação (código — aguarda deploy Firebase/Netlify)
-
-- Coleção / mock **tiposAnalise** + vínculo em nova/editar solicitação + Outro
-- **Sprint 5 wiring:** processor isola checklist/normas/prompt por `tipoAnaliseId` (seeds OCUP/ACESSO/PAC); validação empírica pendente OpenAI
-- **Sprint 6 wiring:** reanálise injeta versão anterior da mesma solicitação; UI de histórico de versões; distinção edição × instrução × feedback
-- **Sprint 7 wiring:** feedbacks `aprovado` do mesmo `tipoAnaliseId` injetados no prompt (máx. 8; revogável); pendente/rejeitado ignorados
-- **Sprint Teach / 8:** hub **Ensinar a IA** (wizard, pares, validação, preview) + golden cases no processor (máx. 3)
-- **Edição de solicitação e arquivos** (P11) — rota `/solicitacoes/:id/editar`
-- **Feedback estruturado** + validação (rascunho/pendente/aprovado/rejeitado) — UI em Configurações
-- **Golden cases** — cadastro por tipo
-- **Versionamento de análise** — subcoleção `analiseVersoes` (snapshot no processor) + navegação no relatório
-- Documento tipo **Outro** no upload
+- **Tipos de análise** + vínculo em nova/editar + Outro; seeds `ocupacao-faixa`, `acesso`, `pac`, **`poc`**, **`ppu`**, **`pac-viabilidade`**, **`pac-executivo`**
+- **Sprint 5:** isolamento por `tipoAnaliseId` (prefixos OCUP/ACESSO/PAC/POC/PPU/PACV/PACE)
+- **Sprint 6:** memória de reanálise + histórico de versões na UI
+- **Sprint 7:** feedbacks aprovados injetados (máx. 8; revogável)
+- **Sprint 8 / Ensinar a IA:** hub + golden cases no processor (máx. 3); review Teach 09/09 incorporado
+- **Edição de solicitação e arquivos** (P11) — `/solicitacoes/:id/editar`
+- Mitigações PDF Baseinfra (sem API): taxonomia ausência×NC, mensagens 429/400, tipos de documento ampliados, `documentosProcessados`/`Omitidos` — ver [`avaliacao_baseinfra_pdf_correcoes.md`](./avaliacao_baseinfra_pdf_correcoes.md)
 - Rules Firestore preparadas para `tiposAnalise`, `feedbacksAprendizado`, `goldenCases`, `analiseVersoes`
+
+### Em evolução (qualidade / produção)
+
+- Validação **empírica** com OpenAI (isolamento, memória, feedback, golden, plantas)
+- Análise visual de plantas / projetos geométricos (falsos negativos)
+- Deploy produção (Netlify front + Firebase rules/functions) — bloqueado por Netlify do cliente / 2FA Firebase CLI
+- Ingestão de golden cases **reais** do cliente
+- Pipeline escalável (Sprint 9) — scaffolding em código na Sprint 13; chamada multi-lote ainda pendente
+
+### Planejado (sprints abertas)
+
+- Sprint 9 residual: indexação/RAG; norma custom PDF no input do modelo
+- Sprint 12: painel de métricas de assertividade
+- Extração assistida de requisitos a partir de PDF de norma
+- Fechos remanescentes Sprint 11 (validar reanálise com docs atualizados em prod)
 
 ### Problemas identificados (testes / reunião)
 
@@ -100,10 +93,10 @@ O principal problema atual é a **qualidade do resultado produzido pela IA**: el
 | P6 | Erros ao enviar muitos arquivos; ocorrência de **HTTP 429** | Escalabilidade |
 | P7 | PDFs extensos (~100 páginas) / múltiplos PDFs na mesma solicitação | Escalabilidade |
 | P8 | Arrastar e soltar fora de modal/campo fecha o componente indevidamente | UX funcional — **corrigido** (dismiss só com mousedown+click no backdrop) |
-| P9 | Clique para gerar/reanalisar às vezes “não faz nada” (sem feedback claro) | UX / erros silenciosos |
+| P9 | Clique para gerar/reanalisar às vezes “não faz nada” (sem feedback claro) | UX — mitigado na Sprint 13 (overlay/enqueue) |
 | P10 | Problemas com acentos/caracteres em alguns fluxos | Estabilidade |
-| P11 | Após criar solicitação, não é possível editar dados nem gerenciar arquivos sem nova solicitação | Operação |
-| P12 | Lista de tipos de documento insuficiente para categorizar todos os projetos | Flexibilidade |
+| P11 | Após criar solicitação, não é possível editar dados nem gerenciar arquivos sem nova solicitação | Operação — **corrigido** (`/solicitacoes/:id/editar`) |
+| P12 | Lista de tipos de documento insuficiente para categorizar todos os projetos | Flexibilidade — **parcial** (catálogo ampliado + docs custom do perfil na Sprint 13) |
 
 ---
 
@@ -154,8 +147,8 @@ Fluxo operacional do produto:
 1. Login  
 2. Cliente (cadastro persistente)  
 3. Processo / Solicitação / Revisão (R00…)  
-4. Informações do projeto (formulário) — **editáveis após criação** (planejado)  
-5. Upload e gestão de documentos — **adicionar/remover/substituir** (planejado)  
+4. Informações do projeto (formulário) — **editáveis após criação** (`/solicitacoes/:id/editar`)  
+5. Upload e gestão de documentos — **adicionar/remover/substituir** (mesma rota)  
 6. Seleção da organização / padrão / tipo de análise  
 7. Análise da IA (versão versionada)  
 8. Revisão humana (concordar, discordar, complementar)  
@@ -202,7 +195,7 @@ Fluxo operacional do produto:
 
 ### Tipo de análise / isolamento
 
-- Cada tipo (ocupação, acesso, PAC, etc.) tem checklist, regras, normas, documentos e exemplos **próprios**.
+- Cada tipo (ocupação, acesso, PAC, POC, PPU, PAC viabilidade/executivo, etc.) tem checklist, regras, normas, documentos e exemplos **próprios**.
 - A IA recupera prioritariamente o contexto do tipo selecionado — **não** misturar bases.
 
 ### Validação de apontamento
