@@ -9,6 +9,7 @@ import {
   Eye,
   MessageSquareWarning,
   Plus,
+  Trash2,
   X,
 } from 'lucide-react'
 import type { TipoAnalise } from '../models/TipoAnalise'
@@ -28,6 +29,7 @@ import {
 } from '../services/feedback/feedbackService'
 import {
   createGoldenCase,
+  deleteGoldenCase,
   isGoldenCasesMockMode,
   listGoldenCases,
   setGoldenCaseAtivo,
@@ -1086,6 +1088,29 @@ export default function EnsinarIA() {
                   Reabrir como pendente
                 </button>
               )}
+              <button
+                type="button"
+                className="ensinar-ia-btn secondary danger-outline"
+                onClick={() => {
+                  const ok = window.confirm(
+                    `Remover o caso "${selecionado.codigo} — ${selecionado.titulo}"?\n\nEsta ação não pode ser desfeita. O caso deixa de ensinar a IA.`,
+                  )
+                  if (!ok) return
+                  void (async () => {
+                    setError(null)
+                    try {
+                      await deleteGoldenCase(selecionado.id)
+                      setSelecionado(null)
+                      setSuccess('Caso modelo removido do acervo.')
+                      await reload()
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Erro ao remover o caso.')
+                    }
+                  })()
+                }}
+              >
+                <Trash2 size={16} /> Remover caso
+              </button>
             </div>
           </aside>
         </div>

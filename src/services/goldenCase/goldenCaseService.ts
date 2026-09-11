@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -372,4 +373,24 @@ export async function setGoldenCaseStatus(
 
 export async function setGoldenCaseAtivo(id: string, ativo: boolean): Promise<GoldenCase> {
   return updateGoldenCase(id, { ativo })
+}
+
+export async function deleteGoldenCase(id: string): Promise<void> {
+  if (!id.trim()) throw new Error('ID do caso inválido.')
+
+  if (mockMode) {
+    writeMock(readMock().filter((item) => item.id !== id))
+    return
+  }
+
+  try {
+    await deleteDoc(doc(db, COLLECTION, id))
+  } catch (err) {
+    if (isPermissionError(err)) {
+      mockMode = true
+      writeMock(readMock().filter((item) => item.id !== id))
+      return
+    }
+    throw err
+  }
 }
