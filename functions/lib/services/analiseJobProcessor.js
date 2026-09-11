@@ -9,11 +9,19 @@ const prompts_1 = require("../config/prompts");
 const concessionariaProfiles_1 = require("../config/concessionariaProfiles");
 const exemplosAnalise_1 = require("../config/exemplosAnalise");
 const consistencyAnalyzer_1 = require("./consistencyAnalyzer");
+const pipeline_1 = require("./pipeline");
+const pipeline_2 = require("./pipeline");
 const concessionariaPerfilService_1 = require("./concessionariaPerfilService");
+const tipoAnaliseService_1 = require("./tipoAnaliseService");
+const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
+const goldenCaseService_1 = require("./goldenCaseService");
 const MAX_PDFS_PROJETO = 10;
 const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
-const storage = (0, storage_1.getStorage)();
+/** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
+function getBucket() {
+    return (0, storage_1.getStorage)().bucket();
+}
 function isValidTipo(value) {
     return typeof value === "string" && VALID_TIPOS.includes(value);
 }
@@ -33,7 +41,7 @@ async function updateJob(jobRef, solicitacaoRef, state, progress, stage, extra =
     });
 }
 async function downloadStorageFile(url) {
-    const bucket = storage.bucket();
+    const bucket = getBucket();
     if (url.includes("firebasestorage.googleapis.com") || url.includes("storage.googleapis.com")) {
         const decodedUrl = decodeURIComponent(url);
         const pathMatch = decodedUrl.match(/\/o\/(.+?)(\?|$)/);
@@ -130,6 +138,61 @@ function formatPendenciasFromChecklist(checklistRaw) {
         return String(checklistRaw).slice(0, 8000);
     }
 }
+function buildBlocoContextoAnaliseAnterior(params) {
+    const parecer = (params.parecerTecnico || "").trim().slice(0, 12000);
+    const pendencias = formatPendenciasFromChecklist(params.checklistConformidade || undefined);
+    const checklistResumo = (params.checklistConformidade || "").trim().slice(0, 10000);
+    const complementos = (params.complementosChecklist || "").trim().slice(0, 4000);
+    const observacoes = (params.observacoesAnalista || "").trim().slice(0, 3000);
+    const versaoLabel = typeof params.versao === "number" && params.versao > 0 ? `v${params.versao}` : "anterior";
+    return [
+        params.tituloBloco,
+        `Origem: ${params.origemLabel}`,
+        `Versão de referência: ${versaoLabel}`,
+        `Título: ${params.titulo || "não informado"}`,
+        "",
+        "PENDÊNCIAS / NÃO CONFORMIDADES DA ANÁLISE ANTERIOR:",
+        pendencias,
+        "",
+        "PARECER TÉCNICO ANTERIOR (Markdown, pode estar truncado):",
+        parecer || "(sem parecer anterior)",
+        "",
+        "CHECKLIST COMPLETO ANTERIOR (JSON, pode estar truncado):",
+        checklistResumo || "(sem checklist anterior)",
+        complementos
+            ? `\nCOMPLEMENTOS / OBSERVAÇÕES HUMANAS DO ANALISTA (não descartar sem motivo):\n${complementos}`
+            : "",
+        observacoes ? `\nOBSERVAÇÕES REGISTRADAS NA SOLICITAÇÃO:\n${observacoes}` : "",
+    ]
+        .filter((line) => line !== "")
+        .join("\n");
+}
+/** Memória da mesma solicitação (reanálise vN → vN+1). */
+function loadContextoVersaoAnteriorMesmaSolicitacao(solicitacaoId, data) {
+    const temAnalise = (typeof data.parecerTecnico === "string" && data.parecerTecnico.trim()) ||
+        (typeof data.checklistConformidade === "string" && data.checklistConformidade.trim()) ||
+        (typeof data.relatorioIA === "string" && data.relatorioIA.trim()) ||
+        (typeof data.analiseVersaoAtual === "number" && data.analiseVersaoAtual > 0);
+    if (!temAnalise)
+        return null;
+    const versaoAtual = typeof data.analiseVersaoAtual === "number" && data.analiseVersaoAtual > 0
+        ? data.analiseVersaoAtual
+        : 1;
+    return buildBlocoContextoAnaliseAnterior({
+        tituloBloco: "CONTEXTO DA VERSÃO ANTERIOR DESTA MESMA SOLICITAÇÃO",
+        origemLabel: `solicitação ${solicitacaoId} (reanálise na mesma ficha)`,
+        titulo: data.titulo ? String(data.titulo) : null,
+        versao: versaoAtual,
+        checklistConformidade: typeof data.checklistConformidade === "string" ? data.checklistConformidade : null,
+        parecerTecnico: typeof data.parecerTecnico === "string" ? data.parecerTecnico : null,
+        complementosChecklist: typeof data.complementosChecklist === "string" ? data.complementosChecklist : null,
+        observacoesAnalista: typeof data.descricao === "string"
+            ? data.descricao
+            : typeof data.observacoes === "string"
+                ? data.observacoes
+                : null,
+    });
+}
 async function loadContextoRevisaoAnterior(currentSolicitacaoId, processoId, numeroRevisao) {
     if (!processoId)
         return null;
@@ -154,7 +217,11 @@ async function loadContextoRevisaoAnterior(currentSolicitacaoId, processoId, num
                 ? data.checklistConformidade
                 : undefined,
             parecerTecnico: typeof data.parecerTecnico === "string" ? data.parecerTecnico : undefined,
+            complementosChecklist: typeof data.complementosChecklist === "string"
+                ? data.complementosChecklist
+                : undefined,
             titulo: data.titulo ? String(data.titulo) : undefined,
+            analiseVersaoAtual: typeof data.analiseVersaoAtual === "number" ? data.analiseVersaoAtual : undefined,
         };
     })
         .filter((item) => String(item.numeroRevisao || "").toUpperCase() === prevLabel);
@@ -162,22 +229,22 @@ async function loadContextoRevisaoAnterior(currentSolicitacaoId, processoId, num
         return null;
     candidates.sort((a, b) => b.createdAtMs - a.createdAtMs);
     const prev = candidates[0];
-    const parecer = (prev.parecerTecnico || "").trim().slice(0, 12000);
-    const pendencias = formatPendenciasFromChecklist(prev.checklistConformidade);
-    const checklistResumo = (prev.checklistConformidade || "").trim().slice(0, 10000);
-    return [
-        `Revisão anterior: ${prevLabel} (solicitação ${prev.id})`,
-        `Título anterior: ${prev.titulo || "não informado"}`,
-        "",
-        "PENDÊNCIAS / NÃO CONFORMIDADES DA REVISÃO ANTERIOR:",
-        pendencias,
-        "",
-        "PARECER TÉCNICO DA REVISÃO ANTERIOR (Markdown, pode estar truncado):",
-        parecer || "(sem parecer anterior)",
-        "",
-        "CHECKLIST COMPLETO DA REVISÃO ANTERIOR (JSON, pode estar truncado):",
-        checklistResumo || "(sem checklist anterior)",
-    ].join("\n");
+    return buildBlocoContextoAnaliseAnterior({
+        tituloBloco: "CONTEXTO DA REVISÃO ANTERIOR DO MESMO PROCESSO",
+        origemLabel: `revisão ${prevLabel} (solicitação ${prev.id})`,
+        titulo: prev.titulo,
+        versao: prev.analiseVersaoAtual ?? null,
+        checklistConformidade: prev.checklistConformidade,
+        parecerTecnico: prev.parecerTecnico,
+        complementosChecklist: prev.complementosChecklist,
+    });
+}
+/** Une memória da versão (mesma solicitação) + revisão do processo (R00→R01). */
+function mergeContextosMemoria(contextoVersao, contextoRevisao) {
+    const partes = [contextoVersao, contextoRevisao].filter((p) => Boolean(p && p.trim()));
+    if (partes.length === 0)
+        return null;
+    return partes.join("\n\n═══════════════════════════════════════\n\n");
 }
 function aplicarLimitesPdf(pdfBuffers) {
     const incluidos = [];
@@ -264,6 +331,11 @@ async function runAnaliseJob(params) {
     const solicitacaoRef = db.collection(COLLECTION).doc(params.solicitacaoId);
     const jobRef = solicitacaoRef.collection("analiseJobs").doc(params.jobId);
     (0, openaiService_1.initOpenAI)(params.apiKey);
+    const startedMs = Date.now();
+    let lastStage = "prep";
+    let totalBytes = 0;
+    let filesIncluded = 0;
+    let filesOmitted = 0;
     try {
         const jobSnap = await jobRef.get();
         if (!jobSnap.exists) {
@@ -317,6 +389,11 @@ async function runAnaliseJob(params) {
             }
         }
         const { incluidos: pdfBuffers, omitidos: pdfsOmitidos } = aplicarLimitesPdf(pdfBuffersRaw);
+        lastStage = "extract";
+        totalBytes = pdfBuffers.reduce((sum, pdf) => sum + pdf.buffer.length, 0);
+        filesIncluded = pdfBuffers.length;
+        filesOmitted = pdfsOmitidos.length;
+        lastStage = "chunk";
         let tipoBase;
         if (isValidTipo(data.tipoRelatorio)) {
             tipoBase = data.tipoRelatorio;
@@ -335,8 +412,20 @@ async function runAnaliseJob(params) {
             return { tipo, config };
         });
         await updateJob(jobRef, solicitacaoRef, "analyzing", 55, "normas");
+        const tipoAnaliseId = typeof data.tipoAnaliseId === "string" ? data.tipoAnaliseId.trim() : "";
+        const tipoAnaliseDescricao = typeof data.tipoAnaliseDescricao === "string"
+            ? data.tipoAnaliseDescricao.trim()
+            : "";
+        const tipoAnaliseDoc = await (0, tipoAnaliseService_1.getTipoAnaliseFromFirestore)(tipoAnaliseId || null);
         const normasMap = new Map();
-        if (perfilFirestore?.normasFontes?.length) {
+        // Prioridade de normas: TipoAnalise → perfil concessionária → fallback por tipoRelatorio
+        const normasDoTipo = tipoAnaliseDoc?.normasFontes?.filter(Boolean) ?? [];
+        if (normasDoTipo.length > 0) {
+            for (const norma of (0, normasService_1.carregarNormasPDFPorFonteIds)(normasDoTipo)) {
+                normasMap.set(norma.fonte.id, norma);
+            }
+        }
+        else if (perfilFirestore?.normasFontes?.length) {
             for (const norma of (0, normasService_1.carregarNormasPDFPorFonteIds)(perfilFirestore.normasFontes)) {
                 normasMap.set(norma.fonte.id, norma);
             }
@@ -376,8 +465,9 @@ async function runAnaliseJob(params) {
             dataRecebimento: data.dataRecebimento,
             numeroRevisao: data.numeroRevisao,
         };
+        const requisitosDoTipo = (0, tipoAnaliseService_1.formatarRequisitosTipoAnalise)(tipoAnaliseDoc);
         const requisitosPerfil = (0, concessionariaPerfilService_1.getRequisitosFromPerfil)(perfilFirestore);
-        const formatarRequisitos = (tipo) => {
+        const formatarRequisitosLegado = (tipo) => {
             if (requisitosPerfil.length > 0) {
                 return requisitosPerfil
                     .map((r) => {
@@ -388,30 +478,89 @@ async function runAnaliseJob(params) {
             }
             return (0, normasService_1.listarRequisitosFormatados)(tipo, concessionariaId);
         };
-        const requisitosFormatados = isProfile
-            ? formatarRequisitos(tipoBase)
-            : tiposConfig
-                .map(({ tipo, config }) => `### ${config.nome} (${tipo})\n${formatarRequisitos(tipo)}`)
+        // Prioridade de checklist: TipoAnalise → perfil → catálogo PIT/PER (legado)
+        let requisitosFormatados;
+        if (requisitosDoTipo) {
+            requisitosFormatados = `### ${tipoAnaliseDoc.nome} (${tipoAnaliseDoc.id})\n${requisitosDoTipo}`;
+        }
+        else if (isProfile) {
+            requisitosFormatados = formatarRequisitosLegado(tipoBase);
+        }
+        else {
+            requisitosFormatados = tiposConfig
+                .map(({ tipo, config }) => `### ${config.nome} (${tipo})\n${formatarRequisitosLegado(tipo)}`)
                 .join("\n\n");
-        const tiposProjetoNome = perfilFirestore?.nome ??
-            (0, concessionariaProfiles_1.getProfileTipoProjetoNome)(promptProfile) ??
-            tiposConfig.map(({ config }) => config.nome).join(", ");
+        }
+        const tiposProjetoNome = [
+            tipoAnaliseDoc ? `Tipo de análise: ${tipoAnaliseDoc.nome}` : null,
+            perfilFirestore?.nome ??
+                (0, concessionariaProfiles_1.getProfileTipoProjetoNome)(promptProfile) ??
+                tiposConfig.map(({ config }) => config.nome).join(", "),
+        ]
+            .filter(Boolean)
+            .join(" · ");
         const systemPrompt = (0, concessionariaProfiles_1.buildProfileSystemPrompt)(promptProfile);
         const promptCustomizadoComPerfil = [
             promptCustomizado,
+            (0, tipoAnaliseService_1.buildTipoAnalisePromptAddon)(tipoAnaliseDoc, tipoAnaliseDescricao || null),
             perfilFirestore?.perfilCompleto ? (0, concessionariaPerfilService_1.buildCustomAnalysisPromptAddon)(perfilFirestore) : "",
         ]
             .filter(Boolean)
             .join("\n");
-        let contextoRevisaoAnterior = null;
+        let contextoMemoriaAnterior = null;
         try {
-            contextoRevisaoAnterior = await loadContextoRevisaoAnterior(params.solicitacaoId, data.processoId ? String(data.processoId) : null, data.numeroRevisao ? String(data.numeroRevisao) : null);
-            if (contextoRevisaoAnterior) {
-                console.log(`Contexto de revisão anterior carregado para solicitação ${params.solicitacaoId}`);
+            const contextoVersao = loadContextoVersaoAnteriorMesmaSolicitacao(params.solicitacaoId, data);
+            let contextoRevisao = null;
+            try {
+                contextoRevisao = await loadContextoRevisaoAnterior(params.solicitacaoId, data.processoId ? String(data.processoId) : null, data.numeroRevisao ? String(data.numeroRevisao) : null);
+            }
+            catch (ctxErr) {
+                console.warn("Falha ao carregar contexto da revisão anterior do processo:", ctxErr);
+            }
+            contextoMemoriaAnterior = mergeContextosMemoria(contextoVersao, contextoRevisao);
+            if (contextoMemoriaAnterior) {
+                console.log(`Contexto de memória/reanálise carregado para solicitação ${params.solicitacaoId}` +
+                    `${contextoVersao ? " [versão]" : ""}${contextoRevisao ? " [revisão]" : ""}`);
             }
         }
         catch (ctxErr) {
-            console.warn("Falha ao carregar contexto da revisão anterior:", ctxErr);
+            console.warn("Falha ao carregar contexto de memória da análise anterior:", ctxErr);
+        }
+        let feedbackBlock = "";
+        let feedbackIdsInjetados = [];
+        let goldenBlock = "";
+        let goldenCaseIdsInjetados = [];
+        if (tipoAnaliseId) {
+            try {
+                const feedbacks = await (0, feedbackAprendizadoService_1.listFeedbacksAprovadosParaAnalise)({
+                    tipoAnaliseId,
+                    organizacaoId: concessionariaId,
+                    maxItems: 8,
+                });
+                feedbackBlock = (0, feedbackAprendizadoService_1.buildFeedbackAprendizadoPromptBlock)(feedbacks);
+                feedbackIdsInjetados = feedbacks.map((item) => item.id);
+                if (feedbackIdsInjetados.length > 0) {
+                    console.log(`Feedbacks aprovados injetados (${feedbackIdsInjetados.length}) para tipo ${tipoAnaliseId}: ${feedbackIdsInjetados.join(", ")}`);
+                }
+            }
+            catch (fbErr) {
+                console.warn("Falha ao carregar feedbacks de aprendizado:", fbErr);
+            }
+            try {
+                const goldens = await (0, goldenCaseService_1.listGoldenCasesAprovadosParaAnalise)({
+                    tipoAnaliseId,
+                    organizacaoId: concessionariaId,
+                    maxItems: 3,
+                });
+                goldenBlock = (0, goldenCaseService_1.buildGoldenCasesPromptBlock)(goldens);
+                goldenCaseIdsInjetados = goldens.map((item) => item.id);
+                if (goldenCaseIdsInjetados.length > 0) {
+                    console.log(`Golden cases injetados (${goldenCaseIdsInjetados.length}) para tipo ${tipoAnaliseId}: ${goldenCaseIdsInjetados.join(", ")}`);
+                }
+            }
+            catch (gcErr) {
+                console.warn("Falha ao carregar golden cases:", gcErr);
+            }
         }
         const analysisPrompt = (0, concessionariaProfiles_1.buildProfileAnalysisPrompt)({
             profile: promptProfile,
@@ -421,35 +570,110 @@ async function runAnaliseJob(params) {
             tiposProjetoNome,
             escopo: escopoAnalise,
             promptCustomizado: promptCustomizadoComPerfil || undefined,
-            contextoRevisaoAnterior: contextoRevisaoAnterior || undefined,
+            contextoRevisaoAnterior: contextoMemoriaAnterior || undefined,
+            feedbackAprendizado: feedbackBlock || undefined,
+            goldenCases: goldenBlock || undefined,
             exemploSaidaEsperada: promptProfile === "eco101" ? (0, exemplosAnalise_1.buildEco101ExemploAnaliseBlock)() : undefined,
         });
         await updateJob(jobRef, solicitacaoRef, "analyzing", 68, "checklist");
-        const parts = [(0, openaiService_1.buildTextInput)(systemPrompt)];
+        const sharedParts = [(0, openaiService_1.buildTextInput)(systemPrompt)];
         for (const norma of normasPDFs) {
-            parts.push((0, openaiService_1.buildFileInput)(norma.fonte.pdf, norma.buffer));
-            parts.push((0, openaiService_1.buildTextInput)(`[NORMA DE REFERÊNCIA: ${norma.fonte.titulo} — ${norma.fonte.orgao}]`));
+            sharedParts.push((0, openaiService_1.buildFileInput)(norma.fonte.pdf, norma.buffer));
+            sharedParts.push((0, openaiService_1.buildTextInput)(`[NORMA DE REFERÊNCIA: ${norma.fonte.titulo} — ${norma.fonte.orgao}]`));
         }
-        if (escopoAnalise.incluirDocumentosProjeto) {
-            for (const pdf of pdfBuffers) {
-                parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
-                parts.push((0, openaiService_1.buildTextInput)(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url)));
-            }
-            if (pdfsOmitidos.length > 0) {
-                parts.push((0, openaiService_1.buildTextInput)(`[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`));
-            }
+        if (pdfsOmitidos.length > 0) {
+            sharedParts.push((0, openaiService_1.buildTextInput)(`[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`));
         }
-        parts.push((0, openaiService_1.buildTextInput)(analysisPrompt));
-        await updateJob(jobRef, solicitacaoRef, "generating_report", 85, "parecer");
-        const result = await (0, openaiService_1.analyze)(parts, {
-            maxOutputTokens: isProfile ? 16000 : 12000,
-            temperature: 0.1,
-            jsonMode: true,
+        const pdfItemsForPlan = pdfBuffers.map((pdf, index) => ({
+            id: String(index),
+            filename: pdf.filename,
+            sizeBytes: pdf.buffer.length,
+        }));
+        const plannedBatches = escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0
+            ? (0, pipeline_1.planDocumentBatches)(pdfItemsForPlan)
+            : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
+        await jobRef.update({
+            batchPlan: {
+                count: plannedBatches.length,
+                batches: plannedBatches.map((b) => ({
+                    batchIndex: b.batchIndex,
+                    filenames: b.items.map((it) => it.filename),
+                    estimatedTokens: b.estimatedTokens,
+                    totalBytes: b.totalBytes,
+                })),
+            },
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
-        const parsed = parseAIResponse(result.content);
-        const checklistFinal = escopoAnalise.gerarChecklistConformidade ? parsed.checklist : [];
-        const parecerFinal = escopoAnalise.gerarParecerTecnico ? parsed.parecerTecnico : "";
-        const conferenciaFinal = (0, consistencyAnalyzer_1.complementarConferenciaDeterministica)(parsed.conferenciaInputs, {
+        const batchResults = [];
+        lastStage = "analyze";
+        const maxOut = isProfile ? 16000 : 12000;
+        for (let i = 0; i < plannedBatches.length; i++) {
+            const batch = plannedBatches[i];
+            const pdfsInBatch = batch.items.length > 0
+                ? batch.items
+                    .map((it) => pdfBuffers[Number(it.id)])
+                    .filter(Boolean)
+                : escopoAnalise.incluirDocumentosProjeto
+                    ? []
+                    : [];
+            const parts = [...sharedParts];
+            if (escopoAnalise.incluirDocumentosProjeto) {
+                const sourcePdfs = pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers;
+                for (const pdf of sourcePdfs) {
+                    parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
+                    parts.push((0, openaiService_1.buildTextInput)(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url)));
+                }
+            }
+            if (plannedBatches.length > 1) {
+                const names = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
+                parts.push((0, openaiService_1.buildTextInput)(`[LOTE ${i + 1}/${plannedBatches.length} — analisar somente estes PDFs do projeto: ${names.join(", ")}. Outros lotes serão analisados em passagens separadas e consolidados depois.]`));
+            }
+            parts.push((0, openaiService_1.buildTextInput)(analysisPrompt));
+            const progress = Math.min(84, 68 + Math.round(((i + 1) / plannedBatches.length) * 16));
+            await updateJob(jobRef, solicitacaoRef, "analyzing", progress, "checklist");
+            const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
+                maxOutputTokens: maxOut,
+                temperature: 0.1,
+                jsonMode: true,
+            }), {
+                maxAttempts: 3,
+                baseDelayMs: 800,
+                isRetryable: pipeline_1.isLikelyRateLimitError,
+            });
+            const parsedBatch = parseAIResponse(result.content);
+            const filenames = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
+            batchResults.push({
+                batchIndex: i,
+                filenames,
+                tokensUsed: result.tokensUsed,
+                checklist: parsedBatch.checklist,
+                parecerTecnico: parsedBatch.parecerTecnico,
+                dadosExtraidos: parsedBatch.dadosExtraidos,
+                conferenciaInputs: parsedBatch.conferenciaInputs,
+                rawContent: result.content,
+            });
+            await jobRef.update({
+                batchResults: batchResults.map((b) => ({
+                    batchIndex: b.batchIndex,
+                    filenames: b.filenames,
+                    tokensUsed: b.tokensUsed ?? null,
+                    checklist: b.checklist,
+                    parecerTecnico: b.parecerTecnico,
+                    dadosExtraidos: b.dadosExtraidos,
+                    conferenciaInputs: b.conferenciaInputs,
+                })),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            });
+        }
+        await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
+        lastStage = "consolidate";
+        const mergedChecklist = (0, pipeline_2.mergeChecklistItems)(batchResults.map((b) => b.checklist));
+        const mergedDados = (0, pipeline_2.mergeDadosExtraidos)(batchResults.map((b) => b.dadosExtraidos));
+        const mergedConferencia = (0, pipeline_2.mergeConferenciaInputs)(batchResults.map((b) => b.conferenciaInputs));
+        const mergedParecer = (0, pipeline_2.consolidatePareceres)(batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })));
+        const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
+        const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
+        const conferenciaFinal = (0, consistencyAnalyzer_1.complementarConferenciaDeterministica)(mergedConferencia, {
             interessado: dadosForm.interessado,
             rodovia: dadosForm.rodovia,
             kilometragem: dadosForm.kilometragem,
@@ -459,14 +683,84 @@ async function runAnaliseJob(params) {
             numeroArt: dadosForm.numeroArt,
             responsavelTecnico: dadosForm.responsavelTecnico,
             tipoIntervencaoDetalhado: dadosForm.tipoIntervencaoDetalhado,
-        }, parsed.dadosExtraidos);
+        }, mergedDados);
+        const resultContent = batchResults.length === 1
+            ? batchResults[0].rawContent
+            : JSON.stringify({
+                modo: "multi_lote",
+                lotes: batchResults.length,
+                consolidado: {
+                    checklist: checklistFinal,
+                    parecerTecnico: parecerFinal,
+                    dadosExtraidos: mergedDados,
+                    conferenciaInputs: conferenciaFinal,
+                },
+            });
+        const tokensUsedTotal = batchResults.reduce((sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0), 0);
+        const result = { content: resultContent, tokensUsed: tokensUsedTotal || undefined };
+        // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai
+        const snapAntes = await solicitacaoRef.get();
+        const dataAntes = snapAntes.data() || {};
+        const versaoAnterior = typeof dataAntes.analiseVersaoAtual === "number" ? dataAntes.analiseVersaoAtual : 0;
+        const novaVersao = versaoAnterior + 1;
+        const versoesRef = solicitacaoRef.collection("analiseVersoes");
+        if (versaoAnterior > 0 ||
+            dataAntes.parecerTecnico ||
+            dataAntes.checklistConformidade ||
+            dataAntes.relatorioIA) {
+            // Preserva o estado anterior como versão N (se ainda não havia contador, vira v1)
+            const versaoParaArquivar = versaoAnterior > 0 ? versaoAnterior : 1;
+            await versoesRef.doc(`v${versaoParaArquivar}`).set({
+                solicitacaoId: params.solicitacaoId,
+                versao: versaoParaArquivar,
+                jobId: dataAntes.activeAnaliseJobId ?? null,
+                tipoAnaliseId: dataAntes.tipoAnaliseId ?? null,
+                tipoRelatorio: dataAntes.tipoRelatorio ?? null,
+                parecerTecnico: dataAntes.parecerTecnico ?? null,
+                checklistConformidade: dataAntes.checklistConformidade ?? null,
+                relatorioIA: dataAntes.relatorioIA ?? null,
+                createdAt: firestore_1.FieldValue.serverTimestamp(),
+                arquivadoEm: firestore_1.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+        const versaoCorrente = versaoAnterior > 0 ? novaVersao : 1;
+        await versoesRef.doc(`v${versaoCorrente}`).set({
+            solicitacaoId: params.solicitacaoId,
+            versao: versaoCorrente,
+            jobId: params.jobId,
+            tipoAnaliseId: tipoAnaliseId || dataAntes.tipoAnaliseId || null,
+            tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
+            tipoRelatorio: tipoBase,
+            parecerTecnico: escopoAnalise.gerarParecerTecnico ? parecerFinal : null,
+            checklistConformidade: escopoAnalise.gerarChecklistConformidade
+                ? JSON.stringify(checklistFinal)
+                : null,
+            relatorioIA: result.content,
+            promptCustomizado: promptCustomizado || null,
+            feedbackIdsInjetados,
+            goldenCaseIdsInjetados,
+            createdAt: firestore_1.FieldValue.serverTimestamp(),
+        });
+        lastStage = "consolidate";
+        const telemetry = {
+            durationMs: Date.now() - startedMs,
+            totalBytes,
+            tokensUsed: result.tokensUsed ?? null,
+            filesIncluded,
+            filesOmitted,
+            batchCount: batchResults.length,
+            failedStage: null,
+            errorCode: null,
+        };
         await solicitacaoRef.update({
             status: "em_analise",
             tipoRelatorio: tipoBase,
             tiposProjetoComparados: tiposAnalise,
+            tipoAnaliseIdUsado: tipoAnaliseId || null,
+            tipoAnaliseNomeUsado: tipoAnaliseDoc?.nome ?? null,
             escopoAnalise,
             relatorioIA: result.content,
-            dadosExtraidos: parsed.dadosExtraidos,
+            dadosExtraidos: mergedDados,
             conferenciaInputs: conferenciaFinal,
             checklistConformidade: escopoAnalise.gerarChecklistConformidade
                 ? JSON.stringify(checklistFinal)
@@ -477,24 +771,68 @@ async function runAnaliseJob(params) {
             activeAnaliseJobId: null,
             analiseJobStatus: "completed",
             analiseJobProgress: 100,
+            analiseVersaoAtual: versaoCorrente,
+            feedbackIdsInjetados,
+            goldenCaseIdsInjetados,
+            documentosProcessados: pdfBuffers.map((pdf) => pdf.filename),
+            documentosOmitidos: pdfsOmitidos,
+            analiseErroCodigo: null,
+            analiseErroMensagem: null,
+            analiseTelemetry: telemetry,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
         await jobRef.update({
             state: "completed",
             progress: 100,
             stage: "final",
+            telemetry,
             completedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
     }
     catch (error) {
-        const message = error instanceof Error ? error.message : "Erro desconhecido na análise.";
+        const rawMessage = error instanceof Error ? error.message : "Erro desconhecido na análise.";
         console.error(`Job ${params.jobId} falhou:`, error);
+        const lower = rawMessage.toLowerCase();
+        let code = "analysis_failed";
+        let message = rawMessage;
+        if (lower.includes("429") ||
+            lower.includes("rate limit") ||
+            lower.includes("too many requests")) {
+            code = "rate_limit_or_tokens";
+            message =
+                "Limite de processamento/tokens (429). Reduza PDFs em Editar, aguarde e reanalise na mesma solicitação.";
+        }
+        else if (lower.includes("context_length") ||
+            lower.includes("context length") ||
+            lower.includes("maximum context") ||
+            lower.includes("context window") ||
+            (lower.includes("400") && lower.includes("context"))) {
+            code = "context_window";
+            message =
+                "Volume acima da janela de contexto (400). Envie só os PDFs da fase atual e tente novamente na mesma ficha.";
+        }
+        else if (lower.includes("api key") ||
+            (lower.includes("openai") && lower.includes("key"))) {
+            code = "missing_api_key";
+            message =
+                "OPENAI_API_KEY ausente/inválida no ambiente das Cloud Functions. Configure o secret e faça o deploy.";
+        }
+        const telemetry = {
+            durationMs: Date.now() - startedMs,
+            totalBytes,
+            tokensUsed: null,
+            filesIncluded,
+            filesOmitted,
+            failedStage: lastStage,
+            errorCode: code,
+        };
         await jobRef.update({
             state: "failed",
             progress: 0,
             stage: "prep",
-            error: { code: "analysis_failed", message },
+            error: { code, message },
+            telemetry,
             completedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
@@ -503,6 +841,9 @@ async function runAnaliseJob(params) {
             activeAnaliseJobId: null,
             analiseJobStatus: "failed",
             analiseJobProgress: 0,
+            analiseErroCodigo: code,
+            analiseErroMensagem: message,
+            analiseTelemetry: telemetry,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
     }

@@ -29,6 +29,10 @@ ${prompts_1.INSTRUCOES_PECAS_GRAFICAS}
 
 ${prompts_1.REGRAS_CONFERENCIA_EVIDENCIA}
 
+${prompts_1.REGRAS_ISOLAMENTO_TIPO}
+
+${prompts_1.REGRAS_ESCOPO_DOCUMENTOS}
+
 3. PROIBIÇÕES ABSOLUTAS
    - Nunca escreva apenas "OK", "Conforme", "Documento apresentado" ou equivalente.
    - Nunca marque checklist OK só porque o arquivo existe.

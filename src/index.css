@@ -71,11 +71,33 @@ body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  /* Evita cursor de texto / seleção em títulos e áreas só informativas */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Seleção só onde faz sentido: campos e trechos para copiar */
+input,
+textarea,
+select,
+[contenteditable='true'],
+pre,
+code,
+.allow-text-select {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+select {
+  cursor: pointer;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+  cursor: pointer;
 }
 
 button,
@@ -83,6 +105,27 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+button,
+label[for],
+summary {
+  cursor: pointer;
+}
+
+/* Relatórios e pareceres: usuário pode selecionar/copiar o conteúdo */
+.relatorio-viewer-container,
+.relatorio-viewer-container * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.relatorio-viewer-container button,
+.relatorio-viewer-container a,
+.relatorio-viewer-container summary {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 button {

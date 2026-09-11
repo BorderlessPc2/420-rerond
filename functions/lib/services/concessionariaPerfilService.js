@@ -23,6 +23,22 @@ function parsePerfil(id, raw) {
             ? raw.tipoProjetoPadrao
             : "pit",
         normasFontes: Array.isArray(raw.normasFontes) ? raw.normasFontes.map(String) : [],
+        normasCustom: Array.isArray(raw.normasCustom)
+            ? raw.normasCustom
+                .map((item) => ({
+                id: String(item?.id ?? "").trim(),
+                titulo: String(item?.titulo ?? "").trim(),
+                orgao: String(item?.orgao ?? "").trim(),
+                ano: typeof item?.ano === "number" && Number.isFinite(item.ano)
+                    ? item.ano
+                    : null,
+                descricao: String(item?.descricao ?? "").trim(),
+                arquivoNome: item?.arquivoNome ? String(item.arquivoNome) : null,
+                arquivoUrl: item?.arquivoUrl ? String(item.arquivoUrl) : null,
+                origem: item?.origem === "arquivo" ? "arquivo" : "manual",
+            }))
+                .filter((item) => item.id && item.titulo && item.orgao && item.descricao)
+            : [],
         modeloRelatorio: {
             tituloPadrao: String(raw.modeloRelatorio?.tituloPadrao ?? "Parecer Técnico"),
             descricao: raw.modeloRelatorio?.descricao
@@ -32,6 +48,15 @@ function parsePerfil(id, raw) {
         },
         documentosObrigatorios: Array.isArray(raw.documentosObrigatorios)
             ? raw.documentosObrigatorios.map(String)
+            : [],
+        documentosCustom: Array.isArray(raw.documentosCustom)
+            ? raw.documentosCustom
+                .map((item) => ({
+                id: String(item?.id ?? "").trim(),
+                label: String(item?.label ?? "").trim(),
+                descricao: item?.descricao ? String(item.descricao).trim() : undefined,
+            }))
+                .filter((item) => item.id && item.label)
             : [],
         requisitos: Array.isArray(raw.requisitos)
             ? raw.requisitos
@@ -73,8 +98,29 @@ function getRequisitosFromPerfil(perfil) {
 }
 function buildCustomAnalysisPromptAddon(perfil) {
     const docs = perfil.documentosObrigatorios.length > 0
-        ? perfil.documentosObrigatorios.map((item) => `- ${item}`).join("\n")
+        ? perfil.documentosObrigatorios
+            .map((id) => {
+            const custom = (perfil.documentosCustom ?? []).find((item) => item.id === id);
+            if (custom) {
+                const extra = custom.descricao ? ` — ${custom.descricao}` : "";
+                return `- ${custom.label}${extra}`;
+            }
+            return `- ${id}`;
+        })
+            .join("\n")
         : "Nenhum documento obrigatório configurado.";
+    const normasCustomSelecionadas = (perfil.normasCustom ?? []).filter((norma) => perfil.normasFontes.includes(norma.id));
+    const normasCustomTexto = normasCustomSelecionadas.length > 0
+        ? `\nNORMAS CUSTOMIZADAS DESTE PERFIL (usar como referência; não inventar além do descrito):\n${normasCustomSelecionadas
+            .map((norma) => {
+            const ano = norma.ano ? ` (${norma.ano})` : "";
+            const arquivo = norma.arquivoNome
+                ? ` [arquivo: ${norma.arquivoNome}]`
+                : "";
+            return `- ${norma.id}: ${norma.titulo} — ${norma.orgao}${ano}${arquivo}\n  ${norma.descricao}`;
+        })
+            .join("\n")}`
+        : "";
     const template = perfil.modeloRelatorio.templateMarkdown?.trim()
         ? `\nESTRUTURA DO RELATÓRIO (seguir quando gerar parecer):\n${perfil.modeloRelatorio.templateMarkdown.trim()}`
         : "";
@@ -85,9 +131,10 @@ Título padrão do relatório: ${perfil.modeloRelatorio.tituloPadrao}
 
 DOCUMENTOS OBRIGATÓRIOS DESTA CONCESSIONÁRIA:
 ${docs}
+${normasCustomTexto}
 ${template}
 
-Use somente as normas anexadas nesta chamada. Presença de arquivo não equivale a conformidade.
+Use somente as normas anexadas nesta chamada e as normas customizadas descritas acima. Presença de arquivo não equivale a conformidade.
 INFORMACAO_AUSENTE = evidência não apresentada; NAO_CONFORME = evidência existe mas está incompleta ou em desacordo com a norma.
 `;
 }

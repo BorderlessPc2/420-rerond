@@ -73,7 +73,10 @@ const MAX_PDFS_PROJETO = 10;
 const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 const VALID_TIPOS: TipoRelatorio[] = ["pit", "obra_per", "obra_nao_per"];
 
-const storage = getStorage();
+/** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
+function getBucket() {
+  return getStorage().bucket();
+}
 
 function isValidTipo(value: unknown): value is TipoRelatorio {
   return typeof value === "string" && VALID_TIPOS.includes(value as TipoRelatorio);
@@ -109,7 +112,7 @@ async function updateJob(
 }
 
 async function downloadStorageFile(url: string): Promise<Buffer> {
-  const bucket = storage.bucket();
+  const bucket = getBucket();
   if (url.includes("firebasestorage.googleapis.com") || url.includes("storage.googleapis.com")) {
     const decodedUrl = decodeURIComponent(url);
     const pathMatch = decodedUrl.match(/\/o\/(.+?)(\?|$)/);

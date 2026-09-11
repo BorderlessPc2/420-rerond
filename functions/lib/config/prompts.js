@@ -1,27 +1,44 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.REGRAS_CONFERENCIA_EVIDENCIA = exports.INSTRUCOES_PECAS_GRAFICAS = exports.TAXONOMIA_STATUS_CHECKLIST = void 0;
+exports.REGRAS_ESCOPO_DOCUMENTOS = exports.REGRAS_ISOLAMENTO_TIPO = exports.REGRAS_CONFERENCIA_EVIDENCIA = exports.INSTRUCOES_PECAS_GRAFICAS = exports.TAXONOMIA_STATUS_CHECKLIST = void 0;
 exports.buildSystemPrompt = buildSystemPrompt;
 exports.buildAnalysisPrompt = buildAnalysisPrompt;
 exports.buildInferTipoPrompt = buildInferTipoPrompt;
 exports.buildComplementacaoSystemPrompt = buildComplementacaoSystemPrompt;
 exports.buildComplementacaoPrompt = buildComplementacaoPrompt;
 const v = (s) => s || "não informado";
-exports.TAXONOMIA_STATUS_CHECKLIST = `TAXONOMIA OBRIGATÓRIA DO CHECKLIST:
-- INFORMACAO_AUSENTE: a evidência (documento, dado, cota ou parâmetro) NÃO foi apresentada nos PDFs. Nunca use NAO_CONFORME só porque o arquivo não existe.
-- NAO_CONFORME: a evidência EXISTE nos documentos, mas está incompleta, incorreta ou em desacordo com a norma citada nesta chamada.
-- OK: evidência completa nos PDFs e aderente à norma. Presença do arquivo NÃO autoriza OK.
+exports.TAXONOMIA_STATUS_CHECKLIST = `TAXONOMIA OBRIGATÓRIA DO CHECKLIST (não misture essas categorias):
+- INFORMACAO_AUSENTE: o documento ou o dado NÃO foi apresentado nos PDFs enviados nesta análise (ausência real). Nunca use NAO_CONFORME só porque o arquivo não existe.
+- NAO_CONFORME: a evidência EXISTE nos documentos enviados, mas está incompleta, incorreta ou em desacordo com a norma citada.
+- OK: evidência completa nos PDFs enviados e aderente à norma. Presença do arquivo NÃO autoriza OK.
+- Nao use NAO_CONFORME quando você apenas NÃO CONSEGUIU LOCALIZAR a informação em um PDF presente: nesse caso use INFORMACAO_AUSENTE e diga explicitamente "não localizado após inspeção de [arquivo/página]" (falha de leitura ≠ não conformidade técnica).
+- Se o item NÃO SE APLICA a esta tipologia/fase, marque OK com situacaoEncontrada "Não aplicável a este tipo/fase" e justifique — não invente pendência.
+- Se o PDF estiver ilegível/truncado e não for possível avaliar, use INFORMACAO_AUSENTE com orientação "Não foi possível avaliar — reenviar arquivo legível", sem inventar cotas.
 - fundamentacao: cite somente normas anexadas nesta análise (título + artigo/parágrafo/página). Não invente artigo, página ou requisito.
-- orientacao: se NAO_CONFORME, o que corrigir no conteúdo apresentado; se INFORMACAO_AUSENTE, o que deve ser apresentado.`;
-exports.INSTRUCOES_PECAS_GRAFICAS = `PEÇAS GRÁFICAS (planta baixa, perfil, sinalização e equivalentes):
+- orientacao: se NAO_CONFORME, o que corrigir; se INFORMACAO_AUSENTE, o que apresentar ou reenviar.
+- Cada apontamento DEVE trazer: evidência observada + localização (arquivo e, se possível, página/trecho/prancha) + justificativa coerente com o veredito + norma citada. Veredito sem esses elementos é inválido.
+- NÃO aponte ausência de documentos de outro volume/fase que não foram enviados nesta solicitação.`;
+exports.INSTRUCOES_PECAS_GRAFICAS = `PEÇAS GRÁFICAS (planta baixa, perfil, sinalização, geométrico e equivalentes):
 - Analise o desenho, não só o nome do arquivo: cotas, FXD, faixa non aedificandi, km, sentido, interferência com pista/acostamento.
 - Se a peça estiver ilegível, truncada ou sem os elementos acima, use INFORMACAO_AUSENTE — não chute cotas nem geometria.
-- Documento gráfico presente mas com parâmetros insuficientes ou em desacordo com a norma → NAO_CONFORME.`;
+- Documento gráfico presente mas com parâmetros insuficientes ou em desacordo com a norma → NAO_CONFORME.
+- PROIBIDO declarar que informação "não existe" na planta sem indicar qual arquivo/página/prancha foi inspecionado e o que se buscou (cota, eixo, FXD, etc.).
+- Compatibilize Memorial × plantas: se houver divergência, NAO_CONFORME com evidência dos dois lados (arquivo/página).`;
 exports.REGRAS_CONFERENCIA_EVIDENCIA = `CONFERÊNCIA FORMULÁRIO × DOCUMENTOS (conferenciaInputs):
 - valorDocumento SOMENTE extraído dos PDFs. Proibido copiar valorFormulario.
 - Para cada item, preencha evidencia quando houver: { "arquivo": "nome.pdf", "pagina": "3" ou null, "trecho": "trecho curto ou null" }.
 - observacao deve ser explícita. Em DIVERGENTE, use o formato: "Formulário: X · Documento: Y".
 - status: COMPATIVEL | DIVERGENTE | AUSENTE_NO_DOCUMENTO | AUSENTE_NO_FORMULARIO.`;
+exports.REGRAS_ISOLAMENTO_TIPO = `ISOLAMENTO POR TIPO DE ANÁLISE:
+- Respeite o bloco TIPO DE ANÁLISE (DOMÍNIO) quando presente (POC, PPU, PAC Viabilidade, PAC Executivo, acesso, ocupação, etc.).
+- Use somente os IDs de requisito listados para aquele tipo/fase. Não importe itens de outro domínio.
+- Corrigir só o NOME da tipologia no parecer SEM trocar o checklist é ERRO: a estrutura de requisitos deve ser a do tipo selecionado.
+- Se o tipo for Outro, não invente checklist de outro domínio.`;
+exports.REGRAS_ESCOPO_DOCUMENTOS = `ESCOPO DOS DOCUMENTOS DESTA ANÁLISE:
+- Avalie SOMENTE os PDFs enviados/anexados nesta solicitação (e normas de referência anexadas).
+- Não exija arquivos de outras fases/volumes que não foram enviados.
+- No parecer, liste explicitamente quais arquivos de projeto foram considerados.
+- Se um PDF foi omitido por limite de tamanho/quantidade, mencione a omissão e não trate o conteúdo omitido como "ausente no projeto" sem essa ressalva.`;
 function buildSystemPrompt() {
     return `Você é um especialista técnico em projetos rodoviários e engenharia de transportes, com profundo conhecimento das normas brasileiras vigentes que regulamentam acessos, faixa de domínio, sinalização de obras e infraestrutura viária.
 
@@ -38,7 +55,11 @@ ${exports.TAXONOMIA_STATUS_CHECKLIST}
 
 ${exports.INSTRUCOES_PECAS_GRAFICAS}
 
-${exports.REGRAS_CONFERENCIA_EVIDENCIA}`;
+${exports.REGRAS_CONFERENCIA_EVIDENCIA}
+
+${exports.REGRAS_ISOLAMENTO_TIPO}
+
+${exports.REGRAS_ESCOPO_DOCUMENTOS}`;
 }
 function buildAnalysisPrompt(dados, tiposRelatorio, requisitosFormatados, tiposProjetoNome, escopo, promptCustomizado) {
     const blocoFormulario = escopo.incluirDadosFormulario
@@ -100,7 +121,9 @@ INSTRUÇÕES:
 5. ${exports.TAXONOMIA_STATUS_CHECKLIST}
 6. ${exports.INSTRUCOES_PECAS_GRAFICAS}
 7. ${exports.REGRAS_CONFERENCIA_EVIDENCIA}
-8. Respeite estritamente as saídas pedidas:
+8. ${exports.REGRAS_ISOLAMENTO_TIPO}
+9. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
+10. Respeite estritamente as saídas pedidas:
 - ${instrucoesSaida}${promptAdicional}
 
 FORMATO DE SAÍDA OBRIGATÓRIO — responda APENAS com JSON válido, sem texto antes ou depois:

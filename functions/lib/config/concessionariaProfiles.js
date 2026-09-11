@@ -40,7 +40,7 @@ function buildProfileSystemPrompt(profile) {
     return (0, prompts_1.buildSystemPrompt)();
 }
 function buildProfileAnalysisPrompt(params) {
-    const { profile, dados, requisitosFormatados, tiposAnalise, tiposProjetoNome, escopo, promptCustomizado, contextoRevisaoAnterior, exemploSaidaEsperada, } = params;
+    const { profile, dados, requisitosFormatados, tiposAnalise, tiposProjetoNome, escopo, promptCustomizado, contextoRevisaoAnterior, feedbackAprendizado, goldenCases, exemploSaidaEsperada, } = params;
     let base;
     if (profile === "eco101") {
         base = (0, eco101_prompt_1.buildEco101AnalysisPrompt)(dados, requisitosFormatados, escopo, promptCustomizado);
@@ -63,15 +63,26 @@ ${exemplo}`);
     const contexto = contextoRevisaoAnterior?.trim();
     if (contexto) {
         blocos.push(`═══════════════════════════════════════
-CONTEXTO DA REVISÃO ANTERIOR DO MESMO PROCESSO
+CONTEXTO DE MEMÓRIA (VERSÃO ANTERIOR E/OU REVISÃO DO PROCESSO)
 ═══════════════════════════════════════
 ${contexto}
 
-INSTRUÇÕES DE CONTINUIDADE (OBRIGATÓRIAS NESTA REVISÃO):
-1. Priorize verificar se as pendências e não conformidades da revisão anterior foram corrigidas nos documentos atuais.
+INSTRUÇÕES DE CONTINUIDADE E ESTABILIDADE (OBRIGATÓRIAS):
+1. Priorize verificar se as pendências e não conformidades da análise/revisão anterior foram corrigidas nos documentos atuais e na instrução desta rodada.
 2. Para cada pendência anterior: indique explicitamente se foi resolvida, parcialmente resolvida ou permanece.
-3. Continúe detectando novas inconformidades ou ausências na versão atual — não se limite às pendências antigas.
-4. Não trate esta revisão como um processo isolado: use o histórico acima como referência, mas avalie o conteúdo atual dos PDFs.`);
+3. Itens NÃO contestados (status OK ou sem mudança pedida na instrução desta reanálise) DEVEM permanecer com o mesmo status, salvo evidência clara nos documentos de que a situação mudou.
+4. Se alterar o status de um item em relação à análise anterior (ex.: OK → NAO_CONFORME ou o inverso), JUSTIFIQUE explicitamente no campo de evidência/orientação: o que mudou nos documentos, na instrução desta rodada ou na evidência encontrada.
+5. Continue detectando novas inconformidades ou ausências — não se limite às pendências antigas.
+6. A instrução/prompt desta reanálise (se houver) aplica-se só a esta execução; não apague o histórico de pendências relevantes sem avaliar.
+7. Não trate esta execução como processo isolado: use o histórico acima como âncora e avalie o conteúdo atual dos PDFs.`);
+    }
+    const feedback = feedbackAprendizado?.trim();
+    if (feedback) {
+        blocos.push(feedback);
+    }
+    const goldens = goldenCases?.trim();
+    if (goldens) {
+        blocos.push(goldens);
     }
     return blocos.join("\n\n");
 }
