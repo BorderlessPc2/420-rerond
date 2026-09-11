@@ -9,7 +9,6 @@ import {
   Eye,
   MessageSquareWarning,
   Plus,
-  Sparkles,
   X,
 } from 'lucide-react'
 import type { TipoAnalise } from '../models/TipoAnalise'
@@ -60,6 +59,8 @@ const emptyPar = (): GoldenCasePar => ({
   correto: '',
   justificativa: '',
 })
+
+const WIZARD_LABELS = ['Tipo', 'Errado × certo', 'Documentos', 'Revisão'] as const
 
 export default function EnsinarIA() {
   const [tab, setTab] = useState<HubTab>('casos')
@@ -212,33 +213,69 @@ export default function EnsinarIA() {
 
   const mockBanner = isGoldenCasesMockMode() || isFeedbacksMockMode()
 
+  const stats = useMemo(() => {
+    const aprovados = goldens.filter((g) => g.status === 'aprovado' && g.ativo).length
+    const pendentes = goldens.filter((g) => g.status === 'pendente').length
+    const feedbackAprovados = feedbacks.filter((f) => f.status === 'aprovado').length
+    return {
+      total: goldens.length,
+      aprovados,
+      pendentes,
+      feedbackAprovados,
+    }
+  }, [goldens, feedbacks])
+
   return (
     <div className="ensinar-ia">
       <header className="ensinar-ia-header">
-        <div>
-          <p className="ensinar-ia-eyebrow">
-            <Sparkles size={14} /> Ensino controlado
-          </p>
-          <h1>
-            <Brain size={26} /> Ensinar a IA
-          </h1>
-          <p>
-            Registre o que está <strong>errado</strong> e o que é <strong>certo</strong> por tipo de
-            análise. Isto <strong>não</strong> é edição de parecer. Só itens{' '}
-            <strong>aprovados</strong> entram em análises futuras do mesmo tipo — quando a chave
-            OpenAI e o deploy estiverem ativos. Até lá, o acervo e o preview ficam prontos.
-          </p>
+        <div className="ensinar-ia-header-main">
+          <div className="ensinar-ia-brand-mark" aria-hidden>
+            <Brain size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h1>Ensinar a IA</h1>
+            <p>
+              Acervo de casos modelo e correções por tipo de análise. Editar o parecer da
+              solicitação não treina a IA — só itens <strong>aprovados</strong> entram nas
+              próximas análises do mesmo domínio.
+            </p>
+          </div>
+        </div>
+        <div className="ensinar-ia-stats" aria-label="Resumo do acervo">
+          <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-value">{stats.aprovados}</span>
+            <span className="ensinar-ia-stat-label">Aprovados ativos</span>
+          </div>
+          <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-value">{stats.pendentes}</span>
+            <span className="ensinar-ia-stat-label">Aguardando validação</span>
+          </div>
+          <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-value">{stats.total}</span>
+            <span className="ensinar-ia-stat-label">Casos no acervo</span>
+          </div>
+          <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-value">{stats.feedbackAprovados}</span>
+            <span className="ensinar-ia-stat-label">Correções pontuais</span>
+          </div>
         </div>
         {mockBanner && (
-          <p className="ensinar-ia-mock">
-            Modo local (Firestore sem permissão). Dados no navegador + seeds de demonstração.
+          <p className="ensinar-ia-mock" role="status">
+            Modo local: Firestore sem permissão. Dados ficam no navegador até o deploy.
           </p>
         )}
       </header>
 
-      <div className="ensinar-ia-tabs">
-        <button type="button" className={tab === 'casos' ? 'active' : ''} onClick={() => setTab('casos')}>
-          <BookMarked size={16} /> Casos modelo
+      <nav className="ensinar-ia-tabs" aria-label="Seções do hub">
+        <button
+          type="button"
+          className={tab === 'casos' ? 'active' : ''}
+          onClick={() => setTab('casos')}
+          aria-current={tab === 'casos' ? 'page' : undefined}
+        >
+          <BookMarked size={16} />
+          Casos modelo
+          <span className="ensinar-ia-tab-count">{stats.total}</span>
         </button>
         <button
           type="button"
@@ -247,30 +284,63 @@ export default function EnsinarIA() {
             resetWizard()
             setTab('novo')
           }}
+          aria-current={tab === 'novo' ? 'page' : undefined}
         >
-          <Plus size={16} /> Novo caso
+          <Plus size={16} />
+          Novo caso
         </button>
         <button
           type="button"
           className={tab === 'feedback' ? 'active' : ''}
           onClick={() => setTab('feedback')}
+          aria-current={tab === 'feedback' ? 'page' : undefined}
         >
-          <MessageSquareWarning size={16} /> Correção pontual
+          <MessageSquareWarning size={16} />
+          Correção pontual
         </button>
         <button
           type="button"
           className={tab === 'preview' ? 'active' : ''}
           onClick={() => setTab('preview')}
+          aria-current={tab === 'preview' ? 'page' : undefined}
         >
-          <Eye size={16} /> O que a IA receberia
+          <Eye size={16} />
+          Preview do prompt
         </button>
-      </div>
+      </nav>
 
-      {error && <div className="ensinar-ia-error">{error}</div>}
-      {success && <div className="ensinar-ia-success">{success}</div>}
+      {error && (
+        <div className="ensinar-ia-error" role="alert">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="ensinar-ia-success" role="status">
+          {success}
+        </div>
+      )}
 
       {tab === 'casos' && (
-        <section className="ensinar-ia-card">
+        <section className="ensinar-ia-card ensinar-ia-panel">
+          <div className="ensinar-ia-panel-head">
+            <div>
+              <h2>Acervo por tipo</h2>
+              <p className="ensinar-ia-hint">
+                Abra um caso para aprovar, revogar ou revisar os pares errado × certo.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ensinar-ia-btn"
+              onClick={() => {
+                resetWizard()
+                setTab('novo')
+              }}
+            >
+              <Plus size={16} /> Novo caso
+            </button>
+          </div>
+
           <div className="ensinar-ia-filters">
             <label>
               Tipo
@@ -309,13 +379,23 @@ export default function EnsinarIA() {
 
           {filtrados.length === 0 ? (
             <div className="ensinar-ia-empty">
-              <h3>Nenhum caso modelo ainda</h3>
+              <div className="ensinar-ia-empty-icon" aria-hidden>
+                <BookMarked size={28} />
+              </div>
+              <h3>Nenhum caso neste filtro</h3>
               <p>
-                Comece por um caso completo: tipo + pares errado×certo. Em poucos minutos o acervo
-                fica pronto para ensinar a IA do mesmo domínio.
+                Cadastre um caso completo (tipo + pares). Em poucos minutos o acervo fica pronto
+                para ensinar análises do mesmo domínio.
               </p>
-              <button type="button" className="ensinar-ia-btn" onClick={() => setTab('novo')}>
-                Cadastrar primeiro caso
+              <button
+                type="button"
+                className="ensinar-ia-btn"
+                onClick={() => {
+                  resetWizard()
+                  setTab('novo')
+                }}
+              >
+                Cadastrar caso modelo
               </button>
             </div>
           ) : (
@@ -334,17 +414,33 @@ export default function EnsinarIA() {
                         {STATUS_LABEL[item.status]}
                       </span>
                       {!item.ativo && <span className="ensinar-ia-badge inactive">Inativo</span>}
+                      <span className="ensinar-ia-case-meta">{tipoNome(item.tipoAnaliseId)}</span>
                     </div>
-                    <strong>
-                      {item.codigo} — {item.titulo}
+                    <strong className="ensinar-ia-case-title">
+                      <span className="ensinar-ia-case-code">{item.codigo}</span>
+                      {item.titulo}
                     </strong>
-                    <span className="ensinar-ia-muted">{tipoNome(item.tipoAnaliseId)}</span>
                     {par0 && (
-                      <p className="ensinar-ia-pair-preview">
-                        <span className="wrong">Errado:</span> {par0.original.slice(0, 100)}
-                        {par0.original.length > 100 ? '…' : ''}
-                      </p>
+                      <div className="ensinar-ia-pair-split">
+                        <div className="ensinar-ia-pair-col wrong-col">
+                          <span className="ensinar-ia-pair-label">Errado</span>
+                          <p>
+                            {par0.original.slice(0, 90)}
+                            {par0.original.length > 90 ? '…' : ''}
+                          </p>
+                        </div>
+                        <div className="ensinar-ia-pair-col right-col">
+                          <span className="ensinar-ia-pair-label">Certo</span>
+                          <p>
+                            {par0.correto.slice(0, 90)}
+                            {par0.correto.length > 90 ? '…' : ''}
+                          </p>
+                        </div>
+                      </div>
                     )}
+                    <span className="ensinar-ia-case-footer">
+                      {item.pares.length} par{item.pares.length === 1 ? '' : 'es'} · abrir detalhe
+                    </span>
                   </button>
                 )
               })}
@@ -354,22 +450,27 @@ export default function EnsinarIA() {
       )}
 
       {tab === 'novo' && (
-        <section className="ensinar-ia-card">
-          <div className="ensinar-ia-steps">
-            {[1, 2, 3, 4].map((s) => (
-              <span key={s} className={wizardStep === s ? 'active' : wizardStep > s ? 'done' : ''}>
-                {s}.{' '}
-                {s === 1 ? 'Tipo' : s === 2 ? 'Errado × certo' : s === 3 ? 'Documentos' : 'Revisão'}
-              </span>
-            ))}
-          </div>
+        <section className="ensinar-ia-card ensinar-ia-panel">
+          <ol className="ensinar-ia-steps" aria-label="Etapas do wizard">
+            {WIZARD_LABELS.map((label, idx) => {
+              const step = (idx + 1) as WizardStep
+              const state =
+                wizardStep === step ? 'active' : wizardStep > step ? 'done' : 'todo'
+              return (
+                <li key={label} className={state}>
+                  <span className="ensinar-ia-step-index">{step}</span>
+                  <span className="ensinar-ia-step-label">{label}</span>
+                </li>
+              )
+            })}
+          </ol>
 
           {wizardStep === 1 && (
             <>
-              <h2>1. Tipo e metadados</h2>
+              <h2>Tipo e metadados</h2>
               <p className="ensinar-ia-hint">
-                O caso só ensina análises do <strong>mesmo tipo</strong>. Código sugerido
-                automaticamente.
+                O caso só ensina análises do <strong>mesmo tipo</strong>. O código é sugerido ao
+                escolher o tipo.
               </p>
               <label>
                 Tipo de análise *
@@ -401,9 +502,9 @@ export default function EnsinarIA() {
 
           {wizardStep === 2 && (
             <>
-              <h2>2. Pares errado × certo</h2>
+              <h2>Pares errado × certo</h2>
               <p className="ensinar-ia-hint">
-                Cada par ensina um erro típico da IA e a correção esperada, com justificativa.
+                Cada par ensina um erro típico e a correção esperada, com justificativa.
               </p>
               {gcPares.map((par, index) => (
                 <div key={par.id} className="ensinar-ia-par">
@@ -432,35 +533,37 @@ export default function EnsinarIA() {
                       }
                     />
                   </label>
-                  <label>
-                    Errado (o que a IA fez/disse) *
-                    <textarea
-                      value={par.original}
-                      onChange={(e) =>
-                        setGcPares((prev) =>
-                          prev.map((p) =>
-                            p.id === par.id ? { ...p, original: e.target.value } : p,
-                          ),
-                        )
-                      }
-                      rows={2}
-                    />
-                  </label>
-                  <label>
-                    Correto *
-                    <textarea
-                      value={par.correto}
-                      onChange={(e) =>
-                        setGcPares((prev) =>
-                          prev.map((p) =>
-                            p.id === par.id ? { ...p, correto: e.target.value } : p,
-                          ),
-                        )
-                      }
-                      rows={2}
-                    />
-                  </label>
-                  <label>
+                  <div className="ensinar-ia-pair-fields">
+                    <label className="ensinar-ia-field-wrong">
+                      Errado (o que a IA fez/disse) *
+                      <textarea
+                        value={par.original}
+                        onChange={(e) =>
+                          setGcPares((prev) =>
+                            prev.map((p) =>
+                              p.id === par.id ? { ...p, original: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        rows={3}
+                      />
+                    </label>
+                    <label className="ensinar-ia-field-right">
+                      Correto *
+                      <textarea
+                        value={par.correto}
+                        onChange={(e) =>
+                          setGcPares((prev) =>
+                            prev.map((p) =>
+                              p.id === par.id ? { ...p, correto: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        rows={3}
+                      />
+                    </label>
+                  </div>
+                  <label className="ensinar-ia-field-why">
                     Justificativa *
                     <textarea
                       value={par.justificativa}
@@ -481,16 +584,16 @@ export default function EnsinarIA() {
                 className="ensinar-ia-btn secondary"
                 onClick={() => setGcPares((prev) => [...prev, emptyPar()])}
               >
-                + Adicionar par
+                <Plus size={16} /> Adicionar par
               </button>
             </>
           )}
 
           {wizardStep === 3 && (
             <>
-              <h2>3. Documentos de referência</h2>
+              <h2>Documentos de referência</h2>
               <p className="ensinar-ia-hint">
-                Metadados / URL (upload nativo de Storage pode vir depois). Opcional.
+                Nome e URL opcionais. Upload nativo no Storage pode vir depois.
               </p>
               <div className="ensinar-ia-grid">
                 <label>
@@ -544,9 +647,9 @@ export default function EnsinarIA() {
 
           {wizardStep === 4 && (
             <>
-              <h2>4. Revisão</h2>
+              <h2>Revisão</h2>
               <p className="ensinar-ia-hint">
-                Ao enviar para validação, o caso fica <strong>pendente</strong> até aprovação.
+                Ao enviar, o caso fica <strong>pendente</strong> até aprovação.
               </p>
               <dl className="ensinar-ia-review">
                 <div>
@@ -613,134 +716,183 @@ export default function EnsinarIA() {
       )}
 
       {tab === 'feedback' && (
-        <section className="ensinar-ia-card">
-          <h2>Correção pontual</h2>
-          <p className="ensinar-ia-hint">
-            Atalho para um único item (regra → errado → certo). Para ensinar um caso completo com
-            vários pares, use{' '}
-            <button type="button" className="ensinar-ia-linkish" onClick={() => setTab('novo')}>
-              Novo caso modelo
-            </button>
-            .
-          </p>
-          <label>
-            Tipo *
-            <select value={fbTipoId} onChange={(e) => setFbTipoId(e.target.value)}>
-              <option value="">Selecione…</option>
-              {tipos.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Item / regra *
-            <input value={fbRegra} onChange={(e) => setFbRegra(e.target.value)} />
-          </label>
-          <label>
-            Original (errado) *
-            <textarea value={fbOriginal} onChange={(e) => setFbOriginal(e.target.value)} rows={2} />
-          </label>
-          <label>
-            Correção (certo) *
-            <textarea value={fbCorrecao} onChange={(e) => setFbCorrecao(e.target.value)} rows={2} />
-          </label>
-          <label>
-            Justificativa *
-            <textarea
-              value={fbJustificativa}
-              onChange={(e) => setFbJustificativa(e.target.value)}
-              rows={2}
-            />
-          </label>
-          <button
-            type="button"
-            className="ensinar-ia-btn"
-            onClick={() => {
-              void (async () => {
-                setError(null)
-                if (!fbTipoId.trim()) {
-                  setError('Selecione o tipo.')
-                  return
-                }
-                try {
-                  await createFeedback({
-                    tipoAnaliseId: fbTipoId,
-                    regraOuItem: fbRegra,
-                    original: fbOriginal,
-                    correcao: fbCorrecao,
-                    justificativa: fbJustificativa,
-                    status: 'pendente',
-                  })
-                  setFbRegra('')
-                  setFbOriginal('')
-                  setFbCorrecao('')
-                  setFbJustificativa('')
-                  setSuccess('Correção pontual enviada para validação.')
-                  await reload()
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : 'Erro ao registrar feedback.')
-                }
-              })()
-            }}
-          >
-            Enviar para validação
-          </button>
+        <section className="ensinar-ia-card ensinar-ia-panel">
+          <div className="ensinar-ia-panel-head">
+            <div>
+              <h2>Correção pontual</h2>
+              <p className="ensinar-ia-hint">
+                Um único item (regra → errado → certo). Para vários pares, use{' '}
+                <button type="button" className="ensinar-ia-linkish" onClick={() => setTab('novo')}>
+                  Novo caso modelo
+                </button>
+                .
+              </p>
+            </div>
+          </div>
+          <div className="ensinar-ia-feedback-layout">
+            <div className="ensinar-ia-feedback-form">
+              <label>
+                Tipo *
+                <select value={fbTipoId} onChange={(e) => setFbTipoId(e.target.value)}>
+                  <option value="">Selecione…</option>
+                  {tipos.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Item / regra *
+                <input value={fbRegra} onChange={(e) => setFbRegra(e.target.value)} />
+              </label>
+              <div className="ensinar-ia-pair-fields">
+                <label className="ensinar-ia-field-wrong">
+                  Original (errado) *
+                  <textarea
+                    value={fbOriginal}
+                    onChange={(e) => setFbOriginal(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="ensinar-ia-field-right">
+                  Correção (certo) *
+                  <textarea
+                    value={fbCorrecao}
+                    onChange={(e) => setFbCorrecao(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+              </div>
+              <label className="ensinar-ia-field-why">
+                Justificativa *
+                <textarea
+                  value={fbJustificativa}
+                  onChange={(e) => setFbJustificativa(e.target.value)}
+                  rows={2}
+                />
+              </label>
+              <button
+                type="button"
+                className="ensinar-ia-btn"
+                onClick={() => {
+                  void (async () => {
+                    setError(null)
+                    if (!fbTipoId.trim()) {
+                      setError('Selecione o tipo.')
+                      return
+                    }
+                    try {
+                      await createFeedback({
+                        tipoAnaliseId: fbTipoId,
+                        regraOuItem: fbRegra,
+                        original: fbOriginal,
+                        correcao: fbCorrecao,
+                        justificativa: fbJustificativa,
+                        status: 'pendente',
+                      })
+                      setFbRegra('')
+                      setFbOriginal('')
+                      setFbCorrecao('')
+                      setFbJustificativa('')
+                      setSuccess('Correção pontual enviada para validação.')
+                      await reload()
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Erro ao registrar feedback.')
+                    }
+                  })()
+                }}
+              >
+                Enviar para validação
+              </button>
+            </div>
 
-          <h3>Fila</h3>
-          <ul className="ensinar-ia-list">
-            {feedbacks.map((item) => (
-              <li key={item.id}>
-                <strong>
-                  [{item.status}] {item.regraOuItem}
-                </strong>
-                <span>
-                  {item.original.slice(0, 100)}
-                  {item.original.length > 100 ? '…' : ''}
-                </span>
-                {(item.status === 'pendente' || item.status === 'rascunho') && (
-                  <div className="ensinar-ia-row-actions">
-                    <button type="button" onClick={() => void setFeedbackStatus(item.id, 'aprovado').then(reload)}>
-                      Aprovar
-                    </button>
-                    <button type="button" onClick={() => void setFeedbackStatus(item.id, 'rejeitado').then(reload)}>
-                      Rejeitar
-                    </button>
-                  </div>
-                )}
-                {item.status === 'aprovado' && (
-                  <div className="ensinar-ia-row-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void setFeedbackStatus(item.id, 'rejeitado', 'Revogado').then(reload)
-                      }
-                    >
-                      Revogar
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-            {feedbacks.length === 0 && <li>Nenhuma correção pontual ainda.</li>}
-          </ul>
+            <div className="ensinar-ia-feedback-queue">
+              <h3>Fila de validação</h3>
+              {feedbacks.length === 0 ? (
+                <div className="ensinar-ia-empty compact">
+                  <p>Nenhuma correção pontual ainda.</p>
+                </div>
+              ) : (
+                <ul className="ensinar-ia-list">
+                  {feedbacks.map((item) => (
+                    <li key={item.id}>
+                      <div className="ensinar-ia-list-head">
+                        <span className={`ensinar-ia-badge status-${item.status}`}>
+                          {STATUS_LABEL[item.status] ?? item.status}
+                        </span>
+                        <strong>{item.regraOuItem}</strong>
+                      </div>
+                      <div className="ensinar-ia-pair-split">
+                        <div className="ensinar-ia-pair-col wrong-col">
+                          <span className="ensinar-ia-pair-label">Errado</span>
+                          <p>
+                            {item.original.slice(0, 120)}
+                            {item.original.length > 120 ? '…' : ''}
+                          </p>
+                        </div>
+                        <div className="ensinar-ia-pair-col right-col">
+                          <span className="ensinar-ia-pair-label">Certo</span>
+                          <p>
+                            {item.correcao.slice(0, 120)}
+                            {item.correcao.length > 120 ? '…' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {(item.status === 'pendente' || item.status === 'rascunho') && (
+                        <div className="ensinar-ia-row-actions">
+                          <button
+                            type="button"
+                            className="ensinar-ia-btn-sm success"
+                            onClick={() =>
+                              void setFeedbackStatus(item.id, 'aprovado').then(reload)
+                            }
+                          >
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            className="ensinar-ia-btn-sm danger"
+                            onClick={() =>
+                              void setFeedbackStatus(item.id, 'rejeitado').then(reload)
+                            }
+                          >
+                            Rejeitar
+                          </button>
+                        </div>
+                      )}
+                      {item.status === 'aprovado' && (
+                        <div className="ensinar-ia-row-actions">
+                          <button
+                            type="button"
+                            className="ensinar-ia-btn-sm"
+                            onClick={() =>
+                              void setFeedbackStatus(item.id, 'rejeitado', 'Revogado').then(reload)
+                            }
+                          >
+                            Revogar
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </section>
       )}
 
       {tab === 'preview' && (
-        <section className="ensinar-ia-card">
-          <h2>Pré-visualização do contexto de ensino</h2>
+        <section className="ensinar-ia-card ensinar-ia-panel">
+          <h2>Preview do prompt</h2>
           <p className="ensinar-ia-hint">
-            Mostra o bloco que a análise receberia para o tipo (casos <strong>aprovados</strong>,
-            máx. 3). A análise real só roda com chave OpenAI + deploy das functions.
+            Bloco que a análise receberia para o tipo (casos <strong>aprovados</strong>, máx. 3).
+            A execução real depende de OpenAI + deploy das functions.
           </p>
           <label>
             Tipo para preview
-            <select
-              value={previewTipoId}
-              onChange={(e) => setPreviewTipoId(e.target.value)}
-            >
+            <select value={previewTipoId} onChange={(e) => setPreviewTipoId(e.target.value)}>
               <option value="">Selecione…</option>
               {tipos.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -751,13 +903,17 @@ export default function EnsinarIA() {
           </label>
           {preview.ids.length > 0 ? (
             <>
-              <p className="ensinar-ia-muted">IDs: {preview.ids.join(', ')}</p>
+              <p className="ensinar-ia-muted">
+                {preview.ids.length} caso{preview.ids.length === 1 ? '' : 's'} no bloco · IDs:{' '}
+                {preview.ids.join(', ')}
+              </p>
               <pre className="ensinar-ia-preview-block">{preview.block}</pre>
             </>
           ) : (
-            <p className="ensinar-ia-muted">
-              Nenhum caso aprovado para este tipo. Aprove casos na lista para ver o bloco.
-            </p>
+            <div className="ensinar-ia-empty compact">
+              <h3>Nada para injetar ainda</h3>
+              <p>Aprove casos modelo deste tipo na aba Casos para ver o bloco aqui.</p>
+            </div>
           )}
         </section>
       )}
@@ -768,24 +924,47 @@ export default function EnsinarIA() {
       </p>
 
       {selecionado && (
-        <div className="ensinar-ia-drawer-overlay" onClick={() => setSelecionado(null)}>
-          <aside className="ensinar-ia-drawer" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="ensinar-ia-drawer-overlay"
+          onClick={() => setSelecionado(null)}
+          role="presentation"
+        >
+          <aside
+            className="ensinar-ia-drawer"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ensinar-ia-drawer-title"
+          >
             <header>
               <div>
-                <h2>
-                  {selecionado.codigo} — {selecionado.titulo}
+                <p className="ensinar-ia-drawer-kicker">{tipoNome(selecionado.tipoAnaliseId)}</p>
+                <h2 id="ensinar-ia-drawer-title">
+                  <span className="ensinar-ia-case-code">{selecionado.codigo}</span>
+                  {selecionado.titulo}
                 </h2>
-                <p className="ensinar-ia-muted">
-                  {tipoNome(selecionado.tipoAnaliseId)} · {STATUS_LABEL[selecionado.status]}
-                  {!selecionado.ativo ? ' · inativo' : ''}
-                </p>
+                <div className="ensinar-ia-drawer-meta">
+                  <span className={`ensinar-ia-badge status-${selecionado.status}`}>
+                    {STATUS_LABEL[selecionado.status]}
+                  </span>
+                  {!selecionado.ativo && (
+                    <span className="ensinar-ia-badge inactive">Inativo</span>
+                  )}
+                </div>
               </div>
-              <button type="button" aria-label="Fechar" onClick={() => setSelecionado(null)}>
+              <button
+                type="button"
+                className="ensinar-ia-icon-btn"
+                aria-label="Fechar"
+                onClick={() => setSelecionado(null)}
+              >
                 <X size={20} />
               </button>
             </header>
 
-            {selecionado.descricao && <p>{selecionado.descricao}</p>}
+            {selecionado.descricao && (
+              <p className="ensinar-ia-drawer-desc">{selecionado.descricao}</p>
+            )}
 
             <h3>Pares errado × certo</h3>
             {selecionado.pares.length === 0 && <p className="ensinar-ia-muted">Sem pares.</p>}
@@ -795,13 +974,17 @@ export default function EnsinarIA() {
                   Par {i + 1}
                   {par.regraOuItem ? ` — ${par.regraOuItem}` : ''}
                 </strong>
-                <p>
-                  <span className="wrong">Errado:</span> {par.original}
-                </p>
-                <p>
-                  <span className="right">Correto:</span> {par.correto}
-                </p>
-                <p>
+                <div className="ensinar-ia-pair-split">
+                  <div className="ensinar-ia-pair-col wrong-col">
+                    <span className="ensinar-ia-pair-label">Errado</span>
+                    <p>{par.original}</p>
+                  </div>
+                  <div className="ensinar-ia-pair-col right-col">
+                    <span className="ensinar-ia-pair-label">Certo</span>
+                    <p>{par.correto}</p>
+                  </div>
+                </div>
+                <p className="ensinar-ia-why-line">
                   <span className="why">Por quê:</span> {par.justificativa}
                 </p>
               </div>
@@ -810,7 +993,7 @@ export default function EnsinarIA() {
             {selecionado.documentosRef.length > 0 && (
               <>
                 <h3>Documentos</h3>
-                <ul>
+                <ul className="ensinar-ia-doc-list">
                   {selecionado.documentosRef.map((d, i) => (
                     <li key={`${d.nome}-${i}`}>
                       {d.nome}
@@ -829,11 +1012,12 @@ export default function EnsinarIA() {
               </>
             )}
 
-            <div className="ensinar-ia-row-actions">
+            <div className="ensinar-ia-drawer-actions">
               {(selecionado.status === 'pendente' || selecionado.status === 'rascunho') && (
                 <>
                   <button
                     type="button"
+                    className="ensinar-ia-btn"
                     onClick={() =>
                       void setGoldenCaseStatus(selecionado.id, 'aprovado').then(async () => {
                         await reload()
@@ -842,10 +1026,11 @@ export default function EnsinarIA() {
                       })
                     }
                   >
-                    Aprovar
+                    <CheckCircle2 size={16} /> Aprovar
                   </button>
                   <button
                     type="button"
+                    className="ensinar-ia-btn secondary danger-outline"
                     onClick={() =>
                       void setGoldenCaseStatus(selecionado.id, 'rejeitado').then(async () => {
                         await reload()
@@ -860,6 +1045,7 @@ export default function EnsinarIA() {
               {selecionado.status === 'aprovado' && (
                 <button
                   type="button"
+                  className="ensinar-ia-btn secondary"
                   onClick={() =>
                     void setGoldenCaseStatus(
                       selecionado.id,
@@ -876,6 +1062,7 @@ export default function EnsinarIA() {
               )}
               <button
                 type="button"
+                className="ensinar-ia-btn secondary"
                 onClick={() =>
                   void setGoldenCaseAtivo(selecionado.id, !selecionado.ativo).then(async () => {
                     await reload()
@@ -888,6 +1075,7 @@ export default function EnsinarIA() {
               {selecionado.status === 'rejeitado' && (
                 <button
                   type="button"
+                  className="ensinar-ia-btn secondary"
                   onClick={() =>
                     void updateGoldenCase(selecionado.id, { status: 'pendente' }).then(async () => {
                       await reload()
