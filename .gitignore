@@ -24,6 +24,7 @@ uploads/
 # Firebase service account (Admin SDK)
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+.firebase/
 
 # Environment variables
 .env
