@@ -20,7 +20,8 @@ import {
 const COLLECTION =
   import.meta.env.VITE_FIRESTORE_TIPOS_ANALISE_COLLECTION?.trim() || 'tiposAnalise'
 
-const MOCK_KEY = 'rerond-tipos-analise-mock-v3'
+const MOCK_KEY = 'rerond-tipos-analise-mock-v4'
+const SEED_SYNC_KEY = 'rerond-tipos-seed-sync-v1'
 
 let mockMode = false
 
@@ -53,14 +54,19 @@ const toDate = (value: unknown): Date | undefined => {
 const enrichFromSeed = (tipo: TipoAnalise): TipoAnalise => {
   const seed = TIPOS_ANALISE_SEED.find((item) => item.id === tipo.id)
   if (!seed) return tipo
+  // Seed do material do cliente é fonte da verdade para tipos built-in
   return {
     ...tipo,
-    requisitos: tipo.requisitos?.length ? tipo.requisitos : seed.requisitos,
-    normasFontes: tipo.normasFontes?.length ? tipo.normasFontes : seed.normasFontes,
-    promptOrientacao: tipo.promptOrientacao || seed.promptOrientacao,
-    documentosSugeridos: tipo.documentosSugeridos?.length
-      ? tipo.documentosSugeridos
-      : seed.documentosSugeridos,
+    requisitos: seed.requisitos,
+    normasFontes: seed.normasFontes,
+    promptOrientacao: seed.promptOrientacao,
+    documentosSugeridos: seed.documentosSugeridos?.length
+      ? seed.documentosSugeridos
+      : tipo.documentosSugeridos,
+    nome: seed.nome || tipo.nome,
+    descricao: seed.descricao || tipo.descricao,
+    finalidade: seed.finalidade || tipo.finalidade,
+    categoria: seed.categoria || tipo.categoria,
   }
 }
 
@@ -118,15 +124,36 @@ export async function listTiposAnalise(): Promise<TipoAnalise[]> {
     return readMock().filter((item) => item.ativo)
   }
   try {
+    const needsSeedSync =
+      typeof sessionStorage !== 'undefined' && !sessionStorage.getItem(SEED_SYNC_KEY)
+
+    if (needsSeedSync) {
+      for (const seed of TIPOS_ANALISE_SEED) {
+        await setDoc(
+          doc(db, COLLECTION, seed.id),
+          {
+            ...seed,
+            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          },
+          { merge: true },
+        )
+      }
+      sessionStorage.setItem(SEED_SYNC_KEY, '1')
+    }
+
     const snap = await getDocs(query(collection(db, COLLECTION), orderBy('nome')))
     if (snap.empty) {
-      // Seed remoto silencioso quando coleção vazia e com permissão
       for (const seed of TIPOS_ANALISE_SEED) {
-        await setDoc(doc(db, COLLECTION, seed.id), {
-          ...seed,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true })
+        await setDoc(
+          doc(db, COLLECTION, seed.id),
+          {
+            ...seed,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        )
       }
       const again = await getDocs(query(collection(db, COLLECTION), orderBy('nome')))
       return again.docs

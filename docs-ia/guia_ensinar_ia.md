@@ -48,6 +48,11 @@ Em conflito: **normas + PDFs da solicitação** prevalecem sobre o ensino.
 
 O acervo, a validação e o **preview** funcionam. A análise real só roda com `OPENAI_API_KEY` + deploy das Cloud Functions.
 
-## Seeds de demonstração
+## Seeds de demonstração / cliente
 
-No modo mock local há 3 casos sintéticos (ocupação / acesso / PAC). Substitua pelos casos reais do cliente quando disponíveis.
+Seeds em `goldenCaseSeed.ts` vêm do material `.pdf/testes/` (comparativo + avaliação Baseinfra), com status **pendente**.  
+Na primeira visita a **Ensinar a IA**, docs inexistentes são criados no Firestore **sem sobrescrever** casos já aprovados/rejeitados.
+
+O cliente (ou admin) **aprova** em `/ensinar-ia` antes de o caso entrar no prompt (máx. 3 por tipo).
+
+Playbook de eval: [`treinamento-cliente/EVAL_ASSERTIVIDADE.md`](./treinamento-cliente/EVAL_ASSERTIVIDADE.md).

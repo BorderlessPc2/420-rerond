@@ -437,6 +437,37 @@ async function runAnaliseJob(params) {
                 }
             }
         }
+        // Normas custom do perfil com PDF (Storage/URL) — anexar como arquivo, não só texto
+        if (perfilFirestore?.normasCustom?.length) {
+            for (const norma of perfilFirestore.normasCustom) {
+                if (!perfilFirestore.normasFontes.includes(norma.id))
+                    continue;
+                if (!norma.arquivoUrl?.trim())
+                    continue;
+                if (normasMap.has(norma.id))
+                    continue;
+                try {
+                    const buffer = await downloadStorageFile(norma.arquivoUrl.trim());
+                    if (!buffer?.length)
+                        continue;
+                    normasMap.set(norma.id, {
+                        fonte: {
+                            id: norma.id,
+                            titulo: norma.titulo,
+                            orgao: norma.orgao,
+                            ano: norma.ano ?? 0,
+                            pdf: norma.arquivoNome || `${norma.id}.pdf`,
+                            descricao: norma.descricao,
+                            requerPdf: true,
+                        },
+                        buffer,
+                    });
+                }
+                catch (err) {
+                    console.warn(`Falha ao baixar norma custom ${norma.id}:`, err instanceof Error ? err.message : err);
+                }
+            }
+        }
         const normasPDFs = Array.from(normasMap.values());
         const dadosForm = {
             titulo: data.titulo ?? "",

@@ -26,6 +26,10 @@ firebase-service-account.json
 *-firebase-adminsdk-*.json
 .firebase/
 
+.pdf/
+.pdf/_extract/
+.tmp-pdf-test/
+
 # Environment variables
 .env
 .env.local

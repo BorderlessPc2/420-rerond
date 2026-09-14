@@ -218,11 +218,15 @@ export default function EnsinarIA() {
   const stats = useMemo(() => {
     const aprovados = goldens.filter((g) => g.status === 'aprovado' && g.ativo).length
     const pendentes = goldens.filter((g) => g.status === 'pendente').length
+    const clientePendentes = goldens.filter(
+      (g) => g.status === 'pendente' && g.id.startsWith('cliente-'),
+    ).length
     const feedbackAprovados = feedbacks.filter((f) => f.status === 'aprovado').length
     return {
       total: goldens.length,
       aprovados,
       pendentes,
+      clientePendentes,
       feedbackAprovados,
     }
   }, [goldens, feedbacks])
@@ -264,6 +268,12 @@ export default function EnsinarIA() {
         {mockBanner && (
           <p className="ensinar-ia-mock" role="status">
             Modo local: Firestore sem permissão. Dados ficam no navegador até o deploy.
+          </p>
+        )}
+        {stats.clientePendentes > 0 && (
+          <p className="ensinar-ia-mock" role="status">
+            {stats.clientePendentes} caso(s) do material do cliente aguardando aprovação
+            (filtro: status pendente). Só entram no prompt após aprovar.
           </p>
         )}
       </header>

@@ -6,20 +6,7 @@ import {
   REQ_PAN,
   REQ_POC_CLIENTE,
   REQ_PPU_CLIENTE,
-} from '../config/checklistsCliente'
-
-export type TipoAnaliseCategoria =
-  | 'ocupacao_faixa'
-  | 'acesso'
-  | 'pac'
-  | 'poc'
-  | 'ppu'
-  | 'pan'
-  | 'rede_eletrica'
-  | 'esgoto'
-  | 'publicidade'
-  | 'sinalizacao'
-  | 'outro'
+} from './checklistsCliente'
 
 export type RequisitoTipoAnalise = {
   id: string
@@ -27,28 +14,18 @@ export type RequisitoTipoAnalise = {
   categoria?: string
 }
 
-export type TipoAnalise = {
+export type TipoAnaliseSeed = {
   id: string
   nome: string
   slug: string
-  categoria: TipoAnaliseCategoria
+  categoria: string
   descricao: string
   finalidade?: string
-  /** IDs de normas do catálogo ou custom. */
   normasFontes: string[]
-  /** IDs de documentos esperados (catálogo ou custom). */
   documentosSugeridos: string[]
-  /** Checklist próprio deste tipo (não misturar com outros). */
   requisitos: RequisitoTipoAnalise[]
   promptOrientacao?: string
   ativo: boolean
-  createdAt?: Date
-  updatedAt?: Date
-}
-
-export type TipoAnaliseDraft = Omit<TipoAnalise, 'id' | 'createdAt' | 'updatedAt' | 'ativo'> & {
-  id?: string
-  ativo?: boolean
 }
 
 /** Requisitos exclusivos — IDs prefixados por domínio. */
@@ -161,7 +138,7 @@ const REQ_PAC_VIAB: RequisitoTipoAnalise[] = REQ_PACV_CLIENTE
 const REQ_PAC_EXEC: RequisitoTipoAnalise[] = REQ_PACE_CLIENTE
 const REQ_PAN_LIST: RequisitoTipoAnalise[] = REQ_PAN
 
-export const TIPOS_ANALISE_SEED: TipoAnalise[] = [
+export const TIPOS_ANALISE_SEED: TipoAnaliseSeed[] = [
   {
     id: 'ocupacao-faixa',
     nome: 'Ocupação em faixa de domínio',

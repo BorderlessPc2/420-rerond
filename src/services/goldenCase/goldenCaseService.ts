@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   type Timestamp,
 } from 'firebase/firestore'
@@ -28,7 +29,8 @@ import { GOLDEN_CASES_SEED } from './goldenCaseSeed'
 const COLLECTION =
   import.meta.env.VITE_FIRESTORE_GOLDEN_CASES_COLLECTION?.trim() || 'goldenCases'
 
-const MOCK_KEY = 'rerond-golden-cases-mock-v2'
+const MOCK_KEY = 'rerond-golden-cases-mock-v3'
+const CLIENTE_SEED_SYNC_KEY = 'rerond-golden-cliente-seed-v1'
 let mockMode = false
 let seedApplied = false
 
@@ -110,14 +112,45 @@ const ensureMockSeed = () => {
   if (seedApplied) return
   seedApplied = true
   const current = readMock()
-  if (current.length > 0) return
-  const seeded: GoldenCase[] = GOLDEN_CASES_SEED.map((item, index) => ({
-    ...item,
-    id: item.id || `seed-gc-${index + 1}`,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }))
-  writeMock(seeded)
+  const byId = new Map(current.map((item) => [item.id, item]))
+  for (const seed of GOLDEN_CASES_SEED) {
+    if (byId.has(seed.id)) continue
+    byId.set(seed.id, {
+      ...seed,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+  }
+  writeMock([...byId.values()])
+}
+
+/** Insere seeds do cliente só se o doc ainda não existir (não sobrescreve aprovação). */
+async function ensureClienteGoldenSeeds(): Promise<void> {
+  if (typeof sessionStorage === 'undefined') return
+  if (sessionStorage.getItem(CLIENTE_SEED_SYNC_KEY)) return
+
+  for (const seed of GOLDEN_CASES_SEED) {
+    const ref = doc(db, COLLECTION, seed.id)
+    const existing = await getDoc(ref)
+    if (existing.exists()) continue
+    await setDoc(ref, {
+      codigo: seed.codigo,
+      titulo: seed.titulo,
+      tipoAnaliseId: seed.tipoAnaliseId,
+      organizacaoId: seed.organizacaoId ?? null,
+      descricao: seed.descricao ?? null,
+      erroIa: seed.erroIa ?? null,
+      analiseCorreta: seed.analiseCorreta,
+      observacoes: seed.observacoes ?? null,
+      pares: serializePares(seed.pares),
+      documentosRef: normalizeDocumentosRef(seed.documentosRef),
+      status: seed.status,
+      ativo: seed.ativo !== false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+  }
+  sessionStorage.setItem(CLIENTE_SEED_SYNC_KEY, '1')
 }
 
 const serializePares = (pares: GoldenCasePar[]) =>
@@ -182,6 +215,7 @@ export async function listGoldenCases(
   }
 
   try {
+    await ensureClienteGoldenSeeds()
     const snap = await getDocs(query(collection(db, COLLECTION), orderBy('codigo')))
     return filter(snap.docs.map((item) => parseGoldenCase(item.id, item.data() as Record<string, unknown>)))
   } catch (err) {
