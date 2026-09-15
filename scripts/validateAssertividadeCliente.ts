@@ -54,15 +54,16 @@ function buildGoldenBlock(items: GoldenDoc[]): string {
   const lines = [
     'CASOS MODELO (GOLDEN CASES — MESMO TIPO)',
     'Use como referência de qualidade para ESTE tipo de análise.',
+    'NÃO copie fatos dos documentos do caso modelo como se fossem da solicitação atual.',
     '',
   ]
   for (const [i, item] of items.entries()) {
     lines.push(`${i + 1}) [${item.codigo}] ${item.titulo}`)
-    if (item.analiseCorreta) lines.push(`   Resumo: ${item.analiseCorreta.slice(0, 600)}`)
-    if (item.erroIa) lines.push(`   Evitar: ${item.erroIa.slice(0, 400)}`)
-    for (const par of (item.pares ?? []).slice(0, 8)) {
+    if (item.analiseCorreta) lines.push(`   Resumo: ${item.analiseCorreta}`)
+    if (item.erroIa) lines.push(`   Evitar: ${item.erroIa}`)
+    for (const par of item.pares ?? []) {
       lines.push(
-        `   - ${par.regraOuItem ?? 'item'}: ERRADO: ${(par.original ?? '').slice(0, 180)} | CERTO: ${(par.correto ?? '').slice(0, 180)}`,
+        `   - ${par.regraOuItem ?? 'item'}: ERRADO: ${par.original ?? ''} | CERTO: ${par.correto ?? ''} | PORQUE: ${par.justificativa ?? ''}`,
       )
     }
     lines.push('')
