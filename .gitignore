@@ -30,6 +30,9 @@ firebase-service-account.json
 .pdf/_extract/
 .tmp-pdf-test/
 
+# Guias/relatórios locais (agente + operação) — não versionar
+docs-ia/treinamento-cliente/
+
 # Environment variables
 .env
 .env.local
