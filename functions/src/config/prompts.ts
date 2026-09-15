@@ -74,6 +74,15 @@ export const REGRAS_ESCOPO_DOCUMENTOS = `ESCOPO DOS DOCUMENTOS DESTA ANÁLISE:
 - No parecer, liste explicitamente quais arquivos de projeto foram considerados.
 - Se um PDF foi omitido por limite de tamanho/quantidade, mencione a omissão e não trate o conteúdo omitido como "ausente no projeto" sem essa ressalva.`;
 
+export const REGRAS_RACIOCINIO_ASSERTIVO = `RACIOCÍNIO ASSERTIVO (qualidade do apontamento):
+- Antes de cada veredito, percorra: o que busquei? em qual arquivo/página? o que encontrei? isso fere qual requisito/norma desta análise?
+- Se o arquivo existe e a falha é de qualidade (assinatura, km, carimbo, codificação, texto inconsistente), use NAO_CONFORME — não INFORMACAO_AUSENTE.
+- Se não encontrar um dado em PDF presente após inspeção, declare "não localizado após inspeção de [arquivo]" — não invente NC técnica.
+- Não invente pendências para preencher checklist; "sem inconsistências" é resposta válida quando o documento atende.
+- Índice de conformidade ou conclusão "com objeção" NÃO basta se os fundamentos estiverem errados — priorize fundamentação correta.
+- Compatibilize Memorial × projetos × documentos complementares antes de concluir OK em qualquer um deles.
+- Volumes/codificação (ex.: SUROD 12/2025): existência do arquivo ≠ organização/nomenclatura corretas.`;
+
 export function buildSystemPrompt(): string {
   return `Você é um especialista técnico em projetos rodoviários e engenharia de transportes, com profundo conhecimento das normas brasileiras vigentes que regulamentam acessos, faixa de domínio, sinalização de obras e infraestrutura viária.
 
@@ -94,7 +103,9 @@ ${REGRAS_CONFERENCIA_EVIDENCIA}
 
 ${REGRAS_ISOLAMENTO_TIPO}
 
-${REGRAS_ESCOPO_DOCUMENTOS}`;
+${REGRAS_ESCOPO_DOCUMENTOS}
+
+${REGRAS_RACIOCINIO_ASSERTIVO}`;
 }
 
 export function buildAnalysisPrompt(
@@ -169,8 +180,9 @@ INSTRUÇÕES:
 6. ${INSTRUCOES_PECAS_GRAFICAS}
 7. ${REGRAS_CONFERENCIA_EVIDENCIA}
 8. ${REGRAS_ISOLAMENTO_TIPO}
-9. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
-10. Respeite estritamente as saídas pedidas:
+9. ${REGRAS_RACIOCINIO_ASSERTIVO}
+10. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
+11. Respeite estritamente as saídas pedidas:
 - ${instrucoesSaida}${promptAdicional}
 
 FORMATO DE SAÍDA OBRIGATÓRIO — responda APENAS com JSON válido, sem texto antes ou depois:

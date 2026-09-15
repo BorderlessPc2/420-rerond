@@ -21,7 +21,7 @@ const COLLECTION =
   import.meta.env.VITE_FIRESTORE_TIPOS_ANALISE_COLLECTION?.trim() || 'tiposAnalise'
 
 const MOCK_KEY = 'rerond-tipos-analise-mock-v4'
-const SEED_SYNC_KEY = 'rerond-tipos-seed-sync-v1'
+const SEED_SYNC_KEY = 'rerond-tipos-seed-sync-v2'
 
 let mockMode = false
 

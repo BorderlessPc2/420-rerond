@@ -107,8 +107,9 @@ TIPO DE ANÁLISE (DOMÍNIO) — OBRIGATÓRIO RESPEITAR:
 - finalidade: ${tipo.finalidade || tipo.descricao}${descExtra}
 ${orientacao}
 
-PROIBIDO: misturar requisitos, normas ou critérios de outro tipo de análise (ocupação ≠ acesso ≠ PAC ≠ outro).
+PROIBIDO: misturar requisitos, normas ou critérios de outro tipo de análise (ocupação ≠ acesso ≠ PAC ≠ POC ≠ PPU ≠ PAN).
 Use APENAS a lista de requisitos fornecida para este tipo. Cada item do checklist deve usar o ID listado.
+Antes de cada apontamento: evidência (arquivo/página) → classificação correta (ausente / não localizado / não conforme / N/A) → fundamento.
 `;
 }
 //# sourceMappingURL=tipoAnaliseService.js.map

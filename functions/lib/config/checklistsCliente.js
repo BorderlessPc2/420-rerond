@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.REQ_ACESSO_CLIENTE = exports.REQ_PACE_CLIENTE = exports.REQ_PACV_CLIENTE = exports.REQ_PPU_CLIENTE = exports.REQ_POC_CLIENTE = exports.REQ_PAN = exports.ORIENTACAO_ASSERTIVIDADE = void 0;
-/** Regras transversais de assertividade (gabarito ≠ parâmetro). */
+/** Regras transversais de assertividade (gabarito ≠ parâmetro + anti-padrões dos testes do cliente). */
 exports.ORIENTACAO_ASSERTIVIDADE = `
 REGRAS DE ASSERTIVIDADE (obrigatórias):
 - Gabaritos/exemplos NÃO definem valores-padrão (km, larguras, prazos, velocidades). Identifique parâmetros no processo atual.
@@ -10,6 +10,15 @@ REGRAS DE ASSERTIVIDADE (obrigatórias):
 - Não repetir o mesmo erro em vários itens quando um apontamento de compatibilização resolve o conjunto.
 - Quando adequado, registrar "sem inconsistências" — não inventar observação só para preencher.
 - NÃO apontar: diferença vs outro processo; disciplina não aplicável; redação diferente com mesmo conteúdo; solução alternativa tecnicamente válida.
+
+RACIOCÍNIO E CLASSIFICAÇÃO (anti-padrões Baseinfra):
+- Diferencie SEMPRE: (1) documento não apresentado; (2) apresentado mas informação não localizada após inspeção; (3) localizada porém não conforme; (4) não aplicável; (5) não foi possível avaliar (ilegível/truncado).
+- PROIBIDO marcar como "ausente/não localizado" um arquivo que conste nos anexos desta solicitação — cite o arquivo e a pendência real (assinatura, codificação, km, carimbo etc.).
+- PROIBIDO inventar pendências em peça que está correta (ex.: Plano de Trabalho sem inconsistências).
+- PROIBIDO aprovar Planta/Perfil/Sinalização/Requerimento/Declaração só porque o arquivo existe — conferir km, assinatura, carimbo, codificação SUROD, volumes e compatibilização Memorial × projetos.
+- Conclusão/objeção deve se apoiar nas pendências reais encontradas; "Não conforme" por fundamento errado continua sendo falha.
+- Corrigir só o NOME da tipologia no texto SEM aplicar o checklist desse tipo é ERRO grave.
+- Na reanálise: preserve itens não contestados; revise fundamento e evidência, não apenas o rótulo do status.
 `.trim();
 exports.REQ_PAN = [
     {
