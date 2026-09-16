@@ -6,6 +6,10 @@ export function initOpenAI(apiKey: string): void {
   client = new OpenAI({ apiKey });
 }
 
+export function getOpenAIClient(): OpenAI {
+  return getClient();
+}
+
 function getClient(): OpenAI {
   if (!client) {
     throw new Error("OpenAI não inicializado. Chame initOpenAI primeiro.");

@@ -27,6 +27,10 @@ import {
   resolveConcessionariaPromptProfile,
 } from "../config/concessionariaProfiles";
 import { buildEco101ExemploAnaliseBlock } from "../config/exemplosAnalise";
+import { ORIENTACAO_PER_ARAGUAIA, REQ_OBRA_PER_CLIENTE } from "../config/perAmpliacoesCliente";
+import {
+  buildAnaliseQueryText,
+} from "./embeddingService";
 import {
   complementarConferenciaDeterministica,
   parseEvidencia,
@@ -680,6 +684,18 @@ export async function runAnaliseJob(params: {
         .join("\n\n");
     }
 
+    const usaObraPer =
+      tipoBase === "obra_per" ||
+      tiposAnalise.includes("obra_per") ||
+      tiposConfig.some(({ tipo }) => tipo === "obra_per");
+    if (usaObraPer) {
+      const perReqs = REQ_OBRA_PER_CLIENTE.map((r) => {
+        const cat = r.categoria ? ` [${r.categoria}]` : "";
+        return `- ${r.id}: ${r.descricao}${cat}`;
+      }).join("\n");
+      requisitosFormatados += `\n\n### Ampliações PER — Via Araguaia (cliente)\n${perReqs}`;
+    }
+
     const tiposProjetoNome = [
       tipoAnaliseDoc ? `Tipo de análise: ${tipoAnaliseDoc.nome}` : null,
       perfilFirestore?.nome ??
@@ -694,6 +710,7 @@ export async function runAnaliseJob(params: {
       promptCustomizado,
       buildTipoAnalisePromptAddon(tipoAnaliseDoc, tipoAnaliseDescricao || null),
       perfilFirestore?.perfilCompleto ? buildCustomAnalysisPromptAddon(perfilFirestore) : "",
+      usaObraPer ? ORIENTACAO_PER_ARAGUAIA : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -730,11 +747,28 @@ export async function runAnaliseJob(params: {
     let goldenBlock = "";
     let goldenCaseIdsInjetados: string[] = [];
     if (tipoAnaliseId) {
+      const ragQueryText = buildAnaliseQueryText({
+        tipoAnaliseId,
+        tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
+        titulo: data.titulo ? String(data.titulo) : null,
+        descricao: data.descricao ? String(data.descricao) : null,
+        tipoObra: data.tipoObra ? String(data.tipoObra) : null,
+        rodovia: data.rodovia ? String(data.rodovia) : null,
+        kilometragem: data.kilometragem ? String(data.kilometragem) : null,
+        municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
+        memorial: data.memorial ? String(data.memorial) : null,
+        faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
+        tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
+          ? String(data.tipoIntervencaoDetalhado)
+          : null,
+      });
+
       try {
         const feedbacks = await listFeedbacksAprovadosParaAnalise({
           tipoAnaliseId,
           organizacaoId: concessionariaId,
           maxItems: 8,
+          queryText: ragQueryText,
         });
         feedbackBlock = buildFeedbackAprendizadoPromptBlock(feedbacks);
         feedbackIdsInjetados = feedbacks.map((item) => item.id);
@@ -752,6 +786,7 @@ export async function runAnaliseJob(params: {
           tipoAnaliseId,
           organizacaoId: concessionariaId,
           maxItems: 3,
+          queryText: ragQueryText,
         });
         goldenBlock = buildGoldenCasesPromptBlock(goldens);
         goldenCaseIdsInjetados = goldens.map((item) => item.id);

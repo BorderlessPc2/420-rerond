@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.listGoldenCasesAprovadosParaAnalise = listGoldenCasesAprovadosParaAnalise;
 exports.buildGoldenCasesPromptBlock = buildGoldenCasesPromptBlock;
 const firestore_1 = require("firebase-admin/firestore");
+const embeddingService_1 = require("./embeddingService");
 const COLLECTION = process.env.FIRESTORE_GOLDEN_CASES_COLLECTION?.trim() || "goldenCases";
 const DEFAULT_MAX_ITEMS = 3;
 const DEFAULT_MAX_CHARS_FIELD = 500;
@@ -60,7 +61,6 @@ function normalizePares(raw, fallback) {
     return [];
 }
 function parseDoc(id, raw) {
-    // Sem status explícito: legado só entra se ativo (compat); docs novos sempre gravam status.
     const hasStatusField = Object.prototype.hasOwnProperty.call(raw, "status");
     const statusRaw = hasStatusField
         ? String(raw.status ?? "").trim()
@@ -82,6 +82,9 @@ function parseDoc(id, raw) {
     const pares = normalizePares(raw.pares, { erroIa, analiseCorreta });
     if (!analiseCorreta && pares.length === 0)
         return null;
+    const embedding = Array.isArray(raw.embedding)
+        ? raw.embedding.map(Number).filter((n) => Number.isFinite(n))
+        : null;
     return {
         id,
         codigo: codigo || id,
@@ -97,7 +100,35 @@ function parseDoc(id, raw) {
         ativo: raw.ativo !== false,
         updatedAtMs: toMs(raw.updatedAt) || toMs(raw.createdAt),
         createdAtMs: toMs(raw.createdAt),
+        embedding: embedding && embedding.length > 0 ? embedding : null,
+        embeddingModel: typeof raw.embeddingModel === "string" ? raw.embeddingModel : null,
     };
+}
+async function ensureEmbeddings(items) {
+    const db = (0, firestore_1.getFirestore)();
+    const out = [];
+    for (const item of items) {
+        if (item.embedding?.length &&
+            (!item.embeddingModel || item.embeddingModel === embeddingService_1.EMBEDDING_MODEL)) {
+            out.push(item);
+            continue;
+        }
+        try {
+            const text = (0, embeddingService_1.buildGoldenEmbeddingText)(item);
+            const embedding = await (0, embeddingService_1.createEmbedding)(text);
+            await db.collection(COLLECTION).doc(item.id).set({
+                embedding,
+                embeddingModel: embeddingService_1.EMBEDDING_MODEL,
+                embeddingUpdatedAt: new Date(),
+            }, { merge: true });
+            out.push({ ...item, embedding, embeddingModel: embeddingService_1.EMBEDDING_MODEL });
+        }
+        catch (err) {
+            console.warn(`Falha ao gerar embedding do golden ${item.id}:`, err);
+            out.push(item);
+        }
+    }
+    return out;
 }
 async function listGoldenCasesAprovadosParaAnalise(params) {
     const tipoId = params.tipoAnaliseId.trim();
@@ -108,7 +139,7 @@ async function listGoldenCasesAprovadosParaAnalise(params) {
     try {
         const db = (0, firestore_1.getFirestore)();
         const snap = await db.collection(COLLECTION).limit(80).get();
-        return snap.docs
+        let candidates = snap.docs
             .map((doc) => parseDoc(doc.id, doc.data()))
             .filter((item) => Boolean(item))
             .filter((item) => item.tipoAnaliseId === tipoId)
@@ -118,9 +149,26 @@ async function listGoldenCasesAprovadosParaAnalise(params) {
             if (!orgId)
                 return false;
             return item.organizacaoId === orgId;
-        })
-            .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.createdAtMs - a.createdAtMs)
-            .slice(0, maxItems);
+        });
+        candidates = candidates.sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.createdAtMs - a.createdAtMs);
+        const queryText = params.queryText?.trim();
+        if (!queryText) {
+            return candidates.slice(0, maxItems);
+        }
+        try {
+            const withEmb = await ensureEmbeddings(candidates);
+            if (withEmb.length <= maxItems) {
+                return withEmb;
+            }
+            const queryEmbedding = await (0, embeddingService_1.createEmbedding)(queryText);
+            const ranked = (0, embeddingService_1.rankBySimilarity)(withEmb, queryEmbedding, (item) => item.embedding, maxItems);
+            console.log(`RAG goldens tipo=${tipoId}: ${ranked.map((g) => g.id).join(", ")}`);
+            return ranked;
+        }
+        catch (ragErr) {
+            console.warn("RAG goldens falhou; fallback por recência:", ragErr);
+            return candidates.slice(0, maxItems);
+        }
     }
     catch (err) {
         console.warn("Falha ao carregar goldenCases aprovados:", err);

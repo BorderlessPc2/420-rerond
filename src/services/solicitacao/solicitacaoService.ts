@@ -164,6 +164,12 @@ const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles =>
       data.tipoAnaliseNomeUsado != null ? String(data.tipoAnaliseNomeUsado) : undefined,
     analiseVersaoAtual:
       typeof data.analiseVersaoAtual === 'number' ? data.analiseVersaoAtual : undefined,
+    goldenCaseIdsInjetados: Array.isArray(data.goldenCaseIdsInjetados)
+      ? data.goldenCaseIdsInjetados.map(String)
+      : undefined,
+    feedbackIdsInjetados: Array.isArray(data.feedbackIdsInjetados)
+      ? data.feedbackIdsInjetados.map(String)
+      : undefined,
     analiseErroMensagem: data.analiseErroMensagem ? String(data.analiseErroMensagem) : undefined,
     analiseErroCodigo: data.analiseErroCodigo ? String(data.analiseErroCodigo) : undefined,
     documentosProcessados: Array.isArray(data.documentosProcessados)

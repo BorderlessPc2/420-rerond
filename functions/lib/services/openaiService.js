@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initOpenAI = initOpenAI;
+exports.getOpenAIClient = getOpenAIClient;
 exports.buildFileInput = buildFileInput;
 exports.buildTextInput = buildTextInput;
 exports.analyze = analyze;
@@ -11,6 +12,9 @@ const openai_1 = __importDefault(require("openai"));
 let client = null;
 function initOpenAI(apiKey) {
     client = new openai_1.default({ apiKey });
+}
+function getOpenAIClient() {
+    return getClient();
 }
 function getClient() {
     if (!client) {

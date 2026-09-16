@@ -127,6 +127,10 @@ export interface Solicitacao {
   tipoAnaliseNomeUsado?: string | null
   /** Versão corrente da análise IA (snapshot em subcoleção). */
   analiseVersaoAtual?: number | null
+  /** IDs de golden cases aprovados injetados na última análise. */
+  goldenCaseIdsInjetados?: string[] | null
+  /** IDs de feedbacks aprovados injetados na última análise. */
+  feedbackIdsInjetados?: string[] | null
   analiseErroMensagem?: string | null
   analiseErroCodigo?: string | null
   documentosProcessados?: string[] | null

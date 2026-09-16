@@ -8,6 +8,8 @@ const normasService_1 = require("./normasService");
 const prompts_1 = require("../config/prompts");
 const concessionariaProfiles_1 = require("../config/concessionariaProfiles");
 const exemplosAnalise_1 = require("../config/exemplosAnalise");
+const perAmpliacoesCliente_1 = require("../config/perAmpliacoesCliente");
+const embeddingService_1 = require("./embeddingService");
 const consistencyAnalyzer_1 = require("./consistencyAnalyzer");
 const pipeline_1 = require("./pipeline");
 const pipeline_2 = require("./pipeline");
@@ -522,6 +524,16 @@ async function runAnaliseJob(params) {
                 .map(({ tipo, config }) => `### ${config.nome} (${tipo})\n${formatarRequisitosLegado(tipo)}`)
                 .join("\n\n");
         }
+        const usaObraPer = tipoBase === "obra_per" ||
+            tiposAnalise.includes("obra_per") ||
+            tiposConfig.some(({ tipo }) => tipo === "obra_per");
+        if (usaObraPer) {
+            const perReqs = perAmpliacoesCliente_1.REQ_OBRA_PER_CLIENTE.map((r) => {
+                const cat = r.categoria ? ` [${r.categoria}]` : "";
+                return `- ${r.id}: ${r.descricao}${cat}`;
+            }).join("\n");
+            requisitosFormatados += `\n\n### Ampliações PER — Via Araguaia (cliente)\n${perReqs}`;
+        }
         const tiposProjetoNome = [
             tipoAnaliseDoc ? `Tipo de análise: ${tipoAnaliseDoc.nome}` : null,
             perfilFirestore?.nome ??
@@ -535,6 +547,7 @@ async function runAnaliseJob(params) {
             promptCustomizado,
             (0, tipoAnaliseService_1.buildTipoAnalisePromptAddon)(tipoAnaliseDoc, tipoAnaliseDescricao || null),
             perfilFirestore?.perfilCompleto ? (0, concessionariaPerfilService_1.buildCustomAnalysisPromptAddon)(perfilFirestore) : "",
+            usaObraPer ? perAmpliacoesCliente_1.ORIENTACAO_PER_ARAGUAIA : "",
         ]
             .filter(Boolean)
             .join("\n");
@@ -562,11 +575,27 @@ async function runAnaliseJob(params) {
         let goldenBlock = "";
         let goldenCaseIdsInjetados = [];
         if (tipoAnaliseId) {
+            const ragQueryText = (0, embeddingService_1.buildAnaliseQueryText)({
+                tipoAnaliseId,
+                tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
+                titulo: data.titulo ? String(data.titulo) : null,
+                descricao: data.descricao ? String(data.descricao) : null,
+                tipoObra: data.tipoObra ? String(data.tipoObra) : null,
+                rodovia: data.rodovia ? String(data.rodovia) : null,
+                kilometragem: data.kilometragem ? String(data.kilometragem) : null,
+                municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
+                memorial: data.memorial ? String(data.memorial) : null,
+                faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
+                tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
+                    ? String(data.tipoIntervencaoDetalhado)
+                    : null,
+            });
             try {
                 const feedbacks = await (0, feedbackAprendizadoService_1.listFeedbacksAprovadosParaAnalise)({
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
                     maxItems: 8,
+                    queryText: ragQueryText,
                 });
                 feedbackBlock = (0, feedbackAprendizadoService_1.buildFeedbackAprendizadoPromptBlock)(feedbacks);
                 feedbackIdsInjetados = feedbacks.map((item) => item.id);
@@ -582,6 +611,7 @@ async function runAnaliseJob(params) {
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
                     maxItems: 3,
+                    queryText: ragQueryText,
                 });
                 goldenBlock = (0, goldenCaseService_1.buildGoldenCasesPromptBlock)(goldens);
                 goldenCaseIdsInjetados = goldens.map((item) => item.id);

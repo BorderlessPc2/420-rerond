@@ -204,6 +204,39 @@ export type EvalScoreResult = {
   criticosFalhos: string[]
   percentual: number
   passouCriticos: boolean
+  /** Detalhe opcional do matching lexical. */
+  findingsOk?: string[]
+  findingsFalhos?: string[]
+}
+
+/** Needles por finding — relatório “bom” deve mencionar ao menos um. */
+export const EVAL_FINDING_NEEDLES: Record<string, string[]> = {
+  'f-volumes': ['volume iii', 'volumes', 'individualiz'],
+  'f-codificacao': ['surod', 'codifica', 'nomenclatura'],
+  'f-memorial': ['cariacica', 'travessia', 'viana'],
+  'f-plano-trabalho': ['plano de trabalho', 'sem inconsist'],
+  'f-pba': ['pba', 'sustentabilidade', 'plano básico ambiental', 'plano basico ambiental'],
+  'f-planta': ['300+140', 'poste', 'planta baixa'],
+  'f-perfil': ['perfil', 'assinatura'],
+  'f-sinalizacao': ['sinaliza', 'carimbo', 'ecorodovias', 'eco rodovias'],
+  'f-especificacoes': ['especifica', 'sinalização provisória', 'sinalizacao provisoria'],
+  'f-requerimento': ['requerimento', 'travessia'],
+  'f-declaracao': ['declaração', 'declaracao', 'representante legal'],
+  'f-art': ['art', 'volume iii', 'volume i'],
+  'f-cronograma': ['cronograma', 'volume iii'],
+  'f-licenca': ['licença', 'licenca', 'inexigibilidade', 'dispensa'],
+  'f-conclusao': ['obje', 'pendên', 'pendenc', 'não conforme', 'nao conforme'],
+  'f-meta-pac': ['pac', 'checklist'],
+  'f-meta-ppu': ['ppu', 'publicidade', 'sustentação', 'sustentacao'],
+  'f-meta-repetibilidade': ['reanálise', 'reanalise', 'consistência', 'consistencia'],
+}
+
+/** Anti-padrões: se o relatório ainda comete o erro clássico, o finding NÃO marca OK. */
+export const EVAL_FINDING_ANTI_NEEDLES: Record<string, string[]> = {
+  'f-perfil': ['perfil não localizado', 'perfil nao localizado', 'perfil ausente'],
+  'f-plano-trabalho': ['falta de recomposição', 'falta de recomposicao', 'interferência no tráfego'],
+  'f-planta': ['planta completa e sem pendências', 'planta completa e sem pendencias'],
+  'f-sinalizacao': ['sinalização compatível e atendida', 'sinalizacao compativel e atendida'],
 }
 
 /** Pontuação simples: % de findings marcados OK; falha se algum crítico não ok. */
@@ -216,6 +249,7 @@ export function scoreEvalCaso(input: EvalScoreInput): EvalScoreResult | null {
   const criticosFalhos = caso.findings
     .filter((f) => f.severidade === 'critico' && !okSet.has(f.id))
     .map((f) => f.id)
+  const findingsFalhos = caso.findings.filter((f) => !okSet.has(f.id)).map((f) => f.id)
   return {
     casoId: input.casoId,
     total,
@@ -223,5 +257,45 @@ export function scoreEvalCaso(input: EvalScoreInput): EvalScoreResult | null {
     criticosFalhos,
     percentual: total === 0 ? 0 : Math.round((ok / total) * 1000) / 10,
     passouCriticos: criticosFalhos.length === 0,
+    findingsOk: [...okSet],
+    findingsFalhos,
   }
 }
+
+function normalizeText(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+/**
+ * Pontua um relatório/parecer textual contra o eval (matching lexical).
+ * Finding OK se: (1) algum needle positivo aparece e (2) nenhum anti-needle do erro clássico.
+ */
+export function scoreRelatorioContraEval(
+  casoId: string,
+  textoRelatorio: string,
+): EvalScoreResult | null {
+  const caso = EVAL_ASSERTIVIDADE_CASOS.find((c) => c.id === casoId)
+  if (!caso) return null
+  const blob = normalizeText(textoRelatorio)
+  const findingsOk: string[] = []
+
+  for (const finding of caso.findings) {
+    const needles = (EVAL_FINDING_NEEDLES[finding.id] ?? [finding.item]).map((n) =>
+      normalizeText(n),
+    )
+    const antis = (EVAL_FINDING_ANTI_NEEDLES[finding.id] ?? []).map((n) => normalizeText(n))
+    const hitPositive = needles.some((n) => n && blob.includes(n))
+    const hitAnti = antis.some((n) => n && blob.includes(n))
+    if (finding.programaHistoricoAcertou && hitPositive) {
+      findingsOk.push(finding.id)
+      continue
+    }
+    if (hitPositive && !hitAnti) findingsOk.push(finding.id)
+  }
+
+  return scoreEvalCaso({ casoId, findingsOk })
+}
+

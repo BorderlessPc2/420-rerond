@@ -174,9 +174,29 @@
           "id": "CODIFICACAO_DOCS",
           "descricao": "Codificação e identificação de documentos conforme Anexo (Art. 8º)"
         },
-        {
+          {
           "id": "FORMATO_DIGITAL",
           "descricao": "Documentos em formato digital editável e PDF (Art. 6º)"
+        },
+        {
+          "id": "PER_CATEGORIA_AMPLIACAO",
+          "descricao": "Identificar a categoria de ampliação/dispositivo (Duplicação, Faixa Adicional, Via Marginal, Acesso, Trombeta, Diamante, Retorno, Passarela, etc.)."
+        },
+        {
+          "id": "PER_LOCALIZACAO_KM",
+          "descricao": "Rodovia, km inicial/final e município coerentes com o trecho PER declarado nos documentos."
+        },
+        {
+          "id": "PER_CONFIGURACAO_TIPOLOGIA",
+          "descricao": "Configuração e tipologia da obra compatíveis com a categoria PER."
+        },
+        {
+          "id": "PER_QUANTITATIVOS",
+          "descricao": "Extensão/quantidade informada coerente com a natureza da ampliação e com os anexos."
+        },
+        {
+          "id": "PER_DOCS_SUROD12",
+          "descricao": "Volumes/codificação e documentação mínima conforme SUROD 12 aplicável a obra PER."
         }
       ]
     },

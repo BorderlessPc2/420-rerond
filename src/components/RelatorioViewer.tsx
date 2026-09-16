@@ -116,6 +116,9 @@ interface RelatorioViewerProps {
   /** PDFs efetivamente enviados à IA na última análise. */
   documentosProcessados?: string[] | null
   documentosOmitidos?: string[] | null
+  /** Ensino injetado na última análise (transparência). */
+  goldenCaseIdsInjetados?: string[] | null
+  feedbackIdsInjetados?: string[] | null
   dadosExtraidos?: DadosExtraidosAnalise | null
   conferenciaInputs?: ConferenciaInput[]
   onRelatorioAtualizado?: (resultado: SolicitacaoWithFiles) => void
@@ -137,6 +140,8 @@ export default function RelatorioViewer({
   analiseVersaoAtual,
   documentosProcessados,
   documentosOmitidos,
+  goldenCaseIdsInjetados,
+  feedbackIdsInjetados,
   dadosExtraidos,
   conferenciaInputs,
   onRelatorioAtualizado,
@@ -453,6 +458,17 @@ export default function RelatorioViewer({
                 {documentosProcessados.join(', ')}
                 {documentosOmitidos && documentosOmitidos.length > 0
                   ? ` · Omitidos: ${documentosOmitidos.join(', ')}`
+                  : ''}
+              </p>
+            )}
+            {(goldenCaseIdsInjetados != null || feedbackIdsInjetados != null) && (
+              <p className="relatorio-viewer-docs" role="status">
+                Ensino injetado
+                {goldenCaseIdsInjetados && goldenCaseIdsInjetados.length > 0
+                  ? ` · golden cases (${goldenCaseIdsInjetados.length}): ${goldenCaseIdsInjetados.join(', ')}`
+                  : ' · golden cases: nenhum'}
+                {feedbackIdsInjetados && feedbackIdsInjetados.length > 0
+                  ? ` · feedbacks (${feedbackIdsInjetados.length}): ${feedbackIdsInjetados.join(', ')}`
                   : ''}
               </p>
             )}

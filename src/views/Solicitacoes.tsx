@@ -43,6 +43,8 @@ export default function Solicitacoes() {
     analiseVersaoAtual?: number | null
     documentosProcessados?: string[] | null
     documentosOmitidos?: string[] | null
+    goldenCaseIdsInjetados?: string[] | null
+    feedbackIdsInjetados?: string[] | null
     dadosExtraidos?: SolicitacaoWithFiles['dadosExtraidos']
     conferenciaInputs?: SolicitacaoWithFiles['conferenciaInputs']
   } | null>(null)
@@ -241,6 +243,8 @@ export default function Solicitacoes() {
     analiseVersaoAtual: solicitacao.analiseVersaoAtual ?? null,
     documentosProcessados: solicitacao.documentosProcessados ?? null,
     documentosOmitidos: solicitacao.documentosOmitidos ?? null,
+    goldenCaseIdsInjetados: solicitacao.goldenCaseIdsInjetados ?? null,
+    feedbackIdsInjetados: solicitacao.feedbackIdsInjetados ?? null,
     dadosExtraidos: solicitacao.dadosExtraidos,
     conferenciaInputs: solicitacao.conferenciaInputs,
   })
@@ -587,6 +591,8 @@ export default function Solicitacoes() {
           analiseVersaoAtual={relatorioAberto.analiseVersaoAtual}
           documentosProcessados={relatorioAberto.documentosProcessados}
           documentosOmitidos={relatorioAberto.documentosOmitidos}
+          goldenCaseIdsInjetados={relatorioAberto.goldenCaseIdsInjetados}
+          feedbackIdsInjetados={relatorioAberto.feedbackIdsInjetados}
           dadosExtraidos={relatorioAberto.dadosExtraidos}
           conferenciaInputs={relatorioAberto.conferenciaInputs}
           onRelatorioAtualizado={(resultado) => {

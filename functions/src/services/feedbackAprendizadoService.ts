@@ -1,4 +1,10 @@
 import { getFirestore } from "firebase-admin/firestore";
+import {
+  EMBEDDING_MODEL,
+  buildFeedbackEmbeddingText,
+  createEmbedding,
+  rankBySimilarity,
+} from "./embeddingService";
 
 export type FeedbackValidacaoStatus =
   | "rascunho"
@@ -17,6 +23,8 @@ export type FeedbackAprendizadoFirestore = {
   status: FeedbackValidacaoStatus;
   updatedAtMs: number;
   createdAtMs: number;
+  embedding?: number[] | null;
+  embeddingModel?: string | null;
 };
 
 const COLLECTION =
@@ -58,6 +66,10 @@ function parseDoc(
   const justificativa = String(raw.justificativa ?? "").trim();
   if (!regraOuItem || !original || !correcao || !justificativa) return null;
 
+  const embedding = Array.isArray(raw.embedding)
+    ? (raw.embedding as unknown[]).map(Number).filter((n) => Number.isFinite(n))
+    : null;
+
   return {
     id,
     tipoAnaliseId,
@@ -72,19 +84,55 @@ function parseDoc(
     status,
     updatedAtMs: toMs(raw.updatedAt) || toMs(raw.createdAt),
     createdAtMs: toMs(raw.createdAt),
+    embedding: embedding && embedding.length > 0 ? embedding : null,
+    embeddingModel:
+      typeof raw.embeddingModel === "string" ? raw.embeddingModel : null,
   };
+}
+
+async function ensureEmbeddings(
+  items: FeedbackAprendizadoFirestore[],
+): Promise<FeedbackAprendizadoFirestore[]> {
+  const db = getFirestore();
+  const out: FeedbackAprendizadoFirestore[] = [];
+  for (const item of items) {
+    if (
+      item.embedding?.length &&
+      (!item.embeddingModel || item.embeddingModel === EMBEDDING_MODEL)
+    ) {
+      out.push(item);
+      continue;
+    }
+    try {
+      const text = buildFeedbackEmbeddingText(item);
+      const embedding = await createEmbedding(text);
+      await db.collection(COLLECTION).doc(item.id).set(
+        {
+          embedding,
+          embeddingModel: EMBEDDING_MODEL,
+          embeddingUpdatedAt: new Date(),
+        },
+        { merge: true },
+      );
+      out.push({ ...item, embedding, embeddingModel: EMBEDDING_MODEL });
+    } catch (err) {
+      console.warn(`Falha ao gerar embedding do feedback ${item.id}:`, err);
+      out.push(item);
+    }
+  }
+  return out;
 }
 
 /**
  * Carrega feedbacks aprovados para injeção no prompt.
  * Salvaguardas: só aprovado; exige tipoAnaliseId; escopo org (null = genérico do tipo);
- * limita quantidade e tamanho.
+ * ranking semântico opcional (RAG) com fallback por recência.
  */
 export async function listFeedbacksAprovadosParaAnalise(params: {
   tipoAnaliseId: string;
-  /** Mapeia para Feedback.organizacaoId (hoje = concessionariaId). */
   organizacaoId?: string | null;
   maxItems?: number;
+  queryText?: string | null;
 }): Promise<FeedbackAprendizadoFirestore[]> {
   const tipoId = params.tipoAnaliseId.trim();
   if (!tipoId) return [];
@@ -94,28 +142,42 @@ export async function listFeedbacksAprovadosParaAnalise(params: {
 
   try {
     const db = getFirestore();
-    // Query por status; filtro fino de tipo/org em memória (evita índice composto obrigatório).
     const snap = await db
       .collection(COLLECTION)
       .where("status", "==", "aprovado")
       .limit(80)
       .get();
 
-    const items = snap.docs
+    let candidates = snap.docs
       .map((doc) => parseDoc(doc.id, doc.data() as Record<string, unknown>))
       .filter((item): item is FeedbackAprendizadoFirestore => Boolean(item))
       .filter((item) => item.tipoAnaliseId === tipoId)
       .filter((item) => {
-        // Sem org no feedback → vale para o tipo inteiro.
-        // Com org → só se bater com a concessionária da solicitação.
         if (!item.organizacaoId) return true;
         if (!orgId) return false;
         return item.organizacaoId === orgId;
       })
-      .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.createdAtMs - a.createdAtMs)
-      .slice(0, maxItems);
+      .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.createdAtMs - a.createdAtMs);
 
-    return items;
+    const queryText = params.queryText?.trim();
+    if (!queryText) {
+      return candidates.slice(0, maxItems);
+    }
+
+    try {
+      const withEmb = await ensureEmbeddings(candidates);
+      if (withEmb.length <= maxItems) return withEmb;
+      const queryEmbedding = await createEmbedding(queryText);
+      return rankBySimilarity(
+        withEmb,
+        queryEmbedding,
+        (item) => item.embedding,
+        maxItems,
+      );
+    } catch (ragErr) {
+      console.warn("RAG feedbacks falhou; fallback por recência:", ragErr);
+      return candidates.slice(0, maxItems);
+    }
   } catch (err) {
     console.warn("Falha ao carregar feedbacksAprendizado aprovados:", err);
     return [];
