@@ -178,6 +178,28 @@ const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles =>
     documentosOmitidos: Array.isArray(data.documentosOmitidos)
       ? data.documentosOmitidos.map(String)
       : undefined,
+    assertividadeScore:
+      data.assertividadeScore && typeof data.assertividadeScore === 'object'
+        ? {
+            casoId: String((data.assertividadeScore as { casoId?: string }).casoId ?? ''),
+            percentual: Number((data.assertividadeScore as { percentual?: number }).percentual ?? 0),
+            passouCriticos: Boolean(
+              (data.assertividadeScore as { passouCriticos?: boolean }).passouCriticos,
+            ),
+            findingsOk: Array.isArray((data.assertividadeScore as { findingsOk?: unknown }).findingsOk)
+              ? ((data.assertividadeScore as { findingsOk: unknown[] }).findingsOk.map(String))
+              : undefined,
+            findingsFalhos: Array.isArray(
+              (data.assertividadeScore as { findingsFalhos?: unknown }).findingsFalhos,
+            )
+              ? ((data.assertividadeScore as { findingsFalhos: unknown[] }).findingsFalhos.map(String))
+              : undefined,
+            scoredAt:
+              (data.assertividadeScore as { scoredAt?: string }).scoredAt != null
+                ? String((data.assertividadeScore as { scoredAt?: string }).scoredAt)
+                : undefined,
+          }
+        : undefined,
     historicoEdicoes: Array.isArray(data.historicoEdicoes)
       ? (data.historicoEdicoes as Solicitacao['historicoEdicoes'])
       : undefined,

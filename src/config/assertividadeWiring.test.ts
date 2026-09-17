@@ -39,10 +39,17 @@ describe('wiring assertividade cliente', () => {
 
   it('goldens do cliente ficam pendentes até aprovação', () => {
     const cliente = GOLDEN_CASES_SEED.filter((g) => g.id.startsWith('cliente-'))
-    expect(cliente.length).toBeGreaterThanOrEqual(4)
+    expect(cliente.length).toBeGreaterThanOrEqual(16)
     for (const g of cliente) {
       expect(g.status).toBe('pendente')
       expect(g.pares.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('eval multi-tipo cobre tipos críticos', () => {
+    const tipos = new Set(EVAL_ASSERTIVIDADE_CASOS.map((c) => c.tipoAnaliseId))
+    for (const t of ['poc', 'ppu', 'pac-viabilidade', 'pac-executivo', 'pan', 'acesso']) {
+      expect(tipos.has(t), t).toBe(true)
     }
   })
 

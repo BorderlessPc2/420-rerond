@@ -51,10 +51,20 @@ export const TAXONOMIA_STATUS_CHECKLIST = `TAXONOMIA OBRIGATÓRIA DO CHECKLIST (
 
 export const INSTRUCOES_PECAS_GRAFICAS = `PEÇAS GRÁFICAS (planta baixa, perfil, sinalização, geométrico e equivalentes):
 - Analise o desenho, não só o nome do arquivo: cotas, FXD, faixa non aedificandi, km, sentido, interferência com pista/acostamento.
+- Conferir km no carimbo × km do memorial/formulário; divergência → NAO_CONFORME citando ambos os lados.
+- Em plantas de rede/postes: exigir distância poste–bordo (ou equivalente) quando aplicável à tipologia; ausência do parâmetro com peça presente → NAO_CONFORME (não INFORMACAO_AUSENTE).
+- Assinatura do RT nas peças gráficas: falta de assinatura em documento apresentado → NAO_CONFORME.
+- Carimbo/disciplina: título da prancha deve corresponder ao conteúdo (ex.: "Projeto de Sinalização de Obras" ≠ "Detalhe de Ocupação"); carimbo errado → NAO_CONFORME.
+- PRESENTE ≠ CONFORME: existência do PDF gráfico NÃO autoriza OK — avalie parâmetros técnicos e aderência normativa.
 - Se a peça estiver ilegível, truncada ou sem os elementos acima, use INFORMACAO_AUSENTE — não chute cotas nem geometria.
 - Documento gráfico presente mas com parâmetros insuficientes ou em desacordo com a norma → NAO_CONFORME.
-- PROIBIDO declarar que informação "não existe" na planta sem indicar qual arquivo/página/prancha foi inspecionado e o que se buscou (cota, eixo, FXD, etc.).
-- Compatibilize Memorial × plantas: se houver divergência, NAO_CONFORME com evidência dos dois lados (arquivo/página).`;
+- PROIBIDO declarar que informação "não existe" na planta sem indicar qual arquivo/página/prancha foi inspecionado e o que se buscou (cota, eixo, FXD, etc.).`;
+
+export const REGRAS_COMPATIBILIZACAO_DOCS = `COMPATIBILIZAÇÃO ENTRE DOCUMENTOS:
+- Cruzar Memorial × planta × perfil × sinalização × Volume III (e equivalentes da tipologia).
+- Qualquer divergência material (km, município, tipo de intervenção, cotas, nomenclatura de disciplina) → NAO_CONFORME com evidência dos DOIS lados (arquivo/página de cada).
+- Não marcar um documento OK se outro do mesmo pacote o contradiz no mesmo parâmetro.
+- Volumes/codificação: existência do arquivo ≠ organização Volume I/II/III nem nomenclatura SUROD corretas.`;
 
 export const REGRAS_CONFERENCIA_EVIDENCIA = `CONFERÊNCIA FORMULÁRIO × DOCUMENTOS (conferenciaInputs):
 - valorDocumento SOMENTE extraído dos PDFs. Proibido copiar valorFormulario.
@@ -98,6 +108,8 @@ REGRAS IMPORTANTES:
 ${TAXONOMIA_STATUS_CHECKLIST}
 
 ${INSTRUCOES_PECAS_GRAFICAS}
+
+${REGRAS_COMPATIBILIZACAO_DOCS}
 
 ${REGRAS_CONFERENCIA_EVIDENCIA}
 
@@ -178,11 +190,12 @@ INSTRUÇÕES:
 4. Compare o que estiver no escopo com os requisitos listados.
 5. ${TAXONOMIA_STATUS_CHECKLIST}
 6. ${INSTRUCOES_PECAS_GRAFICAS}
-7. ${REGRAS_CONFERENCIA_EVIDENCIA}
-8. ${REGRAS_ISOLAMENTO_TIPO}
-9. ${REGRAS_RACIOCINIO_ASSERTIVO}
-10. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
-11. Respeite estritamente as saídas pedidas:
+7. ${REGRAS_COMPATIBILIZACAO_DOCS}
+8. ${REGRAS_CONFERENCIA_EVIDENCIA}
+9. ${REGRAS_ISOLAMENTO_TIPO}
+10. ${REGRAS_RACIOCINIO_ASSERTIVO}
+11. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
+12. Respeite estritamente as saídas pedidas:
 - ${instrucoesSaida}${promptAdicional}
 
 FORMATO DE SAÍDA OBRIGATÓRIO — responda APENAS com JSON válido, sem texto antes ou depois:

@@ -9,6 +9,7 @@ const prompts_1 = require("../config/prompts");
 const concessionariaProfiles_1 = require("../config/concessionariaProfiles");
 const exemplosAnalise_1 = require("../config/exemplosAnalise");
 const perAmpliacoesCliente_1 = require("../config/perAmpliacoesCliente");
+const evalAssertividadeCliente_1 = require("../config/evalAssertividadeCliente");
 const embeddingService_1 = require("./embeddingService");
 const consistencyAnalyzer_1 = require("./consistencyAnalyzer");
 const pipeline_1 = require("./pipeline");
@@ -762,6 +763,25 @@ async function runAnaliseJob(params) {
         // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai
         const snapAntes = await solicitacaoRef.get();
         const dataAntes = snapAntes.data() || {};
+        const evalCasoId = (0, evalAssertividadeCliente_1.resolveEvalCasoIdPorTipo)(tipoAnaliseId || dataAntes.tipoAnaliseId || null);
+        let assertividadeScore = null;
+        if (evalCasoId) {
+            const textoScore = [
+                parecerFinal || "",
+                escopoAnalise.gerarChecklistConformidade ? JSON.stringify(checklistFinal) : "",
+            ].join("\n");
+            const scored = (0, evalAssertividadeCliente_1.scoreRelatorioContraEval)(evalCasoId, textoScore);
+            if (scored) {
+                assertividadeScore = {
+                    casoId: scored.casoId,
+                    percentual: scored.percentual,
+                    passouCriticos: scored.passouCriticos,
+                    findingsOk: scored.findingsOk ?? [],
+                    findingsFalhos: scored.findingsFalhos ?? [],
+                    scoredAt: new Date().toISOString(),
+                };
+            }
+        }
         const versaoAnterior = typeof dataAntes.analiseVersaoAtual === "number" ? dataAntes.analiseVersaoAtual : 0;
         const novaVersao = versaoAnterior + 1;
         const versoesRef = solicitacaoRef.collection("analiseVersoes");
@@ -801,6 +821,7 @@ async function runAnaliseJob(params) {
             feedbackIdsInjetados,
             goldenCaseIdsInjetados,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
+            ...(assertividadeScore ? { assertividadeScore } : {}),
         });
         lastStage = "consolidate";
         const telemetry = {
@@ -840,6 +861,9 @@ async function runAnaliseJob(params) {
             analiseErroCodigo: null,
             analiseErroMensagem: null,
             analiseTelemetry: telemetry,
+            ...(assertividadeScore
+                ? { assertividadeScore }
+                : { assertividadeScore: firestore_1.FieldValue.delete() }),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
         await jobRef.update({

@@ -119,6 +119,14 @@ interface RelatorioViewerProps {
   /** Ensino injetado na última análise (transparência). */
   goldenCaseIdsInjetados?: string[] | null
   feedbackIdsInjetados?: string[] | null
+  assertividadeScore?: {
+    casoId: string
+    percentual: number
+    passouCriticos: boolean
+    findingsOk?: string[]
+    findingsFalhos?: string[]
+    scoredAt?: string
+  } | null
   dadosExtraidos?: DadosExtraidosAnalise | null
   conferenciaInputs?: ConferenciaInput[]
   onRelatorioAtualizado?: (resultado: SolicitacaoWithFiles) => void
@@ -142,6 +150,7 @@ export default function RelatorioViewer({
   documentosOmitidos,
   goldenCaseIdsInjetados,
   feedbackIdsInjetados,
+  assertividadeScore,
   dadosExtraidos,
   conferenciaInputs,
   onRelatorioAtualizado,
@@ -470,6 +479,13 @@ export default function RelatorioViewer({
                 {feedbackIdsInjetados && feedbackIdsInjetados.length > 0
                   ? ` · feedbacks (${feedbackIdsInjetados.length}): ${feedbackIdsInjetados.join(', ')}`
                   : ''}
+              </p>
+            )}
+            {assertividadeScore && (
+              <p className="relatorio-viewer-docs" role="status">
+                Assertividade eval: {assertividadeScore.percentual}% · críticos{' '}
+                {assertividadeScore.passouCriticos ? 'OK' : 'NOK'}
+                {assertividadeScore.casoId ? ` · ${assertividadeScore.casoId}` : ''}
               </p>
             )}
           </div>

@@ -145,6 +145,15 @@ export interface Solicitacao {
     failedStage?: string | null
     errorCode?: string | null
   } | null
+  /** Score lexical vs eval de assertividade (quando tipo mapeado). */
+  assertividadeScore?: {
+    casoId: string
+    percentual: number
+    passouCriticos: boolean
+    findingsOk?: string[]
+    findingsFalhos?: string[]
+    scoredAt?: string
+  } | null
   /** Histórico leve de edições manuais (P11). */
   historicoEdicoes?: Array<{
     em: string

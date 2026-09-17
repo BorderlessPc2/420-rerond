@@ -29,6 +29,10 @@ import {
 import { buildEco101ExemploAnaliseBlock } from "../config/exemplosAnalise";
 import { ORIENTACAO_PER_ARAGUAIA, REQ_OBRA_PER_CLIENTE } from "../config/perAmpliacoesCliente";
 import {
+  resolveEvalCasoIdPorTipo,
+  scoreRelatorioContraEval,
+} from "../config/evalAssertividadeCliente";
+import {
   buildAnaliseQueryText,
 } from "./embeddingService";
 import {
@@ -996,6 +1000,34 @@ export async function runAnaliseJob(params: {
     // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai
     const snapAntes = await solicitacaoRef.get();
     const dataAntes = snapAntes.data() || {};
+
+    const evalCasoId = resolveEvalCasoIdPorTipo(tipoAnaliseId || dataAntes.tipoAnaliseId || null);
+    let assertividadeScore: {
+      casoId: string;
+      percentual: number;
+      passouCriticos: boolean;
+      findingsOk: string[];
+      findingsFalhos: string[];
+      scoredAt: string;
+    } | null = null;
+    if (evalCasoId) {
+      const textoScore = [
+        parecerFinal || "",
+        escopoAnalise.gerarChecklistConformidade ? JSON.stringify(checklistFinal) : "",
+      ].join("\n");
+      const scored = scoreRelatorioContraEval(evalCasoId, textoScore);
+      if (scored) {
+        assertividadeScore = {
+          casoId: scored.casoId,
+          percentual: scored.percentual,
+          passouCriticos: scored.passouCriticos,
+          findingsOk: scored.findingsOk ?? [],
+          findingsFalhos: scored.findingsFalhos ?? [],
+          scoredAt: new Date().toISOString(),
+        };
+      }
+    }
+
     const versaoAnterior =
       typeof dataAntes.analiseVersaoAtual === "number" ? dataAntes.analiseVersaoAtual : 0;
     const novaVersao = versaoAnterior + 1;
@@ -1043,6 +1075,7 @@ export async function runAnaliseJob(params: {
       feedbackIdsInjetados,
       goldenCaseIdsInjetados,
       createdAt: FieldValue.serverTimestamp(),
+      ...(assertividadeScore ? { assertividadeScore } : {}),
     });
 
     lastStage = "consolidate";
@@ -1084,6 +1117,9 @@ export async function runAnaliseJob(params: {
       analiseErroCodigo: null,
       analiseErroMensagem: null,
       analiseTelemetry: telemetry,
+      ...(assertividadeScore
+        ? { assertividadeScore }
+        : { assertividadeScore: FieldValue.delete() }),
       updatedAt: FieldValue.serverTimestamp(),
     });
 

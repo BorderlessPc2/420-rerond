@@ -1,15 +1,64 @@
 .ensinar-ia {
-  padding: 28px 24px 48px;
-  max-width: 1120px;
+  padding: 24px 24px 56px;
+  max-width: 1180px;
   margin: 0 auto;
+  animation: ensinar-ia-enter 420ms ease both;
 }
 
-/* —— Header —— */
-.ensinar-ia-header {
+@keyframes ensinar-ia-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* —— Hero —— */
+.ensinar-ia-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 4px;
+  padding: 22px 22px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(35, 87, 196, 0.14);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 248, 255, 0.88) 55%, rgba(255, 244, 209, 0.28) 100%);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ensinar-ia-hero-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: min(420px, 70vw);
+  height: 280px;
+  background: radial-gradient(circle at 30% 40%, rgba(35, 87, 196, 0.16), transparent 68%);
+  animation: ensinar-ia-glow 7s ease-in-out infinite alternate;
+}
+
+@keyframes ensinar-ia-glow {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.75;
+  }
+  to {
+    transform: translate(-18px, 12px) scale(1.08);
+    opacity: 1;
+  }
+}
+
+.ensinar-ia-hero-inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-bottom: 4px;
 }
 
 .ensinar-ia-header-main {
@@ -20,46 +69,110 @@
 
 .ensinar-ia-brand-mark {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-md);
-  background: linear-gradient(145deg, var(--color-primary-700), var(--color-primary-900));
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--color-primary-600), var(--color-primary-900));
   color: #fff;
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    0 8px 20px rgba(15, 47, 115, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.ensinar-ia-header h1 {
-  margin: 0 0 6px;
-  font-size: 1.65rem;
+.ensinar-ia-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary-700);
+}
+
+.ensinar-ia-hero-copy h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.55rem, 2.4vw, 1.9rem);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--color-primary-900);
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
-.ensinar-ia-header p {
+.ensinar-ia-hero-copy p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   line-height: 1.55;
-  max-width: 54rem;
+  max-width: 40rem;
 }
 
-.ensinar-ia-header p strong {
-  color: var(--color-text);
-  font-weight: 600;
+.ensinar-ia-journey {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ensinar-ia-journey li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 12px 11px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(213, 227, 245, 0.95);
+  animation: ensinar-ia-enter 520ms ease both;
+}
+
+.ensinar-ia-journey li:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.ensinar-ia-journey li:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.ensinar-ia-journey-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
+.ensinar-ia-journey strong {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-primary-900);
+  margin-bottom: 2px;
+}
+
+.ensinar-ia-journey span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+  line-height: 1.35;
 }
 
 .ensinar-ia-stats {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .ensinar-ia-stat {
-  background: var(--color-surface, #fff);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--color-border, #d5e3f5);
   border-radius: var(--radius-md);
   padding: 12px 14px;
@@ -67,10 +180,38 @@
   flex-direction: column;
   gap: 2px;
   box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.ensinar-ia-stat.accent-ok {
+  border-color: #b7e8ce;
+  background: linear-gradient(180deg, #fff 0%, var(--color-success-bg) 140%);
+}
+
+.ensinar-ia-stat.accent-wait {
+  border-color: #f5d78a;
+  background: linear-gradient(180deg, #fff 0%, var(--color-warning-bg) 140%);
+}
+
+.ensinar-ia-stat-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--color-primary-600);
+  opacity: 0.75;
+}
+
+.ensinar-ia-stat.accent-ok .ensinar-ia-stat-icon {
+  color: var(--color-success);
+}
+
+.ensinar-ia-stat.accent-wait .ensinar-ia-stat-icon {
+  color: var(--color-warning);
 }
 
 .ensinar-ia-stat-value {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--color-primary-800);
   letter-spacing: -0.02em;
@@ -84,7 +225,163 @@
   line-height: 1.3;
 }
 
+.ensinar-ia-progress-block {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ensinar-ia-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+}
+
+.ensinar-ia-progress-head strong {
+  font-size: 0.875rem;
+  color: var(--color-primary-800);
+  font-variant-numeric: tabular-nums;
+}
+
+.ensinar-ia-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(221, 234, 255, 0.9);
+  overflow: hidden;
+}
+
+.ensinar-ia-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-accent-500));
+  transition: width 600ms ease;
+}
+
+.ensinar-ia-coverage {
+  position: relative;
+  z-index: 1;
+}
+
+.ensinar-ia-coverage-title {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ensinar-ia-coverage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ensinar-ia-coverage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  padding: 6px 10px 6px 12px;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 100ms ease;
+}
+
+.ensinar-ia-coverage-chip:hover {
+  border-color: var(--color-primary-600);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.ensinar-ia-coverage-chip:active {
+  transform: translateY(0);
+}
+
+.ensinar-ia-coverage-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ensinar-ia-coverage-count {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-primary-100);
+  color: var(--color-primary-800);
+}
+
+.ensinar-ia-coverage-chip.has-pending .ensinar-ia-coverage-count {
+  background: var(--color-warning-bg);
+  color: #8a5a05;
+}
+
+.ensinar-ia-coverage-chip.has-approved:not(.has-pending) .ensinar-ia-coverage-count {
+  background: var(--color-success-bg);
+  color: #0f6b40;
+}
+
+.ensinar-ia-callout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid #c9dbf7;
+  background: linear-gradient(105deg, #f2f8ff 0%, #fff 55%, #fff8e8 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.ensinar-ia-callout-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--color-primary-700);
+  color: #fff;
+}
+
+.ensinar-ia-callout-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ensinar-ia-callout-body strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--color-primary-900);
+  margin-bottom: 2px;
+}
+
+.ensinar-ia-callout-body p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .ensinar-ia-mock {
+  position: relative;
+  z-index: 1;
   margin: 0;
   background: var(--color-warning-bg, #fff6de);
   border: 1px solid #f5d78a;
@@ -92,6 +389,34 @@
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.8125rem;
+}
+
+@media (max-width: 900px) {
+  .ensinar-ia-journey {
+    grid-template-columns: 1fr;
+  }
+
+  .ensinar-ia-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ensinar-ia-callout {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .ensinar-ia {
+    padding: 16px 14px 40px;
+  }
+
+  .ensinar-ia-hero {
+    padding: 16px;
+  }
+
+  .ensinar-ia-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* —— Tabs (segmented) —— */
@@ -446,15 +771,33 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  overflow: hidden;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
-    transform 100ms ease;
+    transform 140ms ease;
+}
+
+.ensinar-ia-case-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary-600);
+  opacity: 0.35;
 }
 
 .ensinar-ia-case-card:hover {
-  border-color: var(--color-primary-100);
-  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-600);
+  box-shadow: 0 8px 22px rgba(15, 47, 115, 0.1);
+  transform: translateY(-2px);
+}
+
+.ensinar-ia-case-card:hover::before {
+  opacity: 1;
 }
 
 .ensinar-ia-case-card:active {
@@ -499,7 +842,7 @@
 
 .ensinar-ia-badge {
   font-size: 0.6875rem;
-  font-weight: 650;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 6px;
   background: var(--color-neutral-bg, #f3f4f6);
@@ -521,6 +864,11 @@
 .ensinar-ia-badge.inactive {
   background: var(--color-danger-bg);
   color: #9f1239;
+}
+
+.ensinar-ia-badge.client {
+  background: var(--color-accent-100);
+  color: #8a5a05;
 }
 
 /* —— Errado × certo visual split —— */
@@ -679,7 +1027,7 @@
   border-color: var(--color-primary-100);
   background: var(--color-primary-50);
   color: var(--color-primary-800);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ensinar-ia-steps li.active .ensinar-ia-step-index {

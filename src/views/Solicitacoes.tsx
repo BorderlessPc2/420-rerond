@@ -45,6 +45,7 @@ export default function Solicitacoes() {
     documentosOmitidos?: string[] | null
     goldenCaseIdsInjetados?: string[] | null
     feedbackIdsInjetados?: string[] | null
+    assertividadeScore?: SolicitacaoWithFiles['assertividadeScore']
     dadosExtraidos?: SolicitacaoWithFiles['dadosExtraidos']
     conferenciaInputs?: SolicitacaoWithFiles['conferenciaInputs']
   } | null>(null)
@@ -245,6 +246,7 @@ export default function Solicitacoes() {
     documentosOmitidos: solicitacao.documentosOmitidos ?? null,
     goldenCaseIdsInjetados: solicitacao.goldenCaseIdsInjetados ?? null,
     feedbackIdsInjetados: solicitacao.feedbackIdsInjetados ?? null,
+    assertividadeScore: solicitacao.assertividadeScore ?? null,
     dadosExtraidos: solicitacao.dadosExtraidos,
     conferenciaInputs: solicitacao.conferenciaInputs,
   })
@@ -593,6 +595,7 @@ export default function Solicitacoes() {
           documentosOmitidos={relatorioAberto.documentosOmitidos}
           goldenCaseIdsInjetados={relatorioAberto.goldenCaseIdsInjetados}
           feedbackIdsInjetados={relatorioAberto.feedbackIdsInjetados}
+          assertividadeScore={relatorioAberto.assertividadeScore}
           dadosExtraidos={relatorioAberto.dadosExtraidos}
           conferenciaInputs={relatorioAberto.conferenciaInputs}
           onRelatorioAtualizado={(resultado) => {
@@ -610,6 +613,9 @@ export default function Solicitacoes() {
                     tipoRelatorio: resultado.tipoRelatorio,
                     dadosExtraidos: resultado.dadosExtraidos,
                     conferenciaInputs: resultado.conferenciaInputs,
+                    assertividadeScore: resultado.assertividadeScore ?? null,
+                    goldenCaseIdsInjetados: resultado.goldenCaseIdsInjetados ?? null,
+                    feedbackIdsInjetados: resultado.feedbackIdsInjetados ?? null,
                   }
                 : prev,
             )

@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
   EVAL_ASSERTIVIDADE_CASOS,
+  EVAL_CASO_POR_TIPO,
+  resolveEvalCasoIdPorTipo,
   scoreEvalCaso,
   scoreRelatorioContraEval,
 } from './evalAssertividadeCliente'
+
+const CASOS_MULTI = [
+  'eval-ppu-checklist',
+  'eval-pacv-capixaba',
+  'eval-pace-capixaba',
+  'eval-pan-checklist',
+  'eval-acesso-ipr',
+] as const
 
 describe('evalAssertividadeCliente', () => {
   it('tem caso POC Viana com findings críticos', () => {
@@ -53,5 +63,41 @@ describe('evalAssertividadeCliente', () => {
     `
     const scoreRuim = scoreRelatorioContraEval('eval-poc-edp-viana', ruim)
     expect(scoreRuim?.criticosFalhos.length).toBeGreaterThan(0)
+  })
+
+  it.each(CASOS_MULTI)('%s tem ≥1 finding crítico e score falha se crítico ausente', (casoId) => {
+    const caso = EVAL_ASSERTIVIDADE_CASOS.find((c) => c.id === casoId)
+    expect(caso, casoId).toBeTruthy()
+    const criticos = caso!.findings.filter((f) => f.severidade === 'critico')
+    expect(criticos.length).toBeGreaterThanOrEqual(1)
+    const semPrimeiro = caso!.findings.filter((f) => f.id !== criticos[0].id).map((f) => f.id)
+    const result = scoreEvalCaso({ casoId, findingsOk: semPrimeiro })
+    expect(result?.passouCriticos).toBe(false)
+    expect(result?.criticosFalhos).toContain(criticos[0].id)
+  })
+
+  it('mapeia tipos críticos para casos de eval', () => {
+    expect(resolveEvalCasoIdPorTipo('poc')).toBe('eval-poc-edp-viana')
+    expect(resolveEvalCasoIdPorTipo('ppu')).toBe('eval-ppu-checklist')
+    expect(resolveEvalCasoIdPorTipo('pac-viabilidade')).toBe('eval-pacv-capixaba')
+    expect(resolveEvalCasoIdPorTipo('pac-executivo')).toBe('eval-pace-capixaba')
+    expect(resolveEvalCasoIdPorTipo('pan')).toBe('eval-pan-checklist')
+    expect(resolveEvalCasoIdPorTipo('acesso')).toBe('eval-acesso-ipr')
+    expect(resolveEvalCasoIdPorTipo('ocupacao-faixa')).toBeNull()
+    expect(Object.keys(EVAL_CASO_POR_TIPO).length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('scoreRelatorioContraEval cobre needles dos casos multi-tipo', () => {
+    const ppu = scoreRelatorioContraEval(
+      'eval-ppu-checklist',
+      'Análise PPU de publicidade: natureza PPU, estrutura de sustentação e interferências, requerimento/ART/declaração, plantas com área e FD/FNE.',
+    )
+    expect(ppu?.passouCriticos).toBe(true)
+
+    const pan = scoreRelatorioContraEval(
+      'eval-pan-checklist',
+      'Processo de anuência PAN: poligonal com coordenadas, sobreposição com faixa de domínio, ART do imóvel.',
+    )
+    expect(pan?.passouCriticos).toBe(true)
   })
 })

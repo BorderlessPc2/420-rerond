@@ -1,0 +1,884 @@
+BASEINFRA PROJETOS E CONSULTORIA
+Relatório de Análise Técnica – Ocupação em Faixa
+de Domínio
+Projeto / processo:
+EDP Espírito Santo Distribuição de Energia S.A. - BR-101/ES - Ecovias /
+ECO101
+Contrato / ERP:
+—
+Concessionária:
+Ecovias / ECO101
+Trecho / rodovia:
+BR-101/ES — km 300+746 ao km 300+876 — BR-101/ES | km 300+746 ao
+km 300+876 | Viana – ES
+Responsável:
+Administrador Borderless
+Data da análise:
+14/09/2026, 11:06
+Identificador:
+RAC-20260914-NC3DCMCG
+Status geral:
+Não conforme
+Índice de conformidade:
+0%
+Documento técnico com identidade BaseInfra
+Confidencial — uso interno e partes autorizadas
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 1/23
+
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+ Conformidade
+0%
+Conformes
+0
+Atenção
+14
+Não conformes
+4
+LOTE 1/9 (1789077257440-EC1-101ES-300_746-300_876-OCP-PIT-MD-V1-001-R00.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: Não localizado no documento
+• Responsável técnico: Não localizado no documento
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 2/23
+
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.1.3 Plano Básico Ambiental
+Descrição:
+O Plano Básico Ambiental deve apresentar as medidas de mitigação e controle ambiental, conforme legislação
+vigente.
+Análise/Observação:
+• O documento menciona a dispensa de licença ambiental, mas não apresenta comprovação específica.
+• Não há evidência documental de dispensa ou licença.
+• Conclusão do item: Não localizado.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.2.3 Sinalização da Obra
+Descrição:
+O Projeto de Sinalização deve ser compatível com o tipo de intervenção, contendo distâncias de pré-sinalização,
+dispositivos, sentidos de tráfego e áreas de atividade.
+Análise/Observação:
+• O projeto de sinalização está presente e compatível com o tipo de intervenção.
+• Não foram identificadas pendências.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 3/23
+
+• Conclusão do item: Atende.
+3.2.4 Especificações Técnicas
+Descrição:
+As Especificações Técnicas devem incluir referências normativas aplicáveis: DNIT, ANTT/SUROD, ABNT e diretrizes
+da concessionária.
+Análise/Observação:
+• As especificações técnicas estão completas e incluem todas as referências normativas aplicáveis.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.1 Requerimento
+Descrição:
+O Requerimento deve conter a identificação do interessado, contatos, data, descrição do pleito e localização
+quilométrica.
+Análise/Observação:
+• O requerimento está completo e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3.2 Declaração de Veracidade
+Descrição:
+A Declaração de Veracidade deve conter a identificação do interessado, responsável técnico, data e assinaturas.
+Análise/Observação:
+• A declaração está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART não foi localizada nos documentos.
+• Ausência de evidência documental de ART vinculada ao trecho específico.
+• Conclusão do item: Não localizado.
+3.3.4 Cronograma de Execução da Obra
+Descrição:
+O Cronograma deve apresentar a execução em dias, com prazo total e etapas principais da implantação.
+Análise/Observação:
+• O cronograma está completo e inclui todas as etapas principais.
+• Não foram identificadas pendências.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 4/23
+
+• Conclusão do item: Atende.
+3.3.5 Licença Ambiental ou Comprovação de Inexigibilidade
+Descrição:
+A Licença Ambiental ou documento de comprovação de inexigibilidade deve ser apresentado quando aplicável.
+Análise/Observação:
+• Não foi localizado documento específico de licença ou comprovação de inexigibilidade.
+• Ausência de evidência documental.
+• Conclusão do item: Não localizado.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e Licença Ambiental ou comprovação de inexigibilidade.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 2/9 (1789077257442-EC1-101ES-300_746-300_876-OCP-PIT-1D-Y1-002-RR0.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260001208
+• Responsável técnico: Bruno Amaral Cazoto
+ 2. Análise
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 5/23
+
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 6/23
+
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 3/9 (1789077257443-EC1-101ES-300_746-300_876-OCP-PIT-ES-A0-001-R00.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260001208
+• Responsável técnico: Não localizado
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 7/23
+
+2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 8/23
+
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 4/9 (1789077257444-EC1-101ES-300_746-300_876-OCP-PIT-ID-Y1-001-RR0.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 9/23
+
+• Número da ART: 0820260094073
+• Responsável técnico: Francisco Corbalan Larrosa Filho
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 10/23
+
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 5/9 (1789077257445-PROJETO_CAD_3.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 11/23
+
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: Não localizado no documento
+• Responsável técnico: Não localizado no documento
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 12/23
+
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.2.3 Sinalização da Obra
+Descrição:
+O Projeto de Sinalização deve ser compatível com o tipo de intervenção, contendo distâncias de pré-sinalização,
+dispositivos, sentidos de tráfego e áreas de atividade.
+Análise/Observação:
+• O projeto de sinalização está presente e compatível com o tipo de intervenção.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART não foi localizada nos documentos.
+• Ausência de evidência documental de ART vinculada ao trecho específico.
+• Conclusão do item: Não localizado.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 13/23
+
+LOTE 6/9 (1789077257446-PROJETO_CAD_1.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260001208
+• Responsável técnico: Bruno Cazoto
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 14/23
+
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência de informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 7/9 (1789077257447-PROJETO_CAD_2.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 15/23
+
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260001208
+• Responsável técnico: Bruno Amaral Cazoto
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 16/23
+
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Necessidade de maior detalhamento na ART.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 8/9 (1789077257448-ART_MANSERV_ATUALIZADA.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 17/23
+
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260094073
+• Responsável técnico: Francisco Corbalan Larrosa Filho
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 18/23
+
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência de informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+---
+LOTE 9/9 (1789077257449-0003825313_NS_OTRF.pdf)
+Relatório de Análise Técnica – Ocupação em Faixa de Domínio
+1. Identificação do Projeto
+• Interessado: EDP Espírito Santo Distribuição de Energia S.A.
+• Concessionária: Ecovias / ECO101
+• Rodovia: BR-101/ES
+• Quilometragem: km 300+746 ao km 300+876
+• Município/UF: Viana/ES
+• Tipo de projeto: Ocupação em faixa de domínio
+• Tipo de intervenção: Ocupação longitudinal aérea por rede de distribuição de energia elétrica de média tensão –
+15 kV
+• Extensão: 130 m
+• Número da ART: 0820260001208
+• Responsável técnico: Bruno Amaral Cazoto
+ 2. Análise
+2.1 Organização das Pastas
+A documentação está organizada em volumes conforme o padrão ECO101, atendendo aos requisitos de organização.
+2.2 Codificação dos Arquivos
+Os arquivos estão nomeados conforme a codificação aplicável da ANTT/SUROD, sem pendências identificadas.
+3. Solicitação do Interessado - Apresentação de Documentação
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 19/23
+
+3.1 Análise do Volume I – Relatório Técnico
+3.1.1 Memorial Descritivo
+Descrição:
+O Memorial Descritivo deve conter a descrição da ocupação, localização quilométrica, características técnicas,
+materiais, método construtivo, parâmetros geométricos e justificativa técnica.
+Análise/Observação:
+• O memorial está presente, mas não contém informações sobre afastamentos laterais e altura livre.
+• Faltam detalhes sobre a condição dos postes e parâmetros geométricos suficientes.
+• Conclusão do item: Atende parcialmente.
+3.1.2 Plano de Trabalho
+Descrição:
+O Plano de Trabalho deve incluir a sequência das atividades, procedimentos construtivos, mobilização, sinalização,
+interferência no tráfego e recomposição da área afetada.
+Análise/Observação:
+• O plano está presente, mas faltam detalhes sobre a recomposição da área afetada.
+• Não há informações completas sobre interferência no tráfego.
+• Conclusão do item: Atende parcialmente.
+3.2 Análise do Volume II – Projetos
+3.2.1 Planta Baixa
+Descrição:
+A Planta Baixa deve incluir o eixo da via, pista, acostamento, faixa de domínio, faixa non aedificandi, posição da
+ocupação, coordenadas e afastamentos laterais.
+Análise/Observação:
+• A planta baixa está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.2.2 Perfil da Ocupação
+Descrição:
+O Perfil da Ocupação deve demonstrar a relação geométrica com greide, terreno natural, altura livre ou cobrimento
+mínimo.
+Análise/Observação:
+• O documento de perfil da ocupação não foi localizado nos documentos.
+• Ausência de informações sobre a relação geométrica necessária.
+• Conclusão do item: Não localizado.
+3.3 Análise do Volume III – Documentos Complementares
+3.3.2 Declaração de Veracidade
+Descrição:
+A Declaração de Veracidade deve conter a identificação do interessado, responsável técnico, data e assinaturas.
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 20/23
+
+Análise/Observação:
+• A declaração está completa e inclui todos os elementos exigidos.
+• Não foram identificadas pendências.
+• Conclusão do item: Atende.
+3.3.3 Anotação de Responsabilidade Técnica
+Descrição:
+A ART deve ser registrada e quitada, vinculada especificamente ao objeto, local, rodovia, km e ocupação em faixa de
+domínio.
+Análise/Observação:
+• A ART está registrada e quitada, mas não individualiza completamente o trecho específico.
+• Necessidade de maior detalhamento na individualização do trecho.
+• Conclusão do item: Atende parcialmente.
+ 4. Conclusão
+A documentação apresenta várias pendências que precisam ser resolvidas para atender completamente aos
+requisitos ECO101:
+• Falta de informações sobre afastamentos laterais e altura livre no Memorial Descritivo.
+• Detalhes sobre recomposição da área afetada ausentes no Plano de Trabalho.
+• Ausência do Perfil da Ocupação e informações sobre interferência com faixa de domínio.
+A documentação atende parcialmente aos requisitos ECO101 analisados. Recomenda-se a inclusão das informações
+faltantes para conformidade total.
+5. Referências Normativas
+• ANTT/SUROD
+• DNIT
+• ABNT
+• Diretrizes da Concessionária
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 21/23
+
+Anexo — Síntese do checklist de conformidade
+ ECO101_ORGANIZACAO_PASTAS — Documentação organizada em volumes conforme padrão ECO101: Volume I -…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_CODIFICACAO_ARQUIVOS — Arquivos nomeados conforme codificação aplicável da ANTT/SUROD e dire…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_MEMORIAL_DESCRITIVO — Memorial Descritivo contendo descrição da ocupação, localização quilo…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_PLANO_TRABALHO — Plano de Trabalho contendo sequência das atividades, procedimentos co…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_PLANTA_BAIXA — Planta Baixa com eixo da via, pista, acostamento, faixa de domínio, f…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_PERFIL_OCUPACAO — Perfil da Ocupação demonstrando relação geométrica com greide, terren…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_PROJETO_SINALIZACAO — Projeto de Sinalização de Obra compatível com o tipo de intervenção, …
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_ESPECIFICACOES_TECNICAS — Especificações técnicas e referências normativas aplicáveis: DNIT, AN…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_REQUERIMENTO — Requerimento contendo identificação do interessado, contatos, data, d…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_DECLARACAO_VERACIDADE — Declaração de Veracidade com identificação do interessado, responsáve…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_ART — ART registrada e quitada, vinculada especificamente ao objeto, local,…
+Exige atenção
+Item não retornado na análise — verificar documentação
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 22/23
+
+ECO101_CRONOGRAMA — Cronograma de execução em dias, com prazo total e etapas principais d…
+Exige atenção
+Item não retornado na análise — verificar documentação
+ECO101_LICENCA_AMBIENTAL — Licença Ambiental ou documento de comprovação de inexigibilidade/disp…
+Exige atenção
+Item não retornado na análise — verificar documentação
+POC_COMPLETUDE_DOCUMENTAL — Poc Completude Documental
+Não conforme
+Memorial Descritivo e Plano de Trabalho presentes, mas sem informações completas sobre afastam…
+POC_LOCALIZACAO_KM — Poc Localizacao Km
+Não conforme
+Localização quilométrica coerente entre formulário, memorial e plantas.
+POC_COMPAT_MEMORIAL_PLANTAS — Poc Compat Memorial Plantas
+Não conforme
+Inconsistências entre memorial e plantas quanto aos parâmetros geométricos e técnicos.
+POC_ART — Poc Art
+Não conforme
+ART apresentada, mas sem individualização completa do empreendimento e local específico da obr…
+POC_INTERFERENCIA_FXD — Poc Interferencia Fxd
+Exige atenção
+Não foi possível verificar interferência com faixa de domínio devido à ausência de plantas det…
+BaseInfra — Relatório de Análise Técnica – Ocupação em Faixa | RAC-20260914-NC3DCMCG
+Emitido em 14/09/2026, 11:14  ·  Página 23/23

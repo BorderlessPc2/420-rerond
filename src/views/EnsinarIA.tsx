@@ -6,9 +6,14 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Eye,
+  GraduationCap,
+  Hourglass,
   MessageSquareWarning,
   Plus,
+  ShieldCheck,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -222,59 +227,194 @@ export default function EnsinarIA() {
       (g) => g.status === 'pendente' && g.id.startsWith('cliente-'),
     ).length
     const feedbackAprovados = feedbacks.filter((f) => f.status === 'aprovado').length
+    const coberturaTipos = [
+      'poc',
+      'ppu',
+      'pac-viabilidade',
+      'pac-executivo',
+      'pan',
+      'acesso',
+    ].map((id) => ({
+      id,
+      nome: tipos.find((t) => t.id === id)?.nome || id,
+      total: goldens.filter((g) => g.tipoAnaliseId === id).length,
+      aprovados: goldens.filter(
+        (g) => g.tipoAnaliseId === id && g.status === 'aprovado' && g.ativo,
+      ).length,
+      pendentes: goldens.filter((g) => g.tipoAnaliseId === id && g.status === 'pendente')
+        .length,
+    }))
+    const taxaAprovacao =
+      goldens.length === 0 ? 0 : Math.round((aprovados / goldens.length) * 100)
     return {
       total: goldens.length,
       aprovados,
       pendentes,
       clientePendentes,
       feedbackAprovados,
+      coberturaTipos,
+      taxaAprovacao,
     }
-  }, [goldens, feedbacks])
+  }, [goldens, feedbacks, tipos])
 
   return (
     <div className="ensinar-ia">
-      <header className="ensinar-ia-header">
-        <div className="ensinar-ia-header-main">
-          <div className="ensinar-ia-brand-mark" aria-hidden>
-            <Brain size={22} strokeWidth={2.2} />
+      <header className="ensinar-ia-hero">
+        <div className="ensinar-ia-hero-glow" aria-hidden />
+        <div className="ensinar-ia-hero-inner">
+          <div className="ensinar-ia-header-main">
+            <div className="ensinar-ia-brand-mark" aria-hidden>
+              <GraduationCap size={26} strokeWidth={2.1} />
+            </div>
+            <div className="ensinar-ia-hero-copy">
+              <p className="ensinar-ia-eyebrow">
+                <Sparkles size={14} strokeWidth={2.2} aria-hidden />
+                Centro de aprendizado · BaseInfra
+              </p>
+              <h1>Ensinar a IA</h1>
+              <p>
+                Aqui o time valida o que a análise deve repetir. Cada caso aprovado vira
+                memória do domínio — sem fine-tune, com controle humano.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1>Ensinar a IA</h1>
-            <p>
-              Acervo de casos modelo e correções por tipo de análise. Editar o parecer da
-              solicitação não treina a IA — só itens <strong>aprovados</strong> entram nas
-              próximas análises do mesmo domínio.
-            </p>
-          </div>
+
+          <ol className="ensinar-ia-journey" aria-label="Como o ensino funciona">
+            <li>
+              <span className="ensinar-ia-journey-icon" aria-hidden>
+                <BookMarked size={18} />
+              </span>
+              <div>
+                <strong>1. Casos modelo</strong>
+                <span>Errado × certo por tipologia</span>
+              </div>
+            </li>
+            <li>
+              <span className="ensinar-ia-journey-icon" aria-hidden>
+                <ClipboardCheck size={18} />
+              </span>
+              <div>
+                <strong>2. Você aprova</strong>
+                <span>Só entra o que o cliente valida</span>
+              </div>
+            </li>
+            <li>
+              <span className="ensinar-ia-journey-icon" aria-hidden>
+                <Brain size={18} />
+              </span>
+              <div>
+                <strong>3. Próximas análises</strong>
+                <span>Injetado no prompt do mesmo tipo</span>
+              </div>
+            </li>
+          </ol>
         </div>
+
         <div className="ensinar-ia-stats" aria-label="Resumo do acervo">
-          <div className="ensinar-ia-stat">
+          <div className="ensinar-ia-stat accent-ok">
+            <span className="ensinar-ia-stat-icon" aria-hidden>
+              <ShieldCheck size={16} />
+            </span>
             <span className="ensinar-ia-stat-value">{stats.aprovados}</span>
             <span className="ensinar-ia-stat-label">Aprovados ativos</span>
           </div>
-          <div className="ensinar-ia-stat">
+          <div className="ensinar-ia-stat accent-wait">
+            <span className="ensinar-ia-stat-icon" aria-hidden>
+              <Hourglass size={16} />
+            </span>
             <span className="ensinar-ia-stat-value">{stats.pendentes}</span>
             <span className="ensinar-ia-stat-label">Aguardando validação</span>
           </div>
           <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-icon" aria-hidden>
+              <BookMarked size={16} />
+            </span>
             <span className="ensinar-ia-stat-value">{stats.total}</span>
             <span className="ensinar-ia-stat-label">Casos no acervo</span>
           </div>
           <div className="ensinar-ia-stat">
+            <span className="ensinar-ia-stat-icon" aria-hidden>
+              <MessageSquareWarning size={16} />
+            </span>
             <span className="ensinar-ia-stat-value">{stats.feedbackAprovados}</span>
             <span className="ensinar-ia-stat-label">Correções pontuais</span>
           </div>
         </div>
+
+        <div className="ensinar-ia-progress-block" aria-label="Taxa de aprovação do acervo">
+          <div className="ensinar-ia-progress-head">
+            <span>Taxa de aprovação no acervo</span>
+            <strong>{stats.taxaAprovacao}%</strong>
+          </div>
+          <div
+            className="ensinar-ia-progress-track"
+            role="progressbar"
+            aria-valuenow={stats.taxaAprovacao}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="ensinar-ia-progress-fill"
+              style={{ width: `${stats.taxaAprovacao}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="ensinar-ia-coverage" aria-label="Cobertura por tipo crítico">
+          <p className="ensinar-ia-coverage-title">Cobertura por tipo crítico</p>
+          <div className="ensinar-ia-coverage-chips">
+            {stats.coberturaTipos.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`ensinar-ia-coverage-chip ${t.pendentes > 0 ? 'has-pending' : ''} ${t.aprovados > 0 ? 'has-approved' : ''}`}
+                onClick={() => {
+                  setFiltroTipo(t.id)
+                  setFiltroStatus('')
+                  setTab('casos')
+                }}
+                title={`${t.aprovados} aprovado(s), ${t.pendentes} pendente(s)`}
+              >
+                <span className="ensinar-ia-coverage-name">{t.nome}</span>
+                <span className="ensinar-ia-coverage-count">
+                  {t.aprovados}/{t.total}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {mockBanner && (
           <p className="ensinar-ia-mock" role="status">
             Modo local: Firestore sem permissão. Dados ficam no navegador até o deploy.
           </p>
         )}
         {stats.clientePendentes > 0 && (
-          <p className="ensinar-ia-mock" role="status">
-            {stats.clientePendentes} caso(s) do material do cliente aguardando aprovação
-            (filtro: status pendente). Só entram no prompt após aprovar.
-          </p>
+          <div className="ensinar-ia-callout" role="status">
+            <div className="ensinar-ia-callout-icon" aria-hidden>
+              <ClipboardCheck size={20} />
+            </div>
+            <div className="ensinar-ia-callout-body">
+              <strong>
+                {stats.clientePendentes} caso(s) do material do cliente prontos para validar
+              </strong>
+              <p>
+                Seed a partir dos checklists e gabaritos. Só entram no prompt depois da
+                aprovação — o cliente decide o que a IA aprende.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ensinar-ia-btn"
+              onClick={() => {
+                setFiltroStatus('pendente')
+                setFiltroTipo('')
+                setTab('casos')
+              }}
+            >
+              Revisar pendentes
+            </button>
+          </div>
         )}
       </header>
 
@@ -339,6 +479,8 @@ export default function EnsinarIA() {
               <h2>Acervo por tipo</h2>
               <p className="ensinar-ia-hint">
                 Abra um caso para aprovar, revogar ou revisar os pares errado × certo.
+                Casos com selo <strong>Material cliente</strong> vieram dos checklists e
+                gabaritos — valide antes de liberar o ensino.
               </p>
             </div>
             <button
@@ -426,6 +568,9 @@ export default function EnsinarIA() {
                         {STATUS_LABEL[item.status]}
                       </span>
                       {!item.ativo && <span className="ensinar-ia-badge inactive">Inativo</span>}
+                      {item.id.startsWith('cliente-') && (
+                        <span className="ensinar-ia-badge client">Material cliente</span>
+                      )}
                       <span className="ensinar-ia-case-meta">{tipoNome(item.tipoAnaliseId)}</span>
                     </div>
                     <strong className="ensinar-ia-case-title">

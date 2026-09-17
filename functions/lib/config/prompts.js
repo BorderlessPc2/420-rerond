@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.REGRAS_RACIOCINIO_ASSERTIVO = exports.REGRAS_ESCOPO_DOCUMENTOS = exports.REGRAS_ISOLAMENTO_TIPO = exports.REGRAS_CONFERENCIA_EVIDENCIA = exports.INSTRUCOES_PECAS_GRAFICAS = exports.TAXONOMIA_STATUS_CHECKLIST = void 0;
+exports.REGRAS_RACIOCINIO_ASSERTIVO = exports.REGRAS_ESCOPO_DOCUMENTOS = exports.REGRAS_ISOLAMENTO_TIPO = exports.REGRAS_CONFERENCIA_EVIDENCIA = exports.REGRAS_COMPATIBILIZACAO_DOCS = exports.INSTRUCOES_PECAS_GRAFICAS = exports.TAXONOMIA_STATUS_CHECKLIST = void 0;
 exports.buildSystemPrompt = buildSystemPrompt;
 exports.buildAnalysisPrompt = buildAnalysisPrompt;
 exports.buildInferTipoPrompt = buildInferTipoPrompt;
@@ -20,10 +20,19 @@ exports.TAXONOMIA_STATUS_CHECKLIST = `TAXONOMIA OBRIGATÓRIA DO CHECKLIST (não 
 - NÃO aponte ausência de documentos de outro volume/fase que não foram enviados nesta solicitação.`;
 exports.INSTRUCOES_PECAS_GRAFICAS = `PEÇAS GRÁFICAS (planta baixa, perfil, sinalização, geométrico e equivalentes):
 - Analise o desenho, não só o nome do arquivo: cotas, FXD, faixa non aedificandi, km, sentido, interferência com pista/acostamento.
+- Conferir km no carimbo × km do memorial/formulário; divergência → NAO_CONFORME citando ambos os lados.
+- Em plantas de rede/postes: exigir distância poste–bordo (ou equivalente) quando aplicável à tipologia; ausência do parâmetro com peça presente → NAO_CONFORME (não INFORMACAO_AUSENTE).
+- Assinatura do RT nas peças gráficas: falta de assinatura em documento apresentado → NAO_CONFORME.
+- Carimbo/disciplina: título da prancha deve corresponder ao conteúdo (ex.: "Projeto de Sinalização de Obras" ≠ "Detalhe de Ocupação"); carimbo errado → NAO_CONFORME.
+- PRESENTE ≠ CONFORME: existência do PDF gráfico NÃO autoriza OK — avalie parâmetros técnicos e aderência normativa.
 - Se a peça estiver ilegível, truncada ou sem os elementos acima, use INFORMACAO_AUSENTE — não chute cotas nem geometria.
 - Documento gráfico presente mas com parâmetros insuficientes ou em desacordo com a norma → NAO_CONFORME.
-- PROIBIDO declarar que informação "não existe" na planta sem indicar qual arquivo/página/prancha foi inspecionado e o que se buscou (cota, eixo, FXD, etc.).
-- Compatibilize Memorial × plantas: se houver divergência, NAO_CONFORME com evidência dos dois lados (arquivo/página).`;
+- PROIBIDO declarar que informação "não existe" na planta sem indicar qual arquivo/página/prancha foi inspecionado e o que se buscou (cota, eixo, FXD, etc.).`;
+exports.REGRAS_COMPATIBILIZACAO_DOCS = `COMPATIBILIZAÇÃO ENTRE DOCUMENTOS:
+- Cruzar Memorial × planta × perfil × sinalização × Volume III (e equivalentes da tipologia).
+- Qualquer divergência material (km, município, tipo de intervenção, cotas, nomenclatura de disciplina) → NAO_CONFORME com evidência dos DOIS lados (arquivo/página de cada).
+- Não marcar um documento OK se outro do mesmo pacote o contradiz no mesmo parâmetro.
+- Volumes/codificação: existência do arquivo ≠ organização Volume I/II/III nem nomenclatura SUROD corretas.`;
 exports.REGRAS_CONFERENCIA_EVIDENCIA = `CONFERÊNCIA FORMULÁRIO × DOCUMENTOS (conferenciaInputs):
 - valorDocumento SOMENTE extraído dos PDFs. Proibido copiar valorFormulario.
 - Para cada item, preencha evidencia quando houver: { "arquivo": "nome.pdf", "pagina": "3" ou null, "trecho": "trecho curto ou null" }.
@@ -62,6 +71,8 @@ REGRAS IMPORTANTES:
 ${exports.TAXONOMIA_STATUS_CHECKLIST}
 
 ${exports.INSTRUCOES_PECAS_GRAFICAS}
+
+${exports.REGRAS_COMPATIBILIZACAO_DOCS}
 
 ${exports.REGRAS_CONFERENCIA_EVIDENCIA}
 
@@ -130,11 +141,12 @@ INSTRUÇÕES:
 4. Compare o que estiver no escopo com os requisitos listados.
 5. ${exports.TAXONOMIA_STATUS_CHECKLIST}
 6. ${exports.INSTRUCOES_PECAS_GRAFICAS}
-7. ${exports.REGRAS_CONFERENCIA_EVIDENCIA}
-8. ${exports.REGRAS_ISOLAMENTO_TIPO}
-9. ${exports.REGRAS_RACIOCINIO_ASSERTIVO}
-10. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
-11. Respeite estritamente as saídas pedidas:
+7. ${exports.REGRAS_COMPATIBILIZACAO_DOCS}
+8. ${exports.REGRAS_CONFERENCIA_EVIDENCIA}
+9. ${exports.REGRAS_ISOLAMENTO_TIPO}
+10. ${exports.REGRAS_RACIOCINIO_ASSERTIVO}
+11. Em situacaoEncontrada, quando aplicável, cite arquivo/página inspecionados.
+12. Respeite estritamente as saídas pedidas:
 - ${instrucoesSaida}${promptAdicional}
 
 FORMATO DE SAÍDA OBRIGATÓRIO — responda APENAS com JSON válido, sem texto antes ou depois:

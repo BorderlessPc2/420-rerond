@@ -4,6 +4,8 @@
  * Uso:
  *   npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio path.txt
  *   npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio path.txt --caso eval-poc-edp-viana
+ *   npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio path.txt --json
+ *   npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio path.txt --meta 90
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -18,13 +20,19 @@ function argValue(flag: string): string | undefined {
   return process.argv[idx + 1]
 }
 
+function hasFlag(flag: string): boolean {
+  return process.argv.includes(flag)
+}
+
 function main() {
   const relatorioPath = argValue('--relatorio')
   const casoId = argValue('--caso') || 'eval-poc-edp-viana'
+  const meta = Number(argValue('--meta') || '90')
+  const asJson = hasFlag('--json')
 
   if (!relatorioPath) {
     console.error(
-      'Uso: npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio <arquivo> [--caso eval-poc-edp-viana]',
+      'Uso: npx tsx scripts/scoreAssertividadeRelatorio.ts --relatorio <arquivo> [--caso eval-poc-edp-viana] [--meta 90] [--json]',
     )
     process.exit(1)
   }
@@ -39,6 +47,7 @@ function main() {
   const caso = EVAL_ASSERTIVIDADE_CASOS.find((c) => c.id === casoId)
   if (!caso) {
     console.error(`Caso de eval desconhecido: ${casoId}`)
+    console.error(`Disponíveis: ${EVAL_ASSERTIVIDADE_CASOS.map((c) => c.id).join(', ')}`)
     process.exit(1)
   }
 
@@ -48,22 +57,38 @@ function main() {
     process.exit(1)
   }
 
-  console.log(`caso: ${result.casoId}`)
-  console.log(`score: ${result.ok}/${result.total} (${result.percentual}%)`)
-  console.log(`passouCriticos: ${result.passouCriticos}`)
-  if (result.findingsOk?.length) {
-    console.log(`ok: ${result.findingsOk.join(', ')}`)
-  }
-  if (result.findingsFalhos?.length) {
-    console.log(`falhos: ${result.findingsFalhos.join(', ')}`)
-  }
-  if (result.criticosFalhos.length) {
-    console.log(`criticosFalhos: ${result.criticosFalhos.join(', ')}`)
+  const aceiteMeta = result.passouCriticos && result.percentual >= meta
+  const aceiteSugerido70 = result.passouCriticos && result.percentual >= 70
+
+  if (asJson) {
+    console.log(
+      JSON.stringify(
+        {
+          ...result,
+          meta,
+          aceiteMeta,
+          aceiteSugerido70,
+          relatorio: abs,
+          casoTitulo: caso.titulo,
+        },
+        null,
+        2,
+      ),
+    )
+  } else {
+    console.log(`caso: ${result.casoId} — ${caso.titulo}`)
+    console.log(`score: ${result.ok}/${result.total} (${result.percentual}%)`)
+    console.log(`passouCriticos: ${result.passouCriticos}`)
+    if (result.findingsOk?.length) console.log(`ok: ${result.findingsOk.join(', ')}`)
+    if (result.findingsFalhos?.length) console.log(`falhos: ${result.findingsFalhos.join(', ')}`)
+    if (result.criticosFalhos.length) {
+      console.log(`criticosFalhos: ${result.criticosFalhos.join(', ')}`)
+    }
+    console.log(`aceiteSugerido(>=70% + criticos): ${aceiteSugerido70}`)
+    console.log(`aceiteMeta(>=${meta}% + criticos): ${aceiteMeta}`)
   }
 
-  const aceite = result.passouCriticos && result.percentual >= 70
-  console.log(`aceiteSugerido(>=70% + criticos): ${aceite}`)
-  process.exit(aceite ? 0 : 2)
+  process.exit(aceiteMeta ? 0 : 2)
 }
 
 main()

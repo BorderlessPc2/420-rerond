@@ -3,8 +3,28 @@ import { GOLDEN_CASES_SEED } from '../services/goldenCase/goldenCaseSeed'
 import { EVAL_ASSERTIVIDADE_CASOS } from './evalAssertividadeCliente'
 
 describe('goldenCaseSeed cliente', () => {
-  it('tem 4 casos cliente com pares', () => {
-    expect(GOLDEN_CASES_SEED).toHaveLength(4)
+  const MIN_POR_TIPO: Record<string, number> = {
+    poc: 3,
+    ppu: 3,
+    'pac-viabilidade': 3,
+    'pac-executivo': 3,
+    pan: 3,
+    acesso: 3,
+  }
+
+  it('tem ≥3 goldens pendentes por tipo crítico', () => {
+    for (const [tipo, min] of Object.entries(MIN_POR_TIPO)) {
+      const items = GOLDEN_CASES_SEED.filter((g) => g.tipoAnaliseId === tipo)
+      expect(items.length, tipo).toBeGreaterThanOrEqual(min)
+      for (const g of items) {
+        expect(g.status).toBe('pendente')
+        expect(g.pares.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('todos os seeds cliente têm id cliente-* e pares', () => {
+    expect(GOLDEN_CASES_SEED.length).toBeGreaterThanOrEqual(16)
     for (const g of GOLDEN_CASES_SEED) {
       expect(g.id.startsWith('cliente-')).toBe(true)
       expect(g.pares.length).toBeGreaterThan(0)
