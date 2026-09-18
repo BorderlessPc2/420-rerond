@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isPecaGraficaTipoDocumento = isPecaGraficaTipoDocumento;
+exports.buildDocumentoProjetoLabel = buildDocumentoProjetoLabel;
 exports.runAnaliseJob = runAnaliseJob;
 const firestore_1 = require("firebase-admin/firestore");
 const storage_1 = require("firebase-admin/storage");
@@ -89,13 +91,26 @@ function parseArquivosMeta(value) {
     })
         .filter((item) => item.url);
 }
+function isPecaGraficaTipoDocumento(tipo) {
+    return new Set([
+        "planta_baixa",
+        "perfil_ocupacao",
+        "projeto_sinalizacao",
+        "projeto_geometrico",
+        "projeto_drenagem",
+        "projeto_terraplenagem",
+        "projeto_pavimentacao",
+        "projeto_topografico",
+        "projeto_publicidade",
+        "estrutura_sustentacao",
+    ]).has(tipo);
+}
 function buildDocumentoProjetoLabel(filename, arquivosMeta, url) {
     const meta = arquivosMeta.find((m) => m.url === url || m.nome === filename);
     const tipo = meta?.tipoDocumento ?? "desconhecido";
     const nome = meta?.nome ?? filename;
-    const pecasGraficas = new Set(["planta_baixa", "perfil_ocupacao", "projeto_sinalizacao"]);
-    if (pecasGraficas.has(tipo)) {
-        return `[PEÇA GRÁFICA — analisar desenho, cotas, FXD, km, sentido; não só o nome do arquivo | tipoDocumento=${tipo}; arquivo=${nome}]`;
+    if (isPecaGraficaTipoDocumento(tipo)) {
+        return `[PEÇA GRÁFICA — analisar desenho, cotas, FXD, km, sentido e parâmetros visuais; se estiver ilegível, marque como NÃO FOI POSSÍVEL AVALIAR/INFORMACAO_AUSENTE citando o arquivo, sem dizer que o documento está ausente | tipoDocumento=${tipo}; arquivo=${nome}]`;
     }
     return `[DOCUMENTO DO PROJETO: tipoDocumento=${tipo}; arquivo=${nome}]`;
 }
@@ -339,6 +354,9 @@ async function runAnaliseJob(params) {
     let totalBytes = 0;
     let filesIncluded = 0;
     let filesOmitted = 0;
+    let normasPdfCount = 0;
+    const normasCustomPdfIds = [];
+    const normasCustomPdfFalhas = [];
     try {
         const jobSnap = await jobRef.get();
         if (!jobSnap.exists) {
@@ -465,13 +483,16 @@ async function runAnaliseJob(params) {
                         },
                         buffer,
                     });
+                    normasCustomPdfIds.push(norma.id);
                 }
                 catch (err) {
+                    normasCustomPdfFalhas.push(norma.id);
                     console.warn(`Falha ao baixar norma custom ${norma.id}:`, err instanceof Error ? err.message : err);
                 }
             }
         }
         const normasPDFs = Array.from(normasMap.values());
+        normasPdfCount = normasPDFs.length;
         const dadosForm = {
             titulo: data.titulo ?? "",
             tipoObra: data.tipoObra ?? "",
@@ -645,6 +666,12 @@ async function runAnaliseJob(params) {
         }
         if (pdfsOmitidos.length > 0) {
             sharedParts.push((0, openaiService_1.buildTextInput)(`[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`));
+        }
+        if (normasCustomPdfIds.length > 0) {
+            sharedParts.push((0, openaiService_1.buildTextInput)(`[NORMAS CUSTOMIZADAS COM PDF ANEXADO NESTA CHAMADA: ${normasCustomPdfIds.join(", ")}]`));
+        }
+        if (normasCustomPdfFalhas.length > 0) {
+            sharedParts.push((0, openaiService_1.buildTextInput)(`[AVISO: normas customizadas selecionadas, mas sem PDF anexado por falha de download: ${normasCustomPdfFalhas.join(", ")}. Use os metadados textuais do perfil e indique a limitação se precisar citar o conteúdo do PDF.]`));
         }
         const pdfItemsForPlan = pdfBuffers.map((pdf, index) => ({
             id: String(index),
@@ -831,6 +858,9 @@ async function runAnaliseJob(params) {
             filesIncluded,
             filesOmitted,
             batchCount: batchResults.length,
+            normasPdfCount,
+            normasCustomPdfIds,
+            normasCustomPdfFalhas,
             failedStage: null,
             errorCode: null,
         };
@@ -909,6 +939,9 @@ async function runAnaliseJob(params) {
             tokensUsed: null,
             filesIncluded,
             filesOmitted,
+            normasPdfCount,
+            normasCustomPdfIds,
+            normasCustomPdfFalhas,
             failedStage: lastStage,
             errorCode: code,
         };

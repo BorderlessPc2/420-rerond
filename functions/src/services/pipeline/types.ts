@@ -15,6 +15,9 @@ export type AnaliseTelemetry = {
   filesIncluded?: number;
   filesOmitted?: number;
   batchCount?: number;
+  normasPdfCount?: number;
+  normasCustomPdfIds?: string[];
+  normasCustomPdfFalhas?: string[];
   failedStage?: PipelineStage | string | null;
   errorCode?: string | null;
 };

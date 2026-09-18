@@ -135,6 +135,27 @@ const parseConferenciaInputs = (value: unknown): ConferenciaInput[] | undefined 
     .filter((item) => item.campo)
 }
 
+const parseStringArray = (value: unknown): string[] | undefined =>
+  Array.isArray(value) ? value.map(String) : undefined
+
+const parseAnaliseTelemetry = (value: unknown): Solicitacao['analiseTelemetry'] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  return {
+    durationMs: typeof raw.durationMs === 'number' ? raw.durationMs : undefined,
+    totalBytes: typeof raw.totalBytes === 'number' ? raw.totalBytes : undefined,
+    tokensUsed: typeof raw.tokensUsed === 'number' ? raw.tokensUsed : raw.tokensUsed === null ? null : undefined,
+    filesIncluded: typeof raw.filesIncluded === 'number' ? raw.filesIncluded : undefined,
+    filesOmitted: typeof raw.filesOmitted === 'number' ? raw.filesOmitted : undefined,
+    batchCount: typeof raw.batchCount === 'number' ? raw.batchCount : undefined,
+    normasPdfCount: typeof raw.normasPdfCount === 'number' ? raw.normasPdfCount : undefined,
+    normasCustomPdfIds: parseStringArray(raw.normasCustomPdfIds),
+    normasCustomPdfFalhas: parseStringArray(raw.normasCustomPdfFalhas),
+    failedStage: raw.failedStage != null ? String(raw.failedStage) : null,
+    errorCode: raw.errorCode != null ? String(raw.errorCode) : null,
+  }
+}
+
 const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles => {
   const arquivos = parseArquivos(data.arquivos)
   const arquivosMeta = parseArquivosMeta(data.arquivosMeta)
@@ -178,6 +199,7 @@ const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles =>
     documentosOmitidos: Array.isArray(data.documentosOmitidos)
       ? data.documentosOmitidos.map(String)
       : undefined,
+    analiseTelemetry: parseAnaliseTelemetry(data.analiseTelemetry),
     assertividadeScore:
       data.assertividadeScore && typeof data.assertividadeScore === 'object'
         ? {

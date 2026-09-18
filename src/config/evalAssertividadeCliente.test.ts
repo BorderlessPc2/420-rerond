@@ -100,4 +100,36 @@ describe('evalAssertividadeCliente', () => {
     )
     expect(pan?.passouCriticos).toBe(true)
   })
+
+  it('scoreRelatorioContraEval reprova anti-padroes de mistura entre tipos/fases', () => {
+    const ppuComPoc = scoreRelatorioContraEval(
+      'eval-ppu-checklist',
+      'A publicidade foi tratada com checklist de ocupação e POC_*; não há item próprio de sustentação.',
+    )
+    expect(ppuComPoc?.passouCriticos).toBe(false)
+    expect(ppuComPoc?.criticosFalhos).toContain('PPU_NATUREZA_INTERVENCAO')
+
+    const pacvComExecutivo = scoreRelatorioContraEval(
+      'eval-pacv-capixaba',
+      'Na fase de viabilidade, exigir terraplenagem na viabilidade e disciplinas de executivo na viabilidade.',
+    )
+    expect(pacvComExecutivo?.passouCriticos).toBe(false)
+    expect(pacvComExecutivo?.criticosFalhos).toContain('PACV_ESCOPO_VIABILIDADE')
+
+    const panComoPac = scoreRelatorioContraEval(
+      'eval-pan-checklist',
+      'Processo de anuência PAN avaliado com checklist PAC e checklist POC, tratar como ocupação.',
+    )
+    expect(panComoPac?.passouCriticos).toBe(false)
+    expect(panComoPac?.criticosFalhos).toContain('PAN_FINALIDADE_ANUENCIA')
+
+    const acessoComPoc = scoreRelatorioContraEval(
+      'eval-acesso-ipr',
+      'Acesso com faixa de domínio avaliado por checklist POC e ocupação longitudinal; geometria ok sem cotas.',
+    )
+    expect(acessoComPoc?.passouCriticos).toBe(false)
+    expect(acessoComPoc?.criticosFalhos).toEqual(
+      expect.arrayContaining(['ACESSO_FD_DOCS', 'ACESSO_GEOMETRIA_VISIBILIDADE']),
+    )
+  })
 })

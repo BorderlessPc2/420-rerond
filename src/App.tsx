@@ -14,6 +14,7 @@ import Processos from './views/Processos'
 import ProcessoDetalhe from './views/ProcessoDetalhe'
 import ConfiguracoesModulares from './views/ConfiguracoesModulares'
 import EnsinarIA from './views/EnsinarIA'
+import MetricasIA from './views/MetricasIA'
 import { HomeScreen, LoginScreen, RegisterScreen } from './screens'
 import './App.css'
 
@@ -39,6 +40,7 @@ function App() {
             <Route path="solicitacoes/:id/editar" element={<EditarSolicitacao />} />
             <Route path="configuracoes" element={<ConfiguracoesModulares />} />
             <Route path="ensinar-ia" element={<EnsinarIA />} />
+            <Route path="metricas-ia" element={<MetricasIA />} />
             <Route path="concessionarias/nova" element={<NovaConcessionaria />} />
             <Route path="solicitacao-registrada" element={<SolicitacaoRegistrada />} />
           </Route>

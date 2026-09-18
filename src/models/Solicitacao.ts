@@ -142,6 +142,10 @@ export interface Solicitacao {
     tokensUsed?: number | null
     filesIncluded?: number
     filesOmitted?: number
+    batchCount?: number
+    normasPdfCount?: number
+    normasCustomPdfIds?: string[]
+    normasCustomPdfFalhas?: string[]
     failedStage?: string | null
     errorCode?: string | null
   } | null

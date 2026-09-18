@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Plus, Building2, Users, FolderKanban, Menu, X, LogOut, Layers3, Brain } from 'lucide-react'
+import { LayoutDashboard, FileText, Plus, Building2, Users, FolderKanban, Menu, X, LogOut, Layers3, Brain, BarChart3 } from 'lucide-react'
 import { logout } from '../services/auth/authService'
 import './Layout.css'
 
@@ -89,6 +89,14 @@ export default function Layout() {
           >
             <Brain size={20} />
             <span>Ensinar a IA</span>
+          </Link>
+          <Link
+            to="/metricas-ia"
+            className={`nav-item ${isActive('/metricas-ia') ? 'active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <BarChart3 size={20} />
+            <span>Métricas IA</span>
           </Link>
           <Link
             to="/configuracoes"

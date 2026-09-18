@@ -2,9 +2,51 @@
  * Sanitiza textos produzidos pela IA para exibição e PDF.
  * Remove tags HTML e caracteres de controle sem interpretar como HTML.
  */
+export function repairCommonMojibake(value: string): string {
+  if (!/[ÃÂâ]/.test(value)) return value
+
+  const repairedByMap = value
+    .replace(/Ã¡/g, 'á')
+    .replace(/Ã /g, 'à')
+    .replace(/Ã¢/g, 'â')
+    .replace(/Ã£/g, 'ã')
+    .replace(/Ã©/g, 'é')
+    .replace(/Ãª/g, 'ê')
+    .replace(/Ã­/g, 'í')
+    .replace(/Ã³/g, 'ó')
+    .replace(/Ã´/g, 'ô')
+    .replace(/Ãµ/g, 'õ')
+    .replace(/Ãº/g, 'ú')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ã/g, 'Á')
+    .replace(/Ã€/g, 'À')
+    .replace(/Ã‚/g, 'Â')
+    .replace(/Ãƒ/g, 'Ã')
+    .replace(/Ã‰/g, 'É')
+    .replace(/ÃŠ/g, 'Ê')
+    .replace(/Ã/g, 'Í')
+    .replace(/Ã“/g, 'Ó')
+    .replace(/Ã”/g, 'Ô')
+    .replace(/Ã•/g, 'Õ')
+    .replace(/Ãš/g, 'Ú')
+    .replace(/Ã‡/g, 'Ç')
+    .replace(/â€”/g, '—')
+    .replace(/â€“/g, '–')
+    .replace(/â€¦/g, '…')
+
+  try {
+    const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0) & 0xff)
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const score = (text: string) => (text.match(/[ÃÂ�]/g) ?? []).length
+    return score(decoded) < score(repairedByMap) ? decoded : repairedByMap
+  } catch {
+    return repairedByMap
+  }
+}
+
 export function sanitizeText(value: unknown, maxLength = 8000): string {
   if (value == null) return ''
-  let text = String(value)
+  let text = repairCommonMojibake(String(value))
 
   // Remove tags HTML/XML sem executar
   text = text.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')

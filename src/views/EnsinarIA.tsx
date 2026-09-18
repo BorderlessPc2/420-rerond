@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   BookMarked,
@@ -1080,7 +1081,9 @@ export default function EnsinarIA() {
         <Link to="/configuracoes">Configurações</Link>
       </p>
 
-      {selecionado && (
+      {selecionado &&
+        createPortal(
+          (
         <div
           className="ensinar-ia-drawer-overlay"
           onClick={() => setSelecionado(null)}
@@ -1269,7 +1272,9 @@ export default function EnsinarIA() {
             </div>
           </aside>
         </div>
-      )}
+          ),
+          document.body,
+        )}
     </div>
   )
 }
