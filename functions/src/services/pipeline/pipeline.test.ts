@@ -12,8 +12,9 @@ describe("estimateTokens", () => {
   });
 
   it("estima por bytes", () => {
-    expect(estimateTokensFromBytes(3)).toBe(1);
-    expect(estimateTokensFromBytes(9)).toBe(3);
+    expect(estimateTokensFromBytes(40)).toBe(1);
+    expect(estimateTokensFromBytes(80)).toBe(2);
+    expect(estimateTokensFromBytes(400_000)).toBe(10_000);
   });
 });
 

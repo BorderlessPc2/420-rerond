@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileSearch, FileText, Scale, Sparkles, CheckCircle2 } from 'lucide-react'
+import {
+  FileSearch,
+  FileText,
+  Scale,
+  Sparkles,
+  CheckCircle2,
+  Minimize2,
+  Maximize2,
+  X,
+} from 'lucide-react'
 import {
   type AnaliseJobState,
   JOB_STATE_LABELS,
@@ -73,7 +82,7 @@ const STAGES: Stage[] = [
 ]
 
 function StageIcon({ kind, active }: { kind: Stage['icon']; active: boolean }) {
-  const props = { size: 18, strokeWidth: 2.2 }
+  const props = { size: 16, strokeWidth: 2.2 }
   const className = active ? 'apo-stage-icon apo-stage-icon-active' : 'apo-stage-icon'
   switch (kind) {
     case 'docs':
@@ -103,7 +112,9 @@ export default function AnaliseProgressOverlay({
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
+  const [minimized, setMinimized] = useState(false)
   const usesRealJob = Boolean(jobState)
+  const isFailed = jobState === 'failed'
 
   const concessionariaLabel = useMemo(() => {
     if (nomeConcessionaria?.trim()) return nomeConcessionaria.trim()
@@ -128,6 +139,16 @@ export default function AnaliseProgressOverlay({
   }, [jobState, progress, simulatedPercent])
 
   const current = STAGES[Math.min(stageIndex, STAGES.length - 1)]
+
+  useEffect(() => {
+    if (!active) {
+      setMinimized(false)
+      setSimulatedPercent(0)
+      setSimulatedStageIndex(0)
+      return
+    }
+    if (isFailed) setMinimized(false)
+  }, [active, isFailed])
 
   useEffect(() => {
     if (!active || usesRealJob) {
@@ -161,29 +182,81 @@ export default function AnaliseProgressOverlay({
   if (!active) return null
 
   const currentLabel = jobState ? JOB_STATE_LABELS[jobState] : current.label
-  const currentDetail = jobState === 'failed'
+  const currentDetail = isFailed
     ? errorMessage ?? 'Ocorreu um erro durante o processamento.'
     : current.detail
+
+  const shortTitle = titulo?.trim() || 'Solicitação'
+
+  if (minimized && !isFailed) {
+    return (
+      <div className="apo-minimized" role="status" aria-live="polite">
+        <button
+          type="button"
+          className="apo-minimized-main"
+          onClick={() => setMinimized(false)}
+          title="Expandir progresso da análise"
+        >
+          <Sparkles size={16} className="apo-minimized-icon" />
+          <div className="apo-minimized-copy">
+            <strong>Análise em andamento</strong>
+            <span>
+              {displayPercent}% · {currentLabel}
+            </span>
+          </div>
+          <div className="apo-minimized-bar" aria-hidden>
+            <div className="apo-minimized-bar-fill" style={{ width: `${displayPercent}%` }} />
+          </div>
+        </button>
+        <button
+          type="button"
+          className="apo-minimized-expand"
+          onClick={() => setMinimized(false)}
+          aria-label="Expandir modal de progresso"
+        >
+          <Maximize2 size={16} />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="apo-overlay" role="alertdialog" aria-modal="true" aria-labelledby="apo-title">
       <div className="apo-card">
         <div className="apo-brand-row">
           <img src="/logo420.png" alt="BaseInfra" className="apo-brand-logo" />
-          <span className="apo-brand-badge">Análise por IA</span>
+          <div className="apo-brand-actions">
+            <span className="apo-brand-badge">Análise por IA</span>
+            {!isFailed && (
+              <button
+                type="button"
+                className="apo-icon-btn"
+                onClick={() => setMinimized(true)}
+                aria-label="Minimizar e continuar navegando"
+                title="Minimizar"
+              >
+                <Minimize2 size={16} />
+              </button>
+            )}
+            {isFailed && onDismiss && (
+              <button
+                type="button"
+                className="apo-icon-btn"
+                onClick={onDismiss}
+                aria-label="Fechar"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         <h2 id="apo-title" className="apo-title">
-          {jobState === 'failed' ? 'Falha na análise' : 'Gerando relatório técnico'}
+          {isFailed ? 'Falha na análise' : 'Gerando relatório técnico'}
         </h2>
         <p className="apo-subtitle">
-          {titulo ? (
-            <>
-              Processando <strong>{titulo}</strong>
-            </>
-          ) : (
-            'Processando a solicitação'
-          )}
+          Processando <strong title={shortTitle}>{shortTitle}</strong>
           {' · '}
           <span className="apo-concessionaria">{concessionariaLabel}</span>
         </p>
@@ -227,7 +300,7 @@ export default function AnaliseProgressOverlay({
                   .join(' ')}
               >
                 <span className="apo-stage-marker">
-                  {done ? <CheckCircle2 size={16} /> : <StageIcon kind={stage.icon} active={currentStage} />}
+                  {done ? <CheckCircle2 size={14} /> : <StageIcon kind={stage.icon} active={currentStage} />}
                 </span>
                 <span className="apo-stage-text">{stage.label}</span>
               </li>
@@ -236,14 +309,19 @@ export default function AnaliseProgressOverlay({
         </ol>
 
         <p className="apo-hint">
-          {jobState === 'failed'
+          {isFailed
             ? 'Edite a solicitação para ajustar PDFs se necessário e use Tentar novamente na mesma ficha — não é preciso abrir um processo novo.'
-            : usesRealJob
-              ? 'A análise continua em segundo plano. Você pode navegar pelo sistema enquanto processamos os documentos.'
-              : 'A análise pode levar alguns minutos conforme o volume de PDFs.'}
+            : 'Minimize para navegar pelo sistema. A análise continua em segundo plano.'}
         </p>
 
-        {jobState === 'failed' && onDismiss && (
+        {!isFailed && (
+          <button type="button" className="apo-minimize-cta" onClick={() => setMinimized(true)}>
+            <Minimize2 size={15} />
+            Minimizar e continuar navegando
+          </button>
+        )}
+
+        {isFailed && onDismiss && (
           <button type="button" className="apo-dismiss" onClick={onDismiss}>
             Fechar
           </button>

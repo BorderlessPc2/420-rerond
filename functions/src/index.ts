@@ -46,8 +46,8 @@ import {
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
 
-const MAX_PDFS_PROJETO = 10;
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_PDFS_PROJETO = 18;
+const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 
 const app = initializeApp();
 const db = getFirestore(app);

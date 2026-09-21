@@ -16,5 +16,7 @@ export {
   mergeDadosExtraidos,
   mergeConferenciaInputs,
   consolidatePareceres,
+  buildSynthesizeParecerPrompt,
+  summarizeChecklistForSynthesis,
 } from "./consolidateBatchResults";
 export type { AnaliseTelemetry, DocumentBatchItem, PlannedBatch, PipelineStage } from "./types";

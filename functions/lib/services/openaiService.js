@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAnalysisModel = getAnalysisModel;
 exports.initOpenAI = initOpenAI;
 exports.getOpenAIClient = getOpenAIClient;
 exports.buildFileInput = buildFileInput;
@@ -10,6 +11,12 @@ exports.buildTextInput = buildTextInput;
 exports.analyze = analyze;
 const openai_1 = __importDefault(require("openai"));
 let client = null;
+/** Modelo com janela ampla (1M). Override via OPENAI_MODEL. */
+const DEFAULT_ANALYSIS_MODEL = "gpt-4.1";
+function getAnalysisModel() {
+    const fromEnv = process.env.OPENAI_MODEL?.trim();
+    return fromEnv || DEFAULT_ANALYSIS_MODEL;
+}
 function initOpenAI(apiKey) {
     client = new openai_1.default({ apiKey });
 }
@@ -37,8 +44,9 @@ async function analyze(parts, options) {
     const ai = getClient();
     const maxTokens = options?.maxOutputTokens ?? 8000;
     const temperature = options?.temperature ?? 0.1;
+    const model = options?.model?.trim() || getAnalysisModel();
     const response = await ai.responses.create({
-        model: "gpt-4o",
+        model,
         input: [
             {
                 role: "user",

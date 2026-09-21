@@ -4,6 +4,8 @@ exports.mergeChecklistItems = mergeChecklistItems;
 exports.mergeDadosExtraidos = mergeDadosExtraidos;
 exports.mergeConferenciaInputs = mergeConferenciaInputs;
 exports.consolidatePareceres = consolidatePareceres;
+exports.buildSynthesizeParecerPrompt = buildSynthesizeParecerPrompt;
+exports.summarizeChecklistForSynthesis = summarizeChecklistForSynthesis;
 const STATUS_RANK = {
     NAO_CONFORME: 3,
     INFORMACAO_AUSENTE: 2,
@@ -110,7 +112,7 @@ function mergeConferenciaInputs(arrays) {
     }
     return order.map((c) => byCampo.get(c));
 }
-/** Parecer consolidado sem segunda chamada à API (MVP Sprint 9). */
+/** Parecer consolidado sem segunda chamada à API (fallback). */
 function consolidatePareceres(batches) {
     if (batches.length === 0)
         return "";
@@ -123,5 +125,42 @@ function consolidatePareceres(batches) {
         return `## LOTE ${i + 1}/${batches.length} (${files})\n\n${body}`;
     })
         .join("\n\n---\n\n");
+}
+/** Prompt de síntese: une pareceres de lotes em um único texto coeso (sem reenviar PDFs). */
+function buildSynthesizeParecerPrompt(batches, checklistSummary) {
+    const lotes = consolidatePareceres(batches);
+    const checklistPart = checklistSummary?.trim()
+        ? `\nCHECKLIST CONSOLIDADO (resumo):\n${checklistSummary.trim().slice(0, 6000)}\n`
+        : "";
+    return `Você consolidará pareceres técnicos de ${batches.length} lotes da MESMA solicitação em UM parecer final coeso.
+
+Regras:
+- Unifique conclusões; não repita "LOTE 1/LOTE 2" no texto final.
+- Se houver conflito entre lotes, explicite a divergência e indique qual documento sustenta cada lado.
+- Mantenha tom técnico e fundamentação normativa já presente.
+- Não invente fatos que não apareçam nos pareceres dos lotes.
+- Responda APENAS com o texto do parecer final (markdown permitido), sem JSON.
+${checklistPart}
+PARECERES POR LOTE:
+${lotes}`;
+}
+/** Resume itens de checklist para o prompt de síntese. */
+function summarizeChecklistForSynthesis(checklist, maxItems = 40) {
+    const lines = [];
+    for (const raw of checklist.slice(0, maxItems)) {
+        if (!raw || typeof raw !== "object")
+            continue;
+        const row = raw;
+        const item = String(row.item ?? "").trim();
+        if (!item)
+            continue;
+        const status = String(row.status ?? "").trim();
+        const sit = typeof row.situacaoEncontrada === "string" ? row.situacaoEncontrada.trim() : "";
+        lines.push(`- [${status}] ${item}${sit ? `: ${sit.slice(0, 180)}` : ""}`);
+    }
+    if (checklist.length > maxItems) {
+        lines.push(`… (+${checklist.length - maxItems} itens)`);
+    }
+    return lines.join("\n");
 }
 //# sourceMappingURL=consolidateBatchResults.js.map

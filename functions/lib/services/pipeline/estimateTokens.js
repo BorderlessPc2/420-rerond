@@ -10,11 +10,16 @@ function estimateTokensFromText(text) {
         return 0;
     return Math.ceil(len / 4);
 }
-/** Heurística para PDF binário: ~1 token por 3 bytes (pior caso texto denso). */
+/**
+ * Heurística para PDF binário no Responses API.
+ * Antes: bytes/3 (exageradamente pessimista → quase 1 PDF por lote).
+ * Agora: bytes/40 — aproxima custo real de PDFs mistos (texto + plantas)
+ * e permite agrupar vários documentos no mesmo lote.
+ */
 function estimateTokensFromBytes(sizeBytes) {
     if (!sizeBytes || sizeBytes <= 0)
         return 0;
-    return Math.ceil(sizeBytes / 3);
+    return Math.ceil(sizeBytes / 40);
 }
 function sumEstimatedTokens(parts) {
     return parts.reduce((acc, part) => {

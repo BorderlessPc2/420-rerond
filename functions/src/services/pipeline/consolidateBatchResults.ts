@@ -125,7 +125,7 @@ export function mergeConferenciaInputs(arrays: unknown[][]): unknown[] {
   return order.map((c) => byCampo.get(c)!)
 }
 
-/** Parecer consolidado sem segunda chamada à API (MVP Sprint 9). */
+/** Parecer consolidado sem segunda chamada à API (fallback). */
 export function consolidatePareceres(
   batches: Array<{ filenames: string[]; parecer: string }>,
 ): string {
@@ -139,4 +139,44 @@ export function consolidatePareceres(
       return `## LOTE ${i + 1}/${batches.length} (${files})\n\n${body}`
     })
     .join("\n\n---\n\n")
+}
+
+/** Prompt de síntese: une pareceres de lotes em um único texto coeso (sem reenviar PDFs). */
+export function buildSynthesizeParecerPrompt(
+  batches: Array<{ filenames: string[]; parecer: string }>,
+  checklistSummary?: string,
+): string {
+  const lotes = consolidatePareceres(batches)
+  const checklistPart = checklistSummary?.trim()
+    ? `\nCHECKLIST CONSOLIDADO (resumo):\n${checklistSummary.trim().slice(0, 6000)}\n`
+    : ""
+  return `Você consolidará pareceres técnicos de ${batches.length} lotes da MESMA solicitação em UM parecer final coeso.
+
+Regras:
+- Unifique conclusões; não repita "LOTE 1/LOTE 2" no texto final.
+- Se houver conflito entre lotes, explicite a divergência e indique qual documento sustenta cada lado.
+- Mantenha tom técnico e fundamentação normativa já presente.
+- Não invente fatos que não apareçam nos pareceres dos lotes.
+- Responda APENAS com o texto do parecer final (markdown permitido), sem JSON.
+${checklistPart}
+PARECERES POR LOTE:
+${lotes}`
+}
+
+/** Resume itens de checklist para o prompt de síntese. */
+export function summarizeChecklistForSynthesis(checklist: unknown[], maxItems = 40): string {
+  const lines: string[] = []
+  for (const raw of checklist.slice(0, maxItems)) {
+    if (!raw || typeof raw !== "object") continue
+    const row = raw as ChecklistItemLike
+    const item = String(row.item ?? "").trim()
+    if (!item) continue
+    const status = String(row.status ?? "").trim()
+    const sit = typeof row.situacaoEncontrada === "string" ? row.situacaoEncontrada.trim() : ""
+    lines.push(`- [${status}] ${item}${sit ? `: ${sit.slice(0, 180)}` : ""}`)
+  }
+  if (checklist.length > maxItems) {
+    lines.push(`… (+${checklist.length - maxItems} itens)`)
+  }
+  return lines.join("\n")
 }

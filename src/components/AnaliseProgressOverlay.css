@@ -5,25 +5,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
   background:
-    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(35, 87, 196, 0.22), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 90% 90%, rgba(241, 183, 38, 0.16), transparent 50%),
-    rgba(15, 47, 115, 0.78);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(35, 87, 196, 0.18), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 90%, rgba(241, 183, 38, 0.12), transparent 50%),
+    rgba(15, 47, 115, 0.55);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   animation: apo-fade-in 220ms ease-out;
 }
 
 .apo-card {
-  width: min(560px, 100%);
+  width: min(420px, 100%);
+  max-height: min(78vh, 640px);
+  overflow: auto;
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #d5e3f5;
   box-shadow:
-    0 24px 60px rgba(15, 47, 115, 0.28),
+    0 18px 44px rgba(15, 47, 115, 0.24),
     0 0 0 1px rgba(255, 255, 255, 0.4) inset;
-  padding: 28px 28px 24px;
+  padding: 18px 18px 16px;
   font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
   color: #14233d;
 }
@@ -32,18 +34,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.apo-brand-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .apo-brand-logo {
-  height: 36px;
+  height: 28px;
   width: auto;
   object-fit: contain;
 }
 
 .apo-brand-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -51,22 +59,44 @@
   background: #ddeaff;
   border: 1px solid #b8d0f5;
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 4px 8px;
+}
+
+.apo-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #c5d4eb;
+  background: #f5f8fd;
+  color: #1e3a6e;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.apo-icon-btn:hover {
+  background: #eaf1fb;
 }
 
 .apo-title {
-  margin: 0 0 8px;
-  font-size: 1.45rem;
+  margin: 0 0 6px;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #0f2f73;
 }
 
 .apo-subtitle {
-  margin: 0 0 22px;
-  font-size: 0.95rem;
-  line-height: 1.45;
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  line-height: 1.4;
   color: #5d708e;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .apo-subtitle strong {
@@ -82,14 +112,14 @@
 .apo-percent-block {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .apo-percent {
   flex-shrink: 0;
-  min-width: 72px;
-  font-size: 2rem;
+  min-width: 56px;
+  font-size: 1.55rem;
   font-weight: 750;
   letter-spacing: -0.03em;
   color: #0f2f73;
@@ -99,27 +129,27 @@
 .apo-current-stage {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .apo-current-label {
-  font-size: 0.98rem;
+  font-size: 0.88rem;
   font-weight: 650;
   color: #14233d;
 }
 
 .apo-current-detail {
   margin-top: 2px;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: #5d708e;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .apo-stage-icon {
   color: #8aa0c2;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .apo-stage-icon-active {
@@ -128,11 +158,11 @@
 
 .apo-bar {
   position: relative;
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   background: #e8f0fb;
   overflow: hidden;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 
 .apo-bar-fill {
@@ -145,44 +175,44 @@
 .apo-bar-glow {
   position: absolute;
   top: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -12px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
   border-radius: 50%;
-  background: rgba(241, 183, 38, 0.45);
-  filter: blur(8px);
+  background: rgba(241, 183, 38, 0.4);
+  filter: blur(7px);
   pointer-events: none;
   transition: left 280ms ease-out;
 }
 
 .apo-stages {
   list-style: none;
-  margin: 0 0 18px;
+  margin: 0 0 12px;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .apo-stage {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
   border: 1px solid transparent;
   color: #8aa0c2;
   transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .apo-stage-text {
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 550;
 }
 
 .apo-stage-marker {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
@@ -204,30 +234,141 @@
 
 .apo-hint {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.74rem;
+  line-height: 1.35;
   color: #5d708e;
   text-align: center;
-  padding-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid #e8f0fb;
+}
+
+.apo-minimize-cta {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid #9bb8e8;
+  border-radius: 10px;
+  background: #eef4ff;
+  color: #0f2f73;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.apo-minimize-cta:hover {
+  background: #e2ecff;
 }
 
 .apo-dismiss {
   display: block;
   width: 100%;
-  margin-top: 14px;
-  padding: 10px 14px;
+  margin-top: 12px;
+  padding: 9px 12px;
   border: 1px solid #c5d4eb;
   border-radius: 10px;
   background: #f5f8fd;
   color: #1e3a6e;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .apo-dismiss:hover {
   background: #eaf1fb;
+}
+
+/* Chip flutuante quando minimizado — não bloqueia a tela */
+.apo-minimized {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 12000;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  max-width: min(360px, calc(100vw - 32px));
+  animation: apo-slide-up 220ms ease-out;
+}
+
+.apo-minimized-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 6px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #b8d0f5;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 47, 115, 0.22);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.apo-minimized-icon {
+  grid-row: 1 / span 2;
+  color: #2357c4;
+}
+
+.apo-minimized-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.apo-minimized-copy strong {
+  font-size: 0.82rem;
+  color: #0f2f73;
+  font-weight: 700;
+}
+
+.apo-minimized-copy span {
+  font-size: 0.72rem;
+  color: #5d708e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.apo-minimized-bar {
+  grid-column: 2;
+  height: 4px;
+  border-radius: 999px;
+  background: #e8f0fb;
+  overflow: hidden;
+}
+
+.apo-minimized-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f2f73 0%, #2357c4 55%, #f1b726 100%);
+  transition: width 280ms ease-out;
+}
+
+.apo-minimized-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  border: 1px solid #b8d0f5;
+  border-radius: 14px;
+  background: #0f2f73;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(15, 47, 115, 0.22);
+}
+
+.apo-minimized-expand:hover {
+  background: #1a3f8f;
 }
 
 @keyframes apo-fade-in {
@@ -239,17 +380,37 @@
   }
 }
 
+@keyframes apo-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 560px) {
   .apo-card {
-    padding: 22px 18px 18px;
+    width: min(100%, 400px);
+    padding: 16px 14px 14px;
+    max-height: 82vh;
   }
 
   .apo-percent {
-    font-size: 1.7rem;
-    min-width: 60px;
+    font-size: 1.35rem;
+    min-width: 48px;
   }
 
   .apo-title {
-    font-size: 1.25rem;
+    font-size: 1.05rem;
+  }
+
+  .apo-minimized {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    max-width: none;
   }
 }

@@ -30,9 +30,9 @@ export type FeedbackAprendizadoFirestore = {
 const COLLECTION =
   process.env.FIRESTORE_FEEDBACKS_COLLECTION?.trim() || "feedbacksAprendizado";
 
-const DEFAULT_MAX_ITEMS = 8;
-const DEFAULT_MAX_CHARS_FIELD = 500;
-const DEFAULT_MAX_BLOCK_CHARS = 8000;
+const DEFAULT_MAX_ITEMS = 12;
+const DEFAULT_MAX_CHARS_FIELD = 700;
+const DEFAULT_MAX_BLOCK_CHARS = 14000;
 
 function truncate(value: string, max: number): string {
   const trimmed = value.trim();

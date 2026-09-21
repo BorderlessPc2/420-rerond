@@ -41,14 +41,18 @@ import {
   type ConferenciaInput,
   type DadosExtraidosAnalise,
 } from "./consistencyAnalyzer";
-import { planDocumentBatches, withRetry, isLikelyRateLimitError } from "./pipeline";
-import { selectDocumentosPorPrioridade } from "./pipeline/documentPriority";
 import {
+  planDocumentBatches,
+  withRetry,
+  isLikelyRateLimitError,
   mergeChecklistItems,
   mergeDadosExtraidos,
   mergeConferenciaInputs,
   consolidatePareceres,
+  buildSynthesizeParecerPrompt,
+  summarizeChecklistForSynthesis,
 } from "./pipeline";
+import { selectDocumentosPorPrioridade } from "./pipeline/documentPriority";
 import type { AnaliseTelemetry } from "./pipeline";
 import {
   buildCustomAnalysisPromptAddon,
@@ -78,8 +82,11 @@ export type AnaliseJobState =
   | "completed"
   | "failed";
 
-const MAX_PDFS_PROJETO = 10;
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_PDFS_PROJETO = 18;
+const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
+/** Orçamento por lote: cabe vários PDFs + normas no gpt-4.1 (1M). */
+const BATCH_MAX_TOKENS = 280_000;
+const BATCH_MAX_BYTES = 45 * 1024 * 1024;
 const VALID_TIPOS: TipoRelatorio[] = ["pit", "obra_per", "obra_nao_per"];
 
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
@@ -801,7 +808,7 @@ export async function runAnaliseJob(params: {
         const feedbacks = await listFeedbacksAprovadosParaAnalise({
           tipoAnaliseId,
           organizacaoId: concessionariaId,
-          maxItems: 8,
+          maxItems: 12,
           queryText: ragQueryText,
         });
         feedbackBlock = buildFeedbackAprendizadoPromptBlock(feedbacks);
@@ -819,7 +826,7 @@ export async function runAnaliseJob(params: {
         const goldens = await listGoldenCasesAprovadosParaAnalise({
           tipoAnaliseId,
           organizacaoId: concessionariaId,
-          maxItems: 3,
+          maxItems: 5,
           queryText: ragQueryText,
         });
         goldenBlock = buildGoldenCasesPromptBlock(goldens);
@@ -886,7 +893,10 @@ export async function runAnaliseJob(params: {
     }));
     const plannedBatches =
       escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0
-        ? planDocumentBatches(pdfItemsForPlan)
+        ? planDocumentBatches(pdfItemsForPlan, {
+            maxTokensPerBatch: BATCH_MAX_TOKENS,
+            maxBytesPerBatch: BATCH_MAX_BYTES,
+          })
         : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
 
     await jobRef.update({
@@ -915,7 +925,7 @@ export async function runAnaliseJob(params: {
 
     const batchResults: BatchParsed[] = [];
     lastStage = "analyze";
-    const maxOut = isProfile ? 16000 : 12000;
+    const maxOut = isProfile ? 20000 : 16000;
 
     for (let i = 0; i < plannedBatches.length; i++) {
       const batch = plannedBatches[i];
@@ -1002,9 +1012,42 @@ export async function runAnaliseJob(params: {
     const mergedConferencia = mergeConferenciaInputs(
       batchResults.map((b) => b.conferenciaInputs),
     ) as ConferenciaInput[];
-    const mergedParecer = consolidatePareceres(
+
+    let mergedParecer = consolidatePareceres(
       batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })),
     );
+    let synthesizeTokens = 0;
+
+    if (batchResults.length > 1 && escopoAnalise.gerarParecerTecnico) {
+      try {
+        const synthPrompt = buildSynthesizeParecerPrompt(
+          batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })),
+          summarizeChecklistForSynthesis(mergedChecklist),
+        );
+        const synth = await withRetry(
+          () =>
+            analyze([buildTextInput(synthPrompt)], {
+              maxOutputTokens: Math.min(maxOut, 12000),
+              temperature: 0.1,
+            }),
+          {
+            maxAttempts: 2,
+            baseDelayMs: 800,
+            isRetryable: isLikelyRateLimitError,
+          },
+        );
+        const synthesized = synth.content?.trim();
+        if (synthesized && synthesized.length > 80) {
+          mergedParecer = synthesized;
+          synthesizeTokens = typeof synth.tokensUsed === "number" ? synth.tokensUsed : 0;
+        }
+      } catch (synthErr) {
+        console.warn(
+          "Síntese de parecer multi-lote falhou; usando concatenação:",
+          synthErr instanceof Error ? synthErr.message : synthErr,
+        );
+      }
+    }
 
     const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
     const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
@@ -1036,10 +1079,11 @@ export async function runAnaliseJob(params: {
               conferenciaInputs: conferenciaFinal,
             },
           });
-    const tokensUsedTotal = batchResults.reduce(
-      (sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0),
-      0,
-    );
+    const tokensUsedTotal =
+      batchResults.reduce(
+        (sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0),
+        0,
+      ) + synthesizeTokens;
     const result = { content: resultContent, tokensUsed: tokensUsedTotal || undefined };
 
     // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai

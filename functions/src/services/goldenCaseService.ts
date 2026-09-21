@@ -40,9 +40,9 @@ export type GoldenCaseFirestore = {
 const COLLECTION =
   process.env.FIRESTORE_GOLDEN_CASES_COLLECTION?.trim() || "goldenCases";
 
-const DEFAULT_MAX_ITEMS = 3;
-const DEFAULT_MAX_CHARS_FIELD = 500;
-const DEFAULT_MAX_BLOCK_CHARS = 8000;
+const DEFAULT_MAX_ITEMS = 5;
+const DEFAULT_MAX_CHARS_FIELD = 700;
+const DEFAULT_MAX_BLOCK_CHARS = 14000;
 
 function truncate(value: string, max: number): string {
   const trimmed = value.trim();

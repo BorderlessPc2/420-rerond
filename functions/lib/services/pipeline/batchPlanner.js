@@ -4,11 +4,13 @@ exports.planDocumentBatches = planDocumentBatches;
 const estimateTokens_1 = require("./estimateTokens");
 /**
  * Agrupa documentos em lotes sem estourar tokens/bytes estimados.
+ * Defaults pensados para modelos de janela ampla (gpt-4.1 / 1M):
+ * sobra espaço para normas + prompt + saída (~16k).
  * Itens maiores que o limite sozinhos formam lote unitário (caller deve avisar).
  */
 function planDocumentBatches(items, options = {}) {
-    const maxTokens = options.maxTokensPerBatch ?? 80_000;
-    const maxBytes = options.maxBytesPerBatch ?? 15 * 1024 * 1024;
+    const maxTokens = options.maxTokensPerBatch ?? 280_000;
+    const maxBytes = options.maxBytesPerBatch ?? 45 * 1024 * 1024;
     const batches = [];
     let current = [];
     let tokens = 0;

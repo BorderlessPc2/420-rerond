@@ -16,13 +16,15 @@ const embeddingService_1 = require("./embeddingService");
 const consistencyAnalyzer_1 = require("./consistencyAnalyzer");
 const pipeline_1 = require("./pipeline");
 const documentPriority_1 = require("./pipeline/documentPriority");
-const pipeline_2 = require("./pipeline");
 const concessionariaPerfilService_1 = require("./concessionariaPerfilService");
 const tipoAnaliseService_1 = require("./tipoAnaliseService");
 const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
 const goldenCaseService_1 = require("./goldenCaseService");
-const MAX_PDFS_PROJETO = 10;
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_PDFS_PROJETO = 18;
+const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
+/** Orçamento por lote: cabe vários PDFs + normas no gpt-4.1 (1M). */
+const BATCH_MAX_TOKENS = 280_000;
+const BATCH_MAX_BYTES = 45 * 1024 * 1024;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
 function getBucket() {
@@ -613,7 +615,7 @@ async function runAnaliseJob(params) {
                 const feedbacks = await (0, feedbackAprendizadoService_1.listFeedbacksAprovadosParaAnalise)({
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
-                    maxItems: 8,
+                    maxItems: 12,
                     queryText: ragQueryText,
                 });
                 feedbackBlock = (0, feedbackAprendizadoService_1.buildFeedbackAprendizadoPromptBlock)(feedbacks);
@@ -629,7 +631,7 @@ async function runAnaliseJob(params) {
                 const goldens = await (0, goldenCaseService_1.listGoldenCasesAprovadosParaAnalise)({
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
-                    maxItems: 3,
+                    maxItems: 5,
                     queryText: ragQueryText,
                 });
                 goldenBlock = (0, goldenCaseService_1.buildGoldenCasesPromptBlock)(goldens);
@@ -677,7 +679,10 @@ async function runAnaliseJob(params) {
             tipoDocumento: pdf.tipoDocumento,
         }));
         const plannedBatches = escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0
-            ? (0, pipeline_1.planDocumentBatches)(pdfItemsForPlan)
+            ? (0, pipeline_1.planDocumentBatches)(pdfItemsForPlan, {
+                maxTokensPerBatch: BATCH_MAX_TOKENS,
+                maxBytesPerBatch: BATCH_MAX_BYTES,
+            })
             : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
         await jobRef.update({
             batchPlan: {
@@ -693,7 +698,7 @@ async function runAnaliseJob(params) {
         });
         const batchResults = [];
         lastStage = "analyze";
-        const maxOut = isProfile ? 16000 : 12000;
+        const maxOut = isProfile ? 20000 : 16000;
         for (let i = 0; i < plannedBatches.length; i++) {
             const batch = plannedBatches[i];
             const pdfsInBatch = batch.items.length > 0
@@ -754,10 +759,32 @@ async function runAnaliseJob(params) {
         }
         await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
         lastStage = "consolidate";
-        const mergedChecklist = (0, pipeline_2.mergeChecklistItems)(batchResults.map((b) => b.checklist));
-        const mergedDados = (0, pipeline_2.mergeDadosExtraidos)(batchResults.map((b) => b.dadosExtraidos));
-        const mergedConferencia = (0, pipeline_2.mergeConferenciaInputs)(batchResults.map((b) => b.conferenciaInputs));
-        const mergedParecer = (0, pipeline_2.consolidatePareceres)(batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })));
+        const mergedChecklist = (0, pipeline_1.mergeChecklistItems)(batchResults.map((b) => b.checklist));
+        const mergedDados = (0, pipeline_1.mergeDadosExtraidos)(batchResults.map((b) => b.dadosExtraidos));
+        const mergedConferencia = (0, pipeline_1.mergeConferenciaInputs)(batchResults.map((b) => b.conferenciaInputs));
+        let mergedParecer = (0, pipeline_1.consolidatePareceres)(batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })));
+        let synthesizeTokens = 0;
+        if (batchResults.length > 1 && escopoAnalise.gerarParecerTecnico) {
+            try {
+                const synthPrompt = (0, pipeline_1.buildSynthesizeParecerPrompt)(batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })), (0, pipeline_1.summarizeChecklistForSynthesis)(mergedChecklist));
+                const synth = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)([(0, openaiService_1.buildTextInput)(synthPrompt)], {
+                    maxOutputTokens: Math.min(maxOut, 12000),
+                    temperature: 0.1,
+                }), {
+                    maxAttempts: 2,
+                    baseDelayMs: 800,
+                    isRetryable: pipeline_1.isLikelyRateLimitError,
+                });
+                const synthesized = synth.content?.trim();
+                if (synthesized && synthesized.length > 80) {
+                    mergedParecer = synthesized;
+                    synthesizeTokens = typeof synth.tokensUsed === "number" ? synth.tokensUsed : 0;
+                }
+            }
+            catch (synthErr) {
+                console.warn("Síntese de parecer multi-lote falhou; usando concatenação:", synthErr instanceof Error ? synthErr.message : synthErr);
+            }
+        }
         const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
         const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
         const conferenciaFinal = (0, consistencyAnalyzer_1.complementarConferenciaDeterministica)(mergedConferencia, {
@@ -783,7 +810,7 @@ async function runAnaliseJob(params) {
                     conferenciaInputs: conferenciaFinal,
                 },
             });
-        const tokensUsedTotal = batchResults.reduce((sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0), 0);
+        const tokensUsedTotal = batchResults.reduce((sum, b) => sum + (typeof b.tokensUsed === "number" ? b.tokensUsed : 0), 0) + synthesizeTokens;
         const result = { content: resultContent, tokensUsed: tokensUsedTotal || undefined };
         // Snapshot da versão anterior (se existir) + grava versão atual antes de sobrescrever no doc pai
         const snapAntes = await solicitacaoRef.get();

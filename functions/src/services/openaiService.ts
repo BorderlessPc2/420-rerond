@@ -2,6 +2,14 @@ import OpenAI from "openai";
 
 let client: OpenAI | null = null;
 
+/** Modelo com janela ampla (1M). Override via OPENAI_MODEL. */
+const DEFAULT_ANALYSIS_MODEL = "gpt-4.1";
+
+export function getAnalysisModel(): string {
+  const fromEnv = process.env.OPENAI_MODEL?.trim();
+  return fromEnv || DEFAULT_ANALYSIS_MODEL;
+}
+
 export function initOpenAI(apiKey: string): void {
   client = new OpenAI({ apiKey });
 }
@@ -54,14 +62,15 @@ export function buildTextInput(text: string): InputTextPart {
 
 export async function analyze(
   parts: InputPart[],
-  options?: { maxOutputTokens?: number; temperature?: number; jsonMode?: boolean },
+  options?: { maxOutputTokens?: number; temperature?: number; jsonMode?: boolean; model?: string },
 ): Promise<AnaliseResult> {
   const ai = getClient();
   const maxTokens = options?.maxOutputTokens ?? 8000;
   const temperature = options?.temperature ?? 0.1;
+  const model = options?.model?.trim() || getAnalysisModel();
 
   const response = await ai.responses.create({
-    model: "gpt-4o",
+    model,
     input: [
       {
         role: "user",

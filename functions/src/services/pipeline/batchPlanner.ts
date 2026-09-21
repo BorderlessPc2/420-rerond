@@ -4,22 +4,24 @@ import {
 import type { DocumentBatchItem, PlannedBatch } from "./types";
 
 export type BatchPlannerOptions = {
-  /** Orçamento aproximado de tokens por lote (default ~80k). */
+  /** Orçamento aproximado de tokens por lote (default ~280k — janela ampla). */
   maxTokensPerBatch?: number;
-  /** Orçamento de bytes por lote (default 15MB). */
+  /** Orçamento de bytes por lote (default 45MB). */
   maxBytesPerBatch?: number;
 };
 
 /**
  * Agrupa documentos em lotes sem estourar tokens/bytes estimados.
+ * Defaults pensados para modelos de janela ampla (gpt-4.1 / 1M):
+ * sobra espaço para normas + prompt + saída (~16k).
  * Itens maiores que o limite sozinhos formam lote unitário (caller deve avisar).
  */
 export function planDocumentBatches(
   items: DocumentBatchItem[],
   options: BatchPlannerOptions = {},
 ): PlannedBatch[] {
-  const maxTokens = options.maxTokensPerBatch ?? 80_000;
-  const maxBytes = options.maxBytesPerBatch ?? 15 * 1024 * 1024;
+  const maxTokens = options.maxTokensPerBatch ?? 280_000;
+  const maxBytes = options.maxBytesPerBatch ?? 45 * 1024 * 1024;
 
   const batches: PlannedBatch[] = [];
   let current: DocumentBatchItem[] = [];
