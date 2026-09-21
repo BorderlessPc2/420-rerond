@@ -45,6 +45,7 @@ import {
   getRequisitosFromPerfil,
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
+import { selectDocumentosPorPrioridade } from "./services/pipeline/documentPriority";
 
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
@@ -277,24 +278,17 @@ function aplicarLimitesPdf(
   incluidos: Array<{ filename: string; buffer: Buffer; url?: string }>;
   omitidos: string[];
 } {
-  const incluidos: Array<{ filename: string; buffer: Buffer; url?: string }> = [];
-  const omitidos: string[] = [];
-
-  for (const pdf of pdfBuffers) {
-    if (incluidos.length >= MAX_PDFS_PROJETO) {
-      omitidos.push(`${pdf.filename} (limite de ${MAX_PDFS_PROJETO} PDFs)`);
-      continue;
-    }
-    if (pdf.buffer.length > MAX_PDF_SIZE_BYTES) {
-      omitidos.push(
-        `${pdf.filename} (tamanho ${Math.round(pdf.buffer.length / 1024 / 1024)} MB > ${MAX_PDF_SIZE_BYTES / 1024 / 1024} MB)`,
-      );
-      continue;
-    }
-    incluidos.push(pdf);
-  }
-
-  return { incluidos, omitidos };
+  const selected = selectDocumentosPorPrioridade(
+    pdfBuffers.map((pdf) => ({
+      ...pdf,
+      sizeBytes: pdf.buffer.length,
+    })),
+    { maxCount: MAX_PDFS_PROJETO, maxBytesPerFile: MAX_PDF_SIZE_BYTES },
+  );
+  return {
+    incluidos: selected.incluidos.map(({ sizeBytes: _s, ...rest }) => rest),
+    omitidos: selected.omitidos.map((o) => o.motivo),
+  };
 }
 
 async function inferTipoRelatorio(

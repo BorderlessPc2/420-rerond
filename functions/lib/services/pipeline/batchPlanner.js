@@ -3,14 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.planDocumentBatches = planDocumentBatches;
 const estimateTokens_1 = require("./estimateTokens");
 /**
- * Agrupa documentos em lotes sem estourar tokens/bytes estimados.
- * Defaults pensados para modelos de janela ampla (gpt-4.1 / 1M):
- * sobra espaço para normas + prompt + saída (~16k).
+ * Agrupa documentos em lotes sem estourar tokens/bytes/itens estimados.
+ * Defaults pensados para gpt-4.1 + teto OpenAI de ~50MB por request
+ * (normas anexadas fora deste orçamento).
  * Itens maiores que o limite sozinhos formam lote unitário (caller deve avisar).
  */
 function planDocumentBatches(items, options = {}) {
     const maxTokens = options.maxTokensPerBatch ?? 280_000;
-    const maxBytes = options.maxBytesPerBatch ?? 45 * 1024 * 1024;
+    const maxBytes = options.maxBytesPerBatch ?? 28 * 1024 * 1024;
+    const maxItems = options.maxItemsPerBatch ?? 6;
     const batches = [];
     let current = [];
     let tokens = 0;
@@ -34,7 +35,9 @@ function planDocumentBatches(items, options = {}) {
             : (0, estimateTokens_1.estimateTokensFromBytes)(item.sizeBytes);
         const itemBytes = item.sizeBytes || 0;
         const wouldExceed = current.length > 0 &&
-            (tokens + itemTokens > maxTokens || bytes + itemBytes > maxBytes);
+            (current.length >= maxItems ||
+                tokens + itemTokens > maxTokens ||
+                bytes + itemBytes > maxBytes);
         if (wouldExceed)
             flush();
         current.push(item);

@@ -22,12 +22,13 @@ const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
 const goldenCaseService_1 = require("./goldenCaseService");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
-/** Orçamento por lote: cabe vários PDFs + normas no gpt-4.1 (1M). */
+/** Orçamento por lote de PDFs do projeto (folga para normas no teto ~50MB da API). */
 const BATCH_MAX_TOKENS = 280_000;
-const BATCH_MAX_BYTES = 45 * 1024 * 1024;
+const BATCH_MAX_BYTES = 28 * 1024 * 1024;
+const BATCH_MAX_ITEMS = 6;
 /** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
-const PDF_PART_MAX_BYTES = 12 * 1024 * 1024;
-const PDF_PART_MAX_TOKENS = 120_000;
+const PDF_PART_MAX_BYTES = 10 * 1024 * 1024;
+const PDF_PART_MAX_TOKENS = 100_000;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
 function getBucket() {
@@ -713,6 +714,7 @@ async function runAnaliseJob(params) {
             ? (0, pipeline_1.planDocumentBatches)(pdfItemsForPlan, {
                 maxTokensPerBatch: BATCH_MAX_TOKENS,
                 maxBytesPerBatch: BATCH_MAX_BYTES,
+                maxItemsPerBatch: BATCH_MAX_ITEMS,
             })
             : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
         await jobRef.update({

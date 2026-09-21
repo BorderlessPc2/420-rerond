@@ -45,6 +45,37 @@ describe("planDocumentBatches", () => {
     expect(batches.length).toBeGreaterThanOrEqual(2);
     expect(batches.some((b) => b.items.some((i) => i.filename === "c.pdf"))).toBe(true);
   });
+
+  it("não empilha mais que maxItemsPerBatch (muitos arquivos)", () => {
+    const items = Array.from({ length: 24 }, (_, i) => ({
+      id: String(i),
+      filename: `doc-${i}.pdf`,
+      sizeBytes: 500_000,
+    }));
+    const batches = planDocumentBatches(items, {
+      maxItemsPerBatch: 6,
+      maxBytesPerBatch: 28 * 1024 * 1024,
+      maxTokensPerBatch: 280_000,
+    });
+    expect(batches.length).toBe(4);
+    expect(batches.every((b) => b.items.length <= 6)).toBe(true);
+    expect(batches.every((b) => b.totalBytes <= 28 * 1024 * 1024)).toBe(true);
+  });
+
+  it("respeita teto de bytes com folga para normas (~50MB API)", () => {
+    const items = [
+      { id: "1", filename: "a.pdf", sizeBytes: 15 * 1024 * 1024 },
+      { id: "2", filename: "b.pdf", sizeBytes: 15 * 1024 * 1024 },
+      { id: "3", filename: "c.pdf", sizeBytes: 15 * 1024 * 1024 },
+    ];
+    const batches = planDocumentBatches(items, {
+      maxBytesPerBatch: 28 * 1024 * 1024,
+      maxTokensPerBatch: 1_000_000,
+      maxItemsPerBatch: 10,
+    });
+    expect(batches.length).toBeGreaterThanOrEqual(2);
+    expect(batches.every((b) => b.totalBytes <= 28 * 1024 * 1024)).toBe(true);
+  });
 });
 
 describe("selectDocumentosPorPrioridade", () => {
@@ -61,6 +92,33 @@ describe("selectDocumentosPorPrioridade", () => {
     expect(result.incluidos.map((i) => i.filename)).toEqual(["memorial.pdf", "planta.pdf"]);
     expect(result.omitidos).toHaveLength(2);
     expect(result.omitidos.every((o) => o.motivo.includes("prioridade"))).toBe(true);
+  });
+
+  it("omite o 19º+ PDF e mantém memorial/planta entre 25 arquivos", () => {
+    const items = [
+      { filename: "z-anexo.pdf", tipoDocumento: "outro", sizeBytes: 100_000 },
+      ...Array.from({ length: 20 }, (_, i) => ({
+        filename: `anexo-${i}.pdf`,
+        tipoDocumento: "desconhecido",
+        sizeBytes: 100_000,
+      })),
+      { filename: "memorial.pdf", tipoDocumento: "memorial_descritivo", sizeBytes: 100_000 },
+      { filename: "planta.pdf", tipoDocumento: "planta_baixa", sizeBytes: 100_000 },
+      { filename: "art.pdf", tipoDocumento: "art", sizeBytes: 100_000 },
+    ];
+    const result = selectDocumentosPorPrioridade(items, {
+      maxCount: 18,
+      maxBytesPerFile: 35 * 1024 * 1024,
+    });
+    expect(result.incluidos).toHaveLength(18);
+    expect(result.omitidos.length).toBe(items.length - 18);
+    const names = result.incluidos.map((i) => i.filename);
+    expect(names).toContain("memorial.pdf");
+    expect(names).toContain("planta.pdf");
+    expect(names).toContain("art.pdf");
+    expect(result.omitidos.every((o) => o.motivo.includes("limite") || o.motivo.includes("prioridade"))).toBe(
+      true,
+    );
   });
 
   it("omite arquivo acima do tamanho mesmo com prioridade alta", () => {

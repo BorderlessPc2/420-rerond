@@ -6,14 +6,19 @@ import type { DocumentBatchItem, PlannedBatch } from "./types";
 export type BatchPlannerOptions = {
   /** Orçamento aproximado de tokens por lote (default ~280k — janela ampla). */
   maxTokensPerBatch?: number;
-  /** Orçamento de bytes por lote (default 45MB). */
+  /**
+   * Orçamento de bytes dos PDFs do projeto por lote (default 28MB).
+   * Deixa folga para normas + prompt dentro do teto OpenAI (~50MB/request).
+   */
   maxBytesPerBatch?: number;
+  /** Máx. de arquivos/partes por lote (default 6) — evita request gigante. */
+  maxItemsPerBatch?: number;
 };
 
 /**
- * Agrupa documentos em lotes sem estourar tokens/bytes estimados.
- * Defaults pensados para modelos de janela ampla (gpt-4.1 / 1M):
- * sobra espaço para normas + prompt + saída (~16k).
+ * Agrupa documentos em lotes sem estourar tokens/bytes/itens estimados.
+ * Defaults pensados para gpt-4.1 + teto OpenAI de ~50MB por request
+ * (normas anexadas fora deste orçamento).
  * Itens maiores que o limite sozinhos formam lote unitário (caller deve avisar).
  */
 export function planDocumentBatches(
@@ -21,7 +26,8 @@ export function planDocumentBatches(
   options: BatchPlannerOptions = {},
 ): PlannedBatch[] {
   const maxTokens = options.maxTokensPerBatch ?? 280_000;
-  const maxBytes = options.maxBytesPerBatch ?? 45 * 1024 * 1024;
+  const maxBytes = options.maxBytesPerBatch ?? 28 * 1024 * 1024;
+  const maxItems = options.maxItemsPerBatch ?? 6;
 
   const batches: PlannedBatch[] = [];
   let current: DocumentBatchItem[] = [];
@@ -50,7 +56,9 @@ export function planDocumentBatches(
 
     const wouldExceed =
       current.length > 0 &&
-      (tokens + itemTokens > maxTokens || bytes + itemBytes > maxBytes);
+      (current.length >= maxItems ||
+        tokens + itemTokens > maxTokens ||
+        bytes + itemBytes > maxBytes);
 
     if (wouldExceed) flush();
 
