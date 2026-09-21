@@ -106,8 +106,22 @@ describe("withRetry", () => {
     ).rejects.toThrow("invalid schema");
   });
 
-  it("detecta rate limit", () => {
+  it("detecta rate limit e não confunde com context window", () => {
     expect(isLikelyRateLimitError(new Error("HTTP 429"))).toBe(true);
     expect(isLikelyRateLimitError(new Error("boom"))).toBe(false);
+    expect(isLikelyRateLimitError(new Error("context window exceeded"))).toBe(false);
+  });
+});
+
+describe("pdfSplit planning", () => {
+  it("marca PDF grande para split e calcula partes", async () => {
+    const { shouldSplitPdf, planPdfPartCount, isLikelyContextWindowError } = await import(
+      "./pdfSplit"
+    );
+    expect(shouldSplitPdf(20 * 1024 * 1024)).toBe(true);
+    expect(shouldSplitPdf(100_000)).toBe(false);
+    expect(planPdfPartCount(30 * 1024 * 1024, 100)).toBeGreaterThanOrEqual(2);
+    expect(isLikelyContextWindowError(new Error("maximum context length exceeded"))).toBe(true);
+    expect(isLikelyContextWindowError(new Error("429 rate limit"))).toBe(false);
   });
 });

@@ -5,10 +5,16 @@ exports.withRetry = withRetry;
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function isLikelyRateLimitError(error) {
     const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    if (msg.includes("context_length") ||
+        msg.includes("context length") ||
+        msg.includes("maximum context") ||
+        msg.includes("context window") ||
+        msg.includes("too large")) {
+        return false;
+    }
     return (msg.includes("429") ||
         msg.includes("rate limit") ||
-        msg.includes("too many requests") ||
-        msg.includes("tokens"));
+        msg.includes("too many requests"));
 }
 /**
  * Retry com backoff. Pronto para ligar no processor quando houver OpenAI/deploy.

@@ -141,7 +141,7 @@ export function consolidatePareceres(
     .join("\n\n---\n\n")
 }
 
-/** Prompt de síntese: une pareceres de lotes em um único texto coeso (sem reenviar PDFs). */
+/** Prompt de síntese: une pareceres de lotes/partes em um único texto coeso (sem reenviar PDFs). */
 export function buildSynthesizeParecerPrompt(
   batches: Array<{ filenames: string[]; parecer: string }>,
   checklistSummary?: string,
@@ -150,16 +150,18 @@ export function buildSynthesizeParecerPrompt(
   const checklistPart = checklistSummary?.trim()
     ? `\nCHECKLIST CONSOLIDADO (resumo):\n${checklistSummary.trim().slice(0, 6000)}\n`
     : ""
-  return `Você consolidará pareceres técnicos de ${batches.length} lotes da MESMA solicitação em UM parecer final coeso.
+  return `Você consolidará pareceres técnicos de ${batches.length} passagens da MESMA solicitação em UM parecer final coeso.
 
 Regras:
-- Unifique conclusões; não repita "LOTE 1/LOTE 2" no texto final.
+- Unifique conclusões; não repita "LOTE 1/LOTE 2" ou "PARTE 1/PARTE 2" no texto final.
+- Partes do mesmo arquivo (sufixo __parte-N) são o MESMO documento — una a leitura como um memorial/planta contínuo.
 - Se houver conflito entre lotes, explicite a divergência e indique qual documento sustenta cada lado.
+- Prefira NAO_CONFORME / INFORMACAO_AUSENTE apenas quando nenhuma parte trouxe a evidência.
 - Mantenha tom técnico e fundamentação normativa já presente.
 - Não invente fatos que não apareçam nos pareceres dos lotes.
 - Responda APENAS com o texto do parecer final (markdown permitido), sem JSON.
 ${checklistPart}
-PARECERES POR LOTE:
+PARECERES POR PASSAGEM:
 ${lotes}`
 }
 

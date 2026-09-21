@@ -25,6 +25,9 @@ const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 /** Orçamento por lote: cabe vários PDFs + normas no gpt-4.1 (1M). */
 const BATCH_MAX_TOKENS = 280_000;
 const BATCH_MAX_BYTES = 45 * 1024 * 1024;
+/** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
+const PDF_PART_MAX_BYTES = 12 * 1024 * 1024;
+const PDF_PART_MAX_TOKENS = 120_000;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
 function getBucket() {
@@ -108,10 +111,12 @@ function isPecaGraficaTipoDocumento(tipo) {
         "estrutura_sustentacao",
     ]).has(tipo);
 }
-function buildDocumentoProjetoLabel(filename, arquivosMeta, url) {
-    const meta = arquivosMeta.find((m) => m.url === url || m.nome === filename);
+function buildDocumentoProjetoLabel(filename, arquivosMeta, url, sourceFilename) {
+    const meta = arquivosMeta.find((m) => m.url === url ||
+        m.nome === filename ||
+        (sourceFilename && m.nome === sourceFilename));
     const tipo = meta?.tipoDocumento ?? "desconhecido";
-    const nome = meta?.nome ?? filename;
+    const nome = meta?.nome ?? sourceFilename ?? filename;
     if (isPecaGraficaTipoDocumento(tipo)) {
         return `[PEÇA GRÁFICA — analisar desenho, cotas, FXD, km, sentido e parâmetros visuais; se estiver ilegível, marque como NÃO FOI POSSÍVEL AVALIAR/INFORMACAO_AUSENTE citando o arquivo, sem dizer que o documento está ausente | tipoDocumento=${tipo}; arquivo=${nome}]`;
     }
@@ -408,18 +413,41 @@ async function runAnaliseJob(params) {
                 console.error(`Erro ao baixar PDF: ${url}`, err);
             }
         }
-        const { incluidos: pdfBuffers, omitidos: pdfsOmitidos } = aplicarLimitesPdf(pdfBuffersRaw);
+        const { incluidos: pdfBuffersLimited, omitidos: pdfsOmitidos } = aplicarLimitesPdf(pdfBuffersRaw);
         lastStage = "extract";
+        // Fatia PDFs grandes em partes por páginas (overlap) para não estourar contexto.
+        const splitOpts = {
+            maxBytesPerPart: PDF_PART_MAX_BYTES,
+            maxTokensPerPart: PDF_PART_MAX_TOKENS,
+            overlapPages: 1,
+            maxParts: 8,
+        };
+        const pdfBuffers = await (0, pipeline_1.expandPdfsForContext)(pdfBuffersLimited, splitOpts);
+        const splitNotices = [];
+        const bySource = new Map();
+        for (const p of pdfBuffers) {
+            const src = p.sourceFilename || p.filename;
+            if ((p.partCount ?? 1) > 1) {
+                bySource.set(src, p.partCount ?? 1);
+            }
+        }
+        for (const [src, count] of bySource) {
+            splitNotices.push(`${src} (dividido em ${count} partes por tamanho/contexto — análise consolidada)`);
+        }
+        if (splitNotices.length > 0) {
+            console.log(`PDFs grandes fatiados: ${splitNotices.join("; ")}`);
+        }
+        const pdfsOmitidosComAviso = [...pdfsOmitidos, ...splitNotices];
         totalBytes = pdfBuffers.reduce((sum, pdf) => sum + pdf.buffer.length, 0);
-        filesIncluded = pdfBuffers.length;
+        filesIncluded = pdfBuffersLimited.length;
         filesOmitted = pdfsOmitidos.length;
         lastStage = "chunk";
         let tipoBase;
         if (isValidTipo(data.tipoRelatorio)) {
             tipoBase = data.tipoRelatorio;
         }
-        else if (pdfBuffers.length > 0) {
-            tipoBase = await inferTipoRelatorio(pdfBuffers);
+        else if (pdfBuffersLimited.length > 0) {
+            tipoBase = await inferTipoRelatorio(pdfBuffersLimited);
         }
         else {
             tipoBase = perfilFirestore?.tipoProjetoPadrao ?? "pit";
@@ -666,6 +694,9 @@ async function runAnaliseJob(params) {
         if (pdfsOmitidos.length > 0) {
             sharedParts.push((0, openaiService_1.buildTextInput)(`[AVISO: PDFs omitidos por limite: ${pdfsOmitidos.join("; ")}]`));
         }
+        if (splitNotices.length > 0) {
+            sharedParts.push((0, openaiService_1.buildTextInput)(`[AVISO: documentos grandes fatiados para caber no contexto: ${splitNotices.join("; ")}. Trate partes do mesmo arquivo como um documento contínuo na consolidação.]`));
+        }
         if (normasCustomPdfIds.length > 0) {
             sharedParts.push((0, openaiService_1.buildTextInput)(`[NORMAS CUSTOMIZADAS COM PDF ANEXADO NESTA CHAMADA: ${normasCustomPdfIds.join(", ")}]`));
         }
@@ -696,9 +727,98 @@ async function runAnaliseJob(params) {
             },
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
+        const maxOut = isProfile ? 20000 : 16000;
+        const appendPdfParts = (parts, sourcePdfs) => {
+            for (const pdf of sourcePdfs) {
+                parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
+                parts.push((0, openaiService_1.buildTextInput)(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url, pdf.sourceFilename)));
+                const partLabel = (0, pipeline_1.buildPdfPartContextLabel)(pdf);
+                if (partLabel)
+                    parts.push((0, openaiService_1.buildTextInput)(partLabel));
+            }
+        };
+        const runAnalyzeCall = async (parts) => (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
+            maxOutputTokens: maxOut,
+            temperature: 0.1,
+            jsonMode: true,
+        }), {
+            maxAttempts: 3,
+            baseDelayMs: 800,
+            isRetryable: pipeline_1.isLikelyRateLimitError,
+        });
+        /**
+         * Analisa um conjunto de PDFs. Se estourar contexto, fatia novamente e
+         * reanalisa em subpassagens (sem derrubar o job).
+         */
+        const analyzePdfSetWithContextFallback = async (sourcePdfs, loteHint, depth = 0) => {
+            const parts = [...sharedParts];
+            if (escopoAnalise.incluirDocumentosProjeto) {
+                appendPdfParts(parts, sourcePdfs);
+            }
+            if (loteHint)
+                parts.push((0, openaiService_1.buildTextInput)(loteHint));
+            parts.push((0, openaiService_1.buildTextInput)(analysisPrompt));
+            try {
+                const result = await runAnalyzeCall(parts);
+                const parsedBatch = parseAIResponse(result.content);
+                return [
+                    {
+                        batchIndex: 0,
+                        filenames: sourcePdfs.map((p) => p.filename),
+                        tokensUsed: result.tokensUsed,
+                        checklist: parsedBatch.checklist,
+                        parecerTecnico: parsedBatch.parecerTecnico,
+                        dadosExtraidos: parsedBatch.dadosExtraidos,
+                        conferenciaInputs: parsedBatch.conferenciaInputs,
+                        rawContent: result.content,
+                    },
+                ];
+            }
+            catch (err) {
+                if (!(0, pipeline_1.isLikelyContextWindowError)(err) || depth >= 2 || sourcePdfs.length === 0) {
+                    throw err;
+                }
+                console.warn(`Contexto estourado (depth=${depth}); fatiando ${sourcePdfs.length} PDF(s) e reanalisando…`, err instanceof Error ? err.message : err);
+                // 1 PDF no lote: fatia o arquivo. Vários: analisa um a um.
+                if (sourcePdfs.length === 1) {
+                    const only = sourcePdfs[0];
+                    const finer = await (0, pipeline_1.splitPdfByPages)(only.buffer, only.sourceFilename || only.filename, {
+                        maxBytesPerPart: Math.max(4 * 1024 * 1024, Math.floor(only.buffer.length / 2)),
+                        maxTokensPerPart: Math.max(40_000, Math.floor(PDF_PART_MAX_TOKENS / 2)),
+                        overlapPages: 1,
+                        maxParts: 4,
+                    });
+                    if (finer.length <= 1)
+                        throw err;
+                    const results = [];
+                    for (let s = 0; s < finer.length; s++) {
+                        const slice = finer[s];
+                        const item = {
+                            ...only,
+                            filename: slice.filename,
+                            buffer: slice.buffer,
+                            sourceFilename: slice.sourceFilename,
+                            partIndex: slice.partIndex,
+                            partCount: slice.partCount,
+                            pageStart: slice.pageStart,
+                            pageEnd: slice.pageEnd,
+                            sizeBytes: slice.sizeBytes,
+                        };
+                        const sub = await analyzePdfSetWithContextFallback([item], `[RECORTE ${s + 1}/${finer.length} após overflow de contexto — consolidar com os demais.]`, depth + 1);
+                        results.push(...sub);
+                    }
+                    return results;
+                }
+                const results = [];
+                for (let p = 0; p < sourcePdfs.length; p++) {
+                    const sub = await analyzePdfSetWithContextFallback([sourcePdfs[p]], `[SUBLOTE ${p + 1}/${sourcePdfs.length} após overflow — um arquivo por chamada.]`, depth + 1);
+                    results.push(...sub);
+                }
+                return results;
+            }
+        };
         const batchResults = [];
         lastStage = "analyze";
-        const maxOut = isProfile ? 20000 : 16000;
         for (let i = 0; i < plannedBatches.length; i++) {
             const batch = plannedBatches[i];
             const pdfsInBatch = batch.items.length > 0
@@ -708,42 +828,25 @@ async function runAnaliseJob(params) {
                 : escopoAnalise.incluirDocumentosProjeto
                     ? []
                     : [];
-            const parts = [...sharedParts];
-            if (escopoAnalise.incluirDocumentosProjeto) {
-                const sourcePdfs = pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers;
-                for (const pdf of sourcePdfs) {
-                    parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
-                    parts.push((0, openaiService_1.buildTextInput)(buildDocumentoProjetoLabel(pdf.filename, arquivosMeta, pdf.url)));
-                }
-            }
-            if (plannedBatches.length > 1) {
-                const names = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
-                parts.push((0, openaiService_1.buildTextInput)(`[LOTE ${i + 1}/${plannedBatches.length} — analisar somente estes PDFs do projeto: ${names.join(", ")}. Outros lotes serão analisados em passagens separadas e consolidados depois.]`));
-            }
-            parts.push((0, openaiService_1.buildTextInput)(analysisPrompt));
+            const sourcePdfs = escopoAnalise.incluirDocumentosProjeto
+                ? pdfsInBatch.length > 0
+                    ? pdfsInBatch
+                    : pdfBuffers
+                : [];
+            const loteHint = plannedBatches.length > 1 || sourcePdfs.some((p) => (p.partCount ?? 1) > 1)
+                ? `[LOTE ${i + 1}/${plannedBatches.length} — analisar estes PDFs/partes: ${sourcePdfs
+                    .map((p) => p.filename)
+                    .join(", ")}. Outros lotes/partes serão analisados em passagens separadas e consolidados depois. Não declare ausência só porque a informação pode estar em outro lote/parte.]`
+                : "";
             const progress = Math.min(84, 68 + Math.round(((i + 1) / plannedBatches.length) * 16));
             await updateJob(jobRef, solicitacaoRef, "analyzing", progress, "checklist");
-            const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
-                maxOutputTokens: maxOut,
-                temperature: 0.1,
-                jsonMode: true,
-            }), {
-                maxAttempts: 3,
-                baseDelayMs: 800,
-                isRetryable: pipeline_1.isLikelyRateLimitError,
-            });
-            const parsedBatch = parseAIResponse(result.content);
-            const filenames = (pdfsInBatch.length > 0 ? pdfsInBatch : pdfBuffers).map((p) => p.filename);
-            batchResults.push({
-                batchIndex: i,
-                filenames,
-                tokensUsed: result.tokensUsed,
-                checklist: parsedBatch.checklist,
-                parecerTecnico: parsedBatch.parecerTecnico,
-                dadosExtraidos: parsedBatch.dadosExtraidos,
-                conferenciaInputs: parsedBatch.conferenciaInputs,
-                rawContent: result.content,
-            });
+            const parsedList = await analyzePdfSetWithContextFallback(sourcePdfs, loteHint, 0);
+            for (const parsed of parsedList) {
+                batchResults.push({
+                    ...parsed,
+                    batchIndex: batchResults.length,
+                });
+            }
             await jobRef.update({
                 batchResults: batchResults.map((b) => ({
                     batchIndex: b.batchIndex,
@@ -911,8 +1014,10 @@ async function runAnaliseJob(params) {
             analiseVersaoAtual: versaoCorrente,
             feedbackIdsInjetados,
             goldenCaseIdsInjetados,
-            documentosProcessados: pdfBuffers.map((pdf) => pdf.filename),
-            documentosOmitidos: pdfsOmitidos,
+            documentosProcessados: [
+                ...new Set(pdfBuffers.map((pdf) => pdf.sourceFilename || pdf.filename)),
+            ],
+            documentosOmitidos: pdfsOmitidosComAviso,
             analiseErroCodigo: null,
             analiseErroMensagem: null,
             analiseTelemetry: telemetry,

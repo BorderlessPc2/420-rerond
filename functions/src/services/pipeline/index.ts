@@ -10,6 +10,14 @@ export {
   sortDocumentosPorPrioridade,
   selectDocumentosPorPrioridade,
 } from "./documentPriority";
+export {
+  shouldSplitPdf,
+  planPdfPartCount,
+  splitPdfByPages,
+  expandPdfsForContext,
+  buildPdfPartContextLabel,
+  isLikelyContextWindowError,
+} from "./pdfSplit";
 export { withRetry, isLikelyRateLimitError } from "./withRetry";
 export {
   mergeChecklistItems,
@@ -20,3 +28,4 @@ export {
   summarizeChecklistForSynthesis,
 } from "./consolidateBatchResults";
 export type { AnaliseTelemetry, DocumentBatchItem, PlannedBatch, PipelineStage } from "./types";
+export type { PdfSlice, SplitPdfOptions } from "./pdfSplit";
