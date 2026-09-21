@@ -570,6 +570,64 @@ export const removeArquivoSolicitacao = async (
   return (await getSolicitacaoById(id)) ?? updated
 }
 
+/**
+ * Substitui um arquivo existente (remove o antigo + adiciona o novo) numa única ação.
+ */
+export const replaceArquivoSolicitacao = async (
+  id: string,
+  arquivoUrlAntigo: string,
+  novoFile: File,
+  tipoDocumento?: TipoDocumentoAnexo,
+  tipoDocumentoLabel?: string,
+): Promise<SolicitacaoWithFiles> => {
+  const atual = await getSolicitacaoById(id)
+  if (!atual) throw new Error('Solicitação não encontrada')
+
+  const metaAntigo = (atual.arquivosMeta ?? []).find((m) => m.url === arquivoUrlAntigo)
+  const tipo =
+    tipoDocumento ??
+    metaAntigo?.tipoDocumento ??
+    ('desconhecido' as TipoDocumentoAnexo)
+  const label =
+    tipoDocumentoLabel ??
+    (tipo === 'outro' ? metaAntigo?.tipoDocumentoLabel : undefined)
+  const nomeAntigo = metaAntigo?.nome || 'arquivo'
+
+  const arquivosSemAntigo = (atual.arquivos ?? []).filter((url) => url !== arquivoUrlAntigo)
+  const metasSemAntigo = (atual.arquivosMeta ?? []).filter((meta) => meta.url !== arquivoUrlAntigo)
+
+  try {
+    if (arquivoUrlAntigo.includes('firebasestorage.googleapis.com')) {
+      const pathMatch = decodeURIComponent(arquivoUrlAntigo).match(/\/o\/([^?]+)/)
+      if (pathMatch?.[1]) {
+        await deleteObject(ref(storage, pathMatch[1].replace(/%2F/g, '/')))
+      }
+    }
+  } catch (err) {
+    console.warn('Substituição: limpeza do Storage do arquivo antigo falhou:', err)
+  }
+
+  const fileKey = `${novoFile.name}-${novoFile.size}-${novoFile.lastModified}`
+  const { urls, metas } = await uploadSolicitacaoFiles(id, [novoFile], {
+    [fileKey]: tipo,
+  })
+  const metasFinais = metas.map((meta) =>
+    meta.tipoDocumento === 'outro' && label
+      ? { ...meta, tipoDocumentoLabel: label }
+      : meta,
+  )
+
+  const updated = await updateSolicitacao(id, {
+    arquivos: [...arquivosSemAntigo, ...urls],
+    arquivosMeta: [...metasSemAntigo, ...metasFinais],
+  })
+  await appendHistoricoEdicao(
+    id,
+    `Substituiu arquivo "${nomeAntigo}" por "${novoFile.name}".`,
+  )
+  return (await getSolicitacaoById(id)) ?? updated
+}
+
 export const reclassifyArquivoSolicitacao = async (
   id: string,
   arquivoUrl: string,

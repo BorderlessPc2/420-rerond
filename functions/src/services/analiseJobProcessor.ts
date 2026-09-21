@@ -42,6 +42,7 @@ import {
   type DadosExtraidosAnalise,
 } from "./consistencyAnalyzer";
 import { planDocumentBatches, withRetry, isLikelyRateLimitError } from "./pipeline";
+import { selectDocumentosPorPrioridade } from "./pipeline/documentPriority";
 import {
   mergeChecklistItems,
   mergeDadosExtraidos,
@@ -393,22 +394,24 @@ function mergeContextosMemoria(
 }
 
 function aplicarLimitesPdf(
-  pdfBuffers: Array<{ filename: string; buffer: Buffer; url?: string }>,
+  pdfBuffers: Array<{
+    filename: string;
+    buffer: Buffer;
+    url?: string;
+    tipoDocumento?: string;
+  }>,
 ) {
-  const incluidos: Array<{ filename: string; buffer: Buffer; url?: string }> = [];
-  const omitidos: string[] = [];
-  for (const pdf of pdfBuffers) {
-    if (incluidos.length >= MAX_PDFS_PROJETO) {
-      omitidos.push(`${pdf.filename} (limite de ${MAX_PDFS_PROJETO} PDFs)`);
-      continue;
-    }
-    if (pdf.buffer.length > MAX_PDF_SIZE_BYTES) {
-      omitidos.push(`${pdf.filename} (tamanho excedido)`);
-      continue;
-    }
-    incluidos.push(pdf);
-  }
-  return { incluidos, omitidos };
+  const selected = selectDocumentosPorPrioridade(
+    pdfBuffers.map((pdf) => ({
+      ...pdf,
+      sizeBytes: pdf.buffer.length,
+    })),
+    { maxCount: MAX_PDFS_PROJETO, maxBytesPerFile: MAX_PDF_SIZE_BYTES },
+  );
+  return {
+    incluidos: selected.incluidos.map(({ sizeBytes: _s, ...rest }) => rest),
+    omitidos: selected.omitidos.map((o) => o.motivo),
+  };
 }
 
 function stripMarkdownFence(raw: string): string {
@@ -542,14 +545,21 @@ export async function runAnaliseJob(params: {
     await updateJob(jobRef, solicitacaoRef, "extracting", 28, "pdfs");
 
     const pdfUrls = arquivos.filter((url) => url.toLowerCase().includes(".pdf"));
-    const pdfBuffersRaw: Array<{ filename: string; buffer: Buffer; url: string }> = [];
+    const pdfBuffersRaw: Array<{
+      filename: string;
+      buffer: Buffer;
+      url: string;
+      tipoDocumento?: string;
+    }> = [];
     for (const url of pdfUrls) {
       try {
         const buffer = await downloadStorageFile(url);
+        const meta = arquivosMeta.find((m) => m.url === url);
         pdfBuffersRaw.push({
-          filename: extractFilenameFromUrl(url),
+          filename: meta?.nome || extractFilenameFromUrl(url),
           buffer,
           url,
+          tipoDocumento: meta?.tipoDocumento,
         });
       } catch (err) {
         console.error(`Erro ao baixar PDF: ${url}`, err);
@@ -872,6 +882,7 @@ export async function runAnaliseJob(params: {
       id: String(index),
       filename: pdf.filename,
       sizeBytes: pdf.buffer.length,
+      tipoDocumento: (pdf as { tipoDocumento?: string }).tipoDocumento,
     }));
     const plannedBatches =
       escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0

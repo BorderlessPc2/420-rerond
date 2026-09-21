@@ -68,18 +68,16 @@ O principal problema atual é a **qualidade do resultado produzido pela IA**: el
 
 ### Em evolução (qualidade / produção)
 
-- Validação **empírica** com OpenAI (isolamento, memória, feedback, golden, plantas)
-- Análise visual de plantas / projetos geométricos (falsos negativos)
-- Deploy produção (Netlify front + Firebase rules/functions) — bloqueado por Netlify do cliente / 2FA Firebase CLI
-- Ingestão de golden cases **reais** do cliente
-- Pipeline escalável (Sprint 9) — scaffolding em código na Sprint 13; chamada multi-lote ainda pendente
+- Validação **empírica** contínua com OpenAI (isolamento, memória, feedback, plantas) — wiring pronto
+- Análise visual de plantas / projetos geométricos (falsos negativos) — prompts endurecidos; qualidade a medir
+- Pipeline Sprint 9: multi-lote + omissão seletiva por prioridade **feitos**; RAG documental (chunk/embed) ainda backlog
+- Extração assistida de requisitos a partir de PDF de norma (confirmação humana)
 
-### Planejado (sprints abertas)
+### Planejado (sprints abertas / backlog fino)
 
-- Sprint 9 residual: indexação/RAG; norma custom PDF no input do modelo
-- Sprint 12: painel de métricas de assertividade
-- Extração assistida de requisitos a partir de PDF de norma
-- Fechos remanescentes Sprint 11 (validar reanálise com docs atualizados em prod)
+- Sprint 9 residual: store de embeddings de documentos de projeto
+- Sprint 12 fino: correções humanas / FP-FN estimados no painel
+- Observabilidade: taxonomia completa de códigos de erro na UI
 
 ### Problemas identificados (testes / reunião)
 
@@ -307,11 +305,11 @@ Uma melhoria de IA só se considera aceita se:
 
 ## Próximo foco de desenvolvimento
 
-1. **Deploy Firebase Functions + Netlify** + chave OpenAI — Sprints 5–8 e hub Ensinar a IA.  
-2. Popular golden cases **reais** do cliente (seeds sintéticos já existem).  
-3. Validação empírica (tipos, reanálise, feedback, golden).  
-4. **Pipeline documental escalável** — chunking/429.  
-5. (Backlog) embeddings/RAG.
+1. Empírica contínua: isolamento / memória / score ≥90% + críticos OK em amostras reais.  
+2. RAG documental (chunk/embed de PDFs de projeto).  
+3. Extração assistida de requisitos de norma (com confirmação humana).  
+4. Métricas finas: correções humanas / FP-FN.  
+5. (Opcional) upgrade runtime Node das Cloud Functions.
 
 ---
 
@@ -326,5 +324,5 @@ Uma melhoria de IA só se considera aceita se:
 | Hotfix build | Site quebrado por import duplicado em `NovaSolicitacao` + tipagem em `processoService`; corrigido; **gate:** `npm run build` obrigatório ao fim de tarefa |
 | Sprint 5 (código) | Isolamento por tipo de análise no processor; seeds OCUP/ACESSO/PAC; prompts de evidência; UI do tipo no relatório; casos de teste documentados |
 | Sprint 6 (código) | Memória da versão anterior na reanálise; regras de itens não contestados; histórico de versões no RelatorioViewer; distinção UI edição × instrução × feedback |
-| Sprint 7 (código) | Injeção de feedbacks aprovados no prompt (mesmo tipo); salvaguardas; revogar na UI; `feedbackIdsInjetados` |
+| Sprint 11–12 residual (2026-09-21) | Omissão seletiva de PDFs; editar org + substituir arquivo; MetricasIA com assertividadeScore; goldens reais aprovados em prod |
 | Teach / Sprint 8 (código) | Hub Ensinar a IA; pares errado×certo; validação; preview; golden no processor; seeds; guia |

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.consolidatePareceres = exports.mergeConferenciaInputs = exports.mergeDadosExtraidos = exports.mergeChecklistItems = exports.isLikelyRateLimitError = exports.withRetry = exports.planDocumentBatches = exports.chunkText = exports.sumEstimatedTokens = exports.estimateTokensFromBytes = exports.estimateTokensFromText = void 0;
+exports.consolidatePareceres = exports.mergeConferenciaInputs = exports.mergeDadosExtraidos = exports.mergeChecklistItems = exports.isLikelyRateLimitError = exports.withRetry = exports.selectDocumentosPorPrioridade = exports.sortDocumentosPorPrioridade = exports.rankDocumentoPrioridade = exports.planDocumentBatches = exports.chunkText = exports.sumEstimatedTokens = exports.estimateTokensFromBytes = exports.estimateTokensFromText = void 0;
 var estimateTokens_1 = require("./estimateTokens");
 Object.defineProperty(exports, "estimateTokensFromText", { enumerable: true, get: function () { return estimateTokens_1.estimateTokensFromText; } });
 Object.defineProperty(exports, "estimateTokensFromBytes", { enumerable: true, get: function () { return estimateTokens_1.estimateTokensFromBytes; } });
@@ -9,6 +9,10 @@ var chunkText_1 = require("./chunkText");
 Object.defineProperty(exports, "chunkText", { enumerable: true, get: function () { return chunkText_1.chunkText; } });
 var batchPlanner_1 = require("./batchPlanner");
 Object.defineProperty(exports, "planDocumentBatches", { enumerable: true, get: function () { return batchPlanner_1.planDocumentBatches; } });
+var documentPriority_1 = require("./documentPriority");
+Object.defineProperty(exports, "rankDocumentoPrioridade", { enumerable: true, get: function () { return documentPriority_1.rankDocumentoPrioridade; } });
+Object.defineProperty(exports, "sortDocumentosPorPrioridade", { enumerable: true, get: function () { return documentPriority_1.sortDocumentosPorPrioridade; } });
+Object.defineProperty(exports, "selectDocumentosPorPrioridade", { enumerable: true, get: function () { return documentPriority_1.selectDocumentosPorPrioridade; } });
 var withRetry_1 = require("./withRetry");
 Object.defineProperty(exports, "withRetry", { enumerable: true, get: function () { return withRetry_1.withRetry; } });
 Object.defineProperty(exports, "isLikelyRateLimitError", { enumerable: true, get: function () { return withRetry_1.isLikelyRateLimitError; } });

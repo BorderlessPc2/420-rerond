@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { chunkText } from "./chunkText";
 import { estimateTokensFromBytes, estimateTokensFromText } from "./estimateTokens";
 import { planDocumentBatches } from "./batchPlanner";
+import { selectDocumentosPorPrioridade } from "./documentPriority";
 import { withRetry, isLikelyRateLimitError } from "./withRetry";
 
 describe("estimateTokens", () => {
@@ -42,6 +43,39 @@ describe("planDocumentBatches", () => {
     );
     expect(batches.length).toBeGreaterThanOrEqual(2);
     expect(batches.some((b) => b.items.some((i) => i.filename === "c.pdf"))).toBe(true);
+  });
+});
+
+describe("selectDocumentosPorPrioridade", () => {
+  it("prioriza memorial/planta sobre anexos genéricos ao omitir por limite", () => {
+    const result = selectDocumentosPorPrioridade(
+      [
+        { filename: "anexo-extra.pdf", tipoDocumento: "outro", sizeBytes: 100 },
+        { filename: "planta.pdf", tipoDocumento: "planta_baixa", sizeBytes: 100 },
+        { filename: "memorial.pdf", tipoDocumento: "memorial_descritivo", sizeBytes: 100 },
+        { filename: "foto.pdf", tipoDocumento: "desconhecido", sizeBytes: 100 },
+      ],
+      { maxCount: 2, maxBytesPerFile: 1_000_000 },
+    );
+    expect(result.incluidos.map((i) => i.filename)).toEqual(["memorial.pdf", "planta.pdf"]);
+    expect(result.omitidos).toHaveLength(2);
+    expect(result.omitidos.every((o) => o.motivo.includes("prioridade"))).toBe(true);
+  });
+
+  it("omite arquivo acima do tamanho mesmo com prioridade alta", () => {
+    const result = selectDocumentosPorPrioridade(
+      [
+        {
+          filename: "memorial-gigante.pdf",
+          tipoDocumento: "memorial_descritivo",
+          sizeBytes: 50_000_000,
+        },
+        { filename: "planta.pdf", tipoDocumento: "planta_baixa", sizeBytes: 100 },
+      ],
+      { maxCount: 10, maxBytesPerFile: 20_000_000 },
+    );
+    expect(result.incluidos.map((i) => i.filename)).toEqual(["planta.pdf"]);
+    expect(result.omitidos[0].motivo).toMatch(/tamanho excedido/);
   });
 });
 

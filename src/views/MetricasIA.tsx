@@ -6,8 +6,10 @@ import {
   Clock3,
   Download,
   FileText,
+  Percent,
   RefreshCw,
   ShieldCheck,
+  Target,
 } from 'lucide-react'
 import type { SolicitacaoWithFiles } from '../models/Solicitacao'
 import { listFeedbacks } from '../services/feedback/feedbackService'
@@ -29,6 +31,9 @@ type TipoMetricas = {
   tokensMedios: number
   lotesMedios: number
   normasCustomPdf: number
+  assertividadeComScore: number
+  assertividadeMedia: number
+  criticosOkPct: number
 }
 
 const tipoDaSolicitacao = (s: SolicitacaoWithFiles) =>
@@ -42,6 +47,9 @@ const formatMs = (ms: number) => {
 }
 
 const formatNumber = (value: number) => (value ? value.toLocaleString('pt-BR') : '-')
+
+const formatPct = (value: number, hasData: boolean) =>
+  hasData ? `${Math.round(value * 10) / 10}%` : '-'
 
 const downloadCsv = (rows: TipoMetricas[]) => {
   const header = [
@@ -57,6 +65,9 @@ const downloadCsv = (rows: TipoMetricas[]) => {
     'tokens_medios',
     'lotes_medios',
     'normas_custom_pdf',
+    'assertividade_n_scored',
+    'assertividade_media_pct',
+    'criticos_ok_pct',
   ]
   const lines = rows.map((row) =>
     [
@@ -72,6 +83,9 @@ const downloadCsv = (rows: TipoMetricas[]) => {
       Math.round(row.tokensMedios),
       Math.round(row.lotesMedios * 10) / 10,
       row.normasCustomPdf,
+      row.assertividadeComScore,
+      row.assertividadeComScore ? Math.round(row.assertividadeMedia * 10) / 10 : '',
+      row.assertividadeComScore ? Math.round(row.criticosOkPct * 10) / 10 : '',
     ]
       .map((value) => `"${String(value).replace(/"/g, '""')}"`)
       .join(','),
@@ -126,6 +140,7 @@ export default function MetricasIA() {
       .map<TipoMetricas>((tipo) => {
         const porTipo = solicitacoes.filter((s) => tipoDaSolicitacao(s) === tipo)
         const comTelemetry = porTipo.filter((s) => s.analiseTelemetry)
+        const comScore = porTipo.filter((s) => s.assertividadeScore)
         const sum = (selector: (s: SolicitacaoWithFiles) => number | undefined | null) =>
           comTelemetry.reduce((acc, s) => acc + (selector(s) ?? 0), 0)
         const avg = (selector: (s: SolicitacaoWithFiles) => number | undefined | null) =>
@@ -134,6 +149,16 @@ export default function MetricasIA() {
         const falhaCodigo = (code: string) =>
           falhas.filter((s) => (s.analiseErroCodigo || s.analiseTelemetry?.errorCode) === code)
             .length
+
+        const assertividadeMedia = comScore.length
+          ? comScore.reduce((acc, s) => acc + (s.assertividadeScore?.percentual ?? 0), 0) /
+            comScore.length
+          : 0
+        const criticosOkPct = comScore.length
+          ? (comScore.filter((s) => s.assertividadeScore?.passouCriticos).length /
+              comScore.length) *
+            100
+          : 0
 
         return {
           tipo,
@@ -159,6 +184,9 @@ export default function MetricasIA() {
             (acc, s) => acc + (s.analiseTelemetry?.normasCustomPdfIds?.length ?? 0),
             0,
           ),
+          assertividadeComScore: comScore.length,
+          assertividadeMedia,
+          criticosOkPct,
         }
       })
   }, [feedbacks, goldens, solicitacoes])
@@ -175,6 +203,16 @@ export default function MetricasIA() {
     (acc, row) => acc + row.falhasLimite + row.falhasTimeout,
     0,
   )
+
+  const scoredAll = solicitacoes.filter((s) => s.assertividadeScore)
+  const assertividadeGlobal = scoredAll.length
+    ? scoredAll.reduce((acc, s) => acc + (s.assertividadeScore?.percentual ?? 0), 0) /
+      scoredAll.length
+    : 0
+  const criticosOkGlobal = scoredAll.length
+    ? (scoredAll.filter((s) => s.assertividadeScore?.passouCriticos).length / scoredAll.length) *
+      100
+    : 0
 
   if (loading) {
     return (
@@ -215,6 +253,23 @@ export default function MetricasIA() {
           <span>{totalReanalises}</span>
           <p>Reanálises</p>
         </div>
+        <div className="metricas-ia-card accent">
+          <Percent size={20} />
+          <span>{formatPct(assertividadeGlobal, scoredAll.length > 0)}</span>
+          <p>Assertividade média</p>
+        </div>
+        <div className="metricas-ia-card accent">
+          <Target size={20} />
+          <span>{formatPct(criticosOkGlobal, scoredAll.length > 0)}</span>
+          <p>Críticos OK</p>
+        </div>
+        <div className="metricas-ia-card">
+          <ShieldCheck size={20} />
+          <span>
+            {scoredAll.length}/{totalAnalises || 0}
+          </span>
+          <p>Com score eval</p>
+        </div>
         <div className="metricas-ia-card">
           <Brain size={20} />
           <span>{totalGoldens}</span>
@@ -254,6 +309,9 @@ export default function MetricasIA() {
                 <th>Feedbacks</th>
                 <th>Goldens aprov.</th>
                 <th>Goldens usados</th>
+                <th>Score n</th>
+                <th>Assert. média</th>
+                <th>Críticos OK</th>
                 <th>Falhas</th>
                 <th>Duração</th>
                 <th>Tokens</th>
@@ -270,6 +328,17 @@ export default function MetricasIA() {
                   <td>{row.feedbacksAprovados}</td>
                   <td>{row.goldensAprovados}</td>
                   <td>{row.goldensInjetados}</td>
+                  <td>{row.assertividadeComScore || '-'}</td>
+                  <td>{formatPct(row.assertividadeMedia, row.assertividadeComScore > 0)}</td>
+                  <td
+                    className={
+                      row.assertividadeComScore > 0 && row.criticosOkPct < 100
+                        ? 'metricas-ia-danger'
+                        : undefined
+                    }
+                  >
+                    {formatPct(row.criticosOkPct, row.assertividadeComScore > 0)}
+                  </td>
                   <td className={row.falhas > 0 ? 'metricas-ia-danger' : undefined}>
                     {row.falhas}
                   </td>

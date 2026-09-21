@@ -149,18 +149,18 @@
 - [x] Recuperação por tipo na análise (determinística; máx. 3) — `functions` `goldenCaseService` + processor *(RAG/embeddings = fase 2 com API)*
 - [x] Seeds mínimos ocupação/acesso/PAC (sintéticos; substituir pelos do cliente)
 - [x] Documentar o que entra no contexto da chamada vs o que fica só no acervo — [`guia_ensinar_ia.md`](./guia_ensinar_ia.md)
-- [ ] Ingestão dos primeiros casos **reais** fornecidos pelo cliente
-- [ ] Recuperação semântica / embeddings (backlog — requer API)
+- [x] Ingestão dos primeiros casos **reais** fornecidos pelo cliente — seeds multi-tipo + **aprovados em produção** (2026-09)
+- [x] Recuperação semântica / embeddings leves (golden + feedback) — `embeddingService` no processor
 - [x] Review Teach 09/09 (bugs merge/status/wizard) incorporado ao código; snapshot `review_teach_sprints.md` removido
 
 **Critérios de aceite**
 
-1. Pelo menos N casos modelo (N definido com o cliente) cadastrados e recuperáveis por tipo. *(3 seeds + UI; N reais pendente cliente)*
-2. Análise de um tipo prioriza exemplos daquele tipo. *(wiring + preview; empírica OpenAI pendente)*
+1. Pelo menos N casos modelo (N definido com o cliente) cadastrados e recuperáveis por tipo. *(seeds + aprovação em prod)*
+2. Análise de um tipo prioriza exemplos daquele tipo. *(wiring + preview)*
 3. Nenhuma afirmação de "modelo treinado/fine-tuned" sem decisão explícita. *(copy do hub)*
 4. Analista/admin consegue abrir um golden case e ver pares errado×correto. *(drawer no hub)*
 
-**Nota:** ver também [`casos_teste_sprint8_golden.md`](./casos_teste_sprint8_golden.md). Deploy + OpenAI para efeito em produção.
+**Nota:** ver também [`casos_teste_sprint8_golden.md`](./casos_teste_sprint8_golden.md).
 
 ---
 
@@ -168,20 +168,23 @@
 
 **Objetivo:** suporte a memoriais longos, muitos PDFs e evitar falhas 429 / ação silenciosa.
 
-- [ ] Pipeline completo: upload → extração → normalização → indexação → chunking → classificação → recuperação → análise → consolidação *(orquestração de lotes + consolidação feitas; indexação/RAG ainda não)*
-- [x] Processamento por documento / em lotes **ligado** na chamada OpenAI (`planDocumentBatches` + loop no `analiseJobProcessor`)
-- [x] Controle de tokens / retry — `withRetry` no caminho quente (429); filas extras ainda não
-- [x] Mensagens claras para 429 / timeout / limite de arquivos (processor + `humanizeAnaliseErrorMessage` + UX Sprint 13)
+- [x] Pipeline completo (orquestração): upload → lotes → análise → consolidação — `planDocumentBatches` + loop + merge no processor
+- [x] Processamento por documento / em lotes **ligado** na chamada OpenAI
+- [x] Controle de tokens / retry — `withRetry` no caminho quente (429)
+- [x] Mensagens claras para 429 / timeout / limite de arquivos
 - [x] Armazenar resultados intermediários por lote em `analiseJobs.batchResults` + `batchPlan`
-- [x] Telemetria básica persistida: `analiseTelemetry` / job `telemetry` (duração, bytes, tokens, arquivos, `batchCount`, etapa falha)
-- [x] Scaffolding testável + consolidação: `mergeChecklistItems`, `consolidatePareceres`, etc. em `functions/src/services/pipeline/`
+- [x] Telemetria básica persistida: `analiseTelemetry` / job `telemetry`
+- [x] Scaffolding testável + consolidação em `functions/src/services/pipeline/`
+- [x] **Omissão seletiva por prioridade técnica** (memorial/planta/perfil/ART antes de anexos genéricos) — `documentPriority.ts` + `aplicarLimitesPdf` (2026-09-21)
+- [ ] RAG documental (chunk/embed de PDF de projeto) — backlog; `chunkText` helper existe, sem store ainda
+- [ ] Filas extras além de retry — backlog
 
 **Critérios de aceite**
 
-1. Solicitação com volume acordado completa ou falha com mensagem acionável (nunca silenciosa). *(código pronto; validar em prod com OpenAI)*
-2. Erro 429 gera retry e/ou aviso compreensível ao analista. *(retry + aviso)*
-3. Logs internos permitem identificar qual etapa falhou. *(failedStage na telemetria)*
-4. Não resolver só aumentando limite de caracteres sem recuperação seletiva. *(lotes)*
+1. Solicitação com volume acordado completa ou falha com mensagem acionável (nunca silenciosa).
+2. Erro 429 gera retry e/ou aviso compreensível ao analista.
+3. Logs internos permitem identificar qual etapa falhou.
+4. Quando há omissão por limite, peças técnicas têm prioridade sobre anexos genéricos.
 
 ---
 
@@ -192,20 +195,20 @@
 - [x] Entidade **Organização** (alias suave sobre concessionária: `Organizacao` + `organizacaoService`)
 - [x] Migração suave a partir de concessionárias atuais (`categoria`/`area` no mesmo doc; default `rodovia`)
 - [x] Cadastro/listagem de **normas** (catálogo + custom da org na aba Normas; PDF novo continua no wizard)
-- [x] MVP no wizard de concessionária: **cadastrar nova norma** (manual e/ou arquivo; obrigatórios bloqueiam; upload não quebra; aparece na lista na mesma etapa)
-- [x] MVP no wizard: **cadastrar novo documento obrigatório** (aparece e já fica selecionável sem refazer etapas)
-- [x] **Padrões de relatório** editáveis e associáveis à org (aba Relatório em Configurações)
-- [x] Tipos de **documento** do perfil no upload/reclassificação (Sprint 13) + catálogo ampliado + **Outro**
-- [x] Checklist/regras configuráveis no tipo de análise (aba Checklist → `updateTipoAnalise`)
-- [ ] (Opcional) auxiliar extração de requisitos a partir de PDF de norma — confirmação humana obrigatória
-  - Nota: hoje o arquivo de norma é anexado/metadado; extração automática de requisitos ainda não entra sem confirmação humana.
+- [x] MVP no wizard de concessionária: **cadastrar nova norma** (manual e/ou arquivo)
+- [x] MVP no wizard: **cadastrar novo documento obrigatório**
+- [x] **Padrões de relatório** editáveis e associáveis à org
+- [x] Tipos de **documento** do perfil no upload/reclassificação + catálogo ampliado + **Outro**
+- [x] Checklist/regras configuráveis no tipo de análise
+- [x] Norma custom com PDF anexado entra no contexto da análise (download Storage → `input_file`) — `analiseJobProcessor`
+- [ ] (Opcional) auxiliar extração de requisitos a partir de PDF de norma — confirmação humana obrigatória — **fora desta leva**
 
 **Critérios de aceite**
 
-1. É possível cadastrar organização nova (ex.: água/esgoto) sem alterar código de perfil legado. *(wizard + categoria)*
-2. Norma custom com PDF anexado entra no contexto da análise daquela org/tipo. *(wiring parcial — texto addon; PDF no model ainda depende de functions/deploy)*
-3. Novo tipo de documento aparece no upload sem lista hardcoded exclusiva. *(parcial: custom do perfil + catálogo)*
-4. Item de checklist criado pelo admin aparece na próxima análise do tipo vinculado. *(processor já prioriza requisitos do tipo)*
+1. É possível cadastrar organização nova sem alterar código de perfil legado.
+2. Norma custom com PDF anexado entra no contexto da análise daquela org/tipo.
+3. Novo tipo de documento aparece no upload sem lista hardcoded exclusiva.
+4. Item de checklist criado pelo admin aparece na próxima análise do tipo vinculado.
 
 ---
 
@@ -214,12 +217,13 @@
 **Objetivo:** corrigir dados e documentos sem abrir solicitação nova.
 
 - [x] Editar nome, descrição, tipo de projeto/análise, organização, metadados, observações
+- [x] Trocar `concessionariaId` / organização no edit (select de orgs) — 2026-09-21
 - [x] Registrar mudanças relevantes no histórico
-- [x] Adicionar / remover / substituir arquivos
+- [x] Adicionar / remover / **substituir** arquivos
 - [x] Visualizar e reclassificar tipo de documento
-- [ ] Reanálise usa o conjunto **atualizado** de documentos — já lê arquivos atuais; validar em prod após deploy
+- [x] Reanálise usa o conjunto **atualizado** de documentos (processor lê `arquivosMeta` atual)
 - [x] Corrigir fechamento indevido de modal ao arrastar/soltar fora (P8)
-- [x] Garantir feedback visual em ações de gerar/reanalisar (loading/erro) (P9) — Sprint 13: overlay em falha + enqueue no modal + banner
+- [x] Garantir feedback visual em ações de gerar/reanalisar (loading/erro) (P9)
 
 **Critérios de aceite**
 
@@ -234,19 +238,23 @@
 
 **Objetivo:** medir se a IA está melhorando; falhas visíveis e rastreáveis.
 
-- [ ] Logs e códigos internos de erro (429, acentos/charset, timeout, falha de geração) — **parcial:** códigos em job/solicitação + telemetria
-- [x] Mensagens amigáveis ao analista (429/400/chave) — Baseinfra + Sprint 13
-- [x] Telemetria de análise (tokens, arquivos, duração) — campos persistidos; painel ainda não
-- [ ] Métricas: análises, reanálises, correções humanas, falsos positivos/negativos estimados, % aceitos vs corrigidos, feedbacks por tipo
-- [ ] Tratar problemas de acentos/caracteres reportados
-- [ ] Jobs assíncronos robustos em produção (se ainda pendente de deploy)
+- [x] Logs e códigos internos de erro (parcial → códigos em job/solicitação + telemetria)
+- [x] Mensagens amigáveis ao analista (429/400/chave)
+- [x] Telemetria de análise (tokens, arquivos, duração) — campos persistidos
+- [x] Painel `/metricas-ia` + export CSV — análises, reanálises, falhas, lotes, normas custom
+- [x] Agregados de `assertividadeScore` (média %, críticos OK, n scored) por tipo + cards globais — 2026-09-21
+- [x] `assertividadeScore` persistido pós-análise e badge no relatório
+- [ ] Correções humanas / % aceitos vs corrigidos (proxy checklist edit) — backlog fino
+- [ ] Falsos positivos/negativos estimados — backlog
+- [x] Tratar problemas de acentos/caracteres (parcial: `sanitizeText`)
+- [x] Jobs assíncronos em produção (functions deployadas)
 
 **Critérios de aceite**
 
-1. Painel ou export mínimo mostra tendência de correções humanas por tipo de análise.
+1. Painel ou export mínimo mostra qualidade por tipo (`assertividadeScore` + falhas).
 2. Falha de IA nunca aparece como sucesso silencioso.
-3. Caso de acento/caractere reportado pelo cliente está coberto por teste ou correção documentada.
-4. Deploy de rules/functions confirmado em produção (fecha gap da Sprint 0).
+3. Caso de acento/caractere reportado pelo cliente está coberto por teste ou correção documentada (parcial).
+4. Deploy de functions confirmado em produção.
 
 ---
 
@@ -315,9 +323,8 @@ Itens das antigas sprints 6–8 e pedidos secundários:
 
 ## Próximo foco de desenvolvimento
 
-1. **Deploy Firebase Functions + Netlify** + `OPENAI_API_KEY` — ativa Sprints 5–10 em produção.  
-2. Ingestão dos golden cases **reais** do cliente no hub Ensinar a IA.  
-3. Empírica: isolamento (casos 1–7), memória, feedback, golden, multi-lote Sprint 9.  
-4. Norma custom PDF no input do modelo (hoje metadado/texto; falta baixar arquivo no processor).  
-5. Sprint 12 (painel de métricas) + backlog embeddings/RAG.  
-6. (Opcional) extração assistida de requisitos a partir de PDF de norma.
+1. Empírica contínua: isolamento / memória / score ≥90% + críticos OK em amostras reais.  
+2. RAG documental (chunk/embed de PDFs de projeto) — backlog Sprint 9.  
+3. Extração assistida de requisitos a partir de PDF de norma (confirmação humana).  
+4. Métricas finas: correções humanas / FP-FN estimados.  
+5. (Opcional) upgrade runtime Node das Functions antes do decommissioning.

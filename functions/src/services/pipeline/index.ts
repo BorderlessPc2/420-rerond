@@ -5,6 +5,11 @@ export {
 } from "./estimateTokens";
 export { chunkText } from "./chunkText";
 export { planDocumentBatches } from "./batchPlanner";
+export {
+  rankDocumentoPrioridade,
+  sortDocumentosPorPrioridade,
+  selectDocumentosPorPrioridade,
+} from "./documentPriority";
 export { withRetry, isLikelyRateLimitError } from "./withRetry";
 export {
   mergeChecklistItems,

@@ -28,6 +28,8 @@ export type DocumentBatchItem = {
   sizeBytes: number;
   /** Texto ou marcador; buffers binários usam sizeBytes no planner. */
   textChars?: number;
+  /** Tipagem do anexo (para prioridade de omissão). */
+  tipoDocumento?: string;
 };
 
 export type PlannedBatch = {

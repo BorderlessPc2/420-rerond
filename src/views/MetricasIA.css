@@ -102,6 +102,15 @@
   font-weight: 600;
 }
 
+.metricas-ia-card.accent {
+  border-color: #c9dbf7;
+  background: linear-gradient(180deg, #fff 0%, #eef5ff 100%);
+}
+
+.metricas-ia-card.accent span {
+  color: var(--color-primary-800);
+}
+
 .metricas-ia-table-wrap {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);

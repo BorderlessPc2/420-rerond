@@ -15,6 +15,7 @@ const evalAssertividadeCliente_1 = require("../config/evalAssertividadeCliente")
 const embeddingService_1 = require("./embeddingService");
 const consistencyAnalyzer_1 = require("./consistencyAnalyzer");
 const pipeline_1 = require("./pipeline");
+const documentPriority_1 = require("./pipeline/documentPriority");
 const pipeline_2 = require("./pipeline");
 const concessionariaPerfilService_1 = require("./concessionariaPerfilService");
 const tipoAnaliseService_1 = require("./tipoAnaliseService");
@@ -265,20 +266,14 @@ function mergeContextosMemoria(contextoVersao, contextoRevisao) {
     return partes.join("\n\n═══════════════════════════════════════\n\n");
 }
 function aplicarLimitesPdf(pdfBuffers) {
-    const incluidos = [];
-    const omitidos = [];
-    for (const pdf of pdfBuffers) {
-        if (incluidos.length >= MAX_PDFS_PROJETO) {
-            omitidos.push(`${pdf.filename} (limite de ${MAX_PDFS_PROJETO} PDFs)`);
-            continue;
-        }
-        if (pdf.buffer.length > MAX_PDF_SIZE_BYTES) {
-            omitidos.push(`${pdf.filename} (tamanho excedido)`);
-            continue;
-        }
-        incluidos.push(pdf);
-    }
-    return { incluidos, omitidos };
+    const selected = (0, documentPriority_1.selectDocumentosPorPrioridade)(pdfBuffers.map((pdf) => ({
+        ...pdf,
+        sizeBytes: pdf.buffer.length,
+    })), { maxCount: MAX_PDFS_PROJETO, maxBytesPerFile: MAX_PDF_SIZE_BYTES });
+    return {
+        incluidos: selected.incluidos.map(({ sizeBytes: _s, ...rest }) => rest),
+        omitidos: selected.omitidos.map((o) => o.motivo),
+    };
 }
 function stripMarkdownFence(raw) {
     let cleaned = raw.trim();
@@ -399,10 +394,12 @@ async function runAnaliseJob(params) {
         for (const url of pdfUrls) {
             try {
                 const buffer = await downloadStorageFile(url);
+                const meta = arquivosMeta.find((m) => m.url === url);
                 pdfBuffersRaw.push({
-                    filename: extractFilenameFromUrl(url),
+                    filename: meta?.nome || extractFilenameFromUrl(url),
                     buffer,
                     url,
+                    tipoDocumento: meta?.tipoDocumento,
                 });
             }
             catch (err) {
@@ -677,6 +674,7 @@ async function runAnaliseJob(params) {
             id: String(index),
             filename: pdf.filename,
             sizeBytes: pdf.buffer.length,
+            tipoDocumento: pdf.tipoDocumento,
         }));
         const plannedBatches = escopoAnalise.incluirDocumentosProjeto && pdfBuffers.length > 0
             ? (0, pipeline_1.planDocumentBatches)(pdfItemsForPlan)

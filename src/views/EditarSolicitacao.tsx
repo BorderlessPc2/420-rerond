@@ -14,10 +14,13 @@ import {
   getSolicitacaoById,
   reclassifyArquivoSolicitacao,
   removeArquivoSolicitacao,
+  replaceArquivoSolicitacao,
   updateSolicitacao,
   appendHistoricoEdicao,
 } from '../services/solicitacao/solicitacaoService'
 import { getConcessionariaPerfilById } from '../services/concessionaria/concessionariaService'
+import { listOrganizacoes } from '../services/organizacao/organizacaoService'
+import type { Organizacao } from '../models/Organizacao'
 import { listTiposAnalise } from '../services/tipoAnalise/tipoAnaliseService'
 import './NovaSolicitacao.css'
 
@@ -25,12 +28,17 @@ export default function EditarSolicitacao() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const replaceInputRef = useRef<HTMLInputElement>(null)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [tiposAnalise, setTiposAnalise] = useState<TipoAnalise[]>([])
+  const [organizacoes, setOrganizacoes] = useState<Organizacao[]>([])
+  const [concessionariaId, setConcessionariaId] = useState('')
+  const [concessionariaIdInicial, setConcessionariaIdInicial] = useState('')
+  const [replaceTargetUrl, setReplaceTargetUrl] = useState<string | null>(null)
 
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
@@ -73,13 +81,18 @@ export default function EditarSolicitacao() {
       setLoading(true)
       setError(null)
       try {
-        const [sol, tipos] = await Promise.all([getSolicitacaoById(id), listTiposAnalise()])
+        const [sol, tipos, orgs] = await Promise.all([
+          getSolicitacaoById(id),
+          listTiposAnalise(),
+          listOrganizacoes(),
+        ])
         if (cancelled) return
         if (!sol) {
           setError('Solicitação não encontrada.')
           return
         }
         setTiposAnalise(tipos)
+        setOrganizacoes(orgs)
         setTitulo(sol.titulo || '')
         setDescricao(sol.descricao || '')
         setTipoObra(sol.tipoObra || '')
@@ -89,6 +102,8 @@ export default function EditarSolicitacao() {
         setCliente(sol.cliente || '')
         setRodovia(sol.rodovia || '')
         setNomeConcessionaria(sol.nomeConcessionaria || '')
+        setConcessionariaId(sol.concessionariaId || '')
+        setConcessionariaIdInicial(sol.concessionariaId || '')
         setObservacoes(sol.memorial || '')
         setArquivosMeta(sol.arquivosMeta ?? [])
         setHistorico(sol.historicoEdicoes ?? [])
@@ -129,6 +144,13 @@ export default function EditarSolicitacao() {
     setError(null)
     setSuccess(null)
     try {
+      const orgSelecionada = organizacoes.find((o) => o.id === concessionariaId)
+      const nomeOrg =
+        orgSelecionada?.nome?.trim() ||
+        nomeConcessionaria.trim() ||
+        undefined
+      const mudouOrg = concessionariaIdInicial !== (concessionariaId || '')
+
       await updateSolicitacao(id, {
         titulo: titulo.trim(),
         descricao: descricao.trim(),
@@ -138,12 +160,25 @@ export default function EditarSolicitacao() {
         tipoAnaliseDescricao: tipoAnaliseDescricao.trim() || null,
         cliente: cliente.trim() || undefined,
         rodovia: rodovia.trim() || undefined,
-        nomeConcessionaria: nomeConcessionaria.trim() || undefined,
+        concessionariaId: concessionariaId || null,
+        nomeConcessionaria: nomeOrg,
         memorial: observacoes.trim() || undefined,
       })
-      await appendHistoricoEdicao(id, 'Atualizou dados da solicitação.')
+      await appendHistoricoEdicao(
+        id,
+        mudouOrg
+          ? `Atualizou dados e organização (${nomeOrg || 'sem org'}).`
+          : 'Atualizou dados da solicitação.',
+      )
       const refreshed = await getSolicitacaoById(id)
       setHistorico(refreshed?.historicoEdicoes ?? [])
+      setConcessionariaIdInicial(concessionariaId || '')
+      if (concessionariaId) {
+        const p = await getConcessionariaPerfilById(concessionariaId)
+        setPerfil(p)
+      } else {
+        setPerfil(null)
+      }
       setSuccess('Dados salvos. A próxima análise usará estas informações.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar.')
@@ -223,6 +258,38 @@ export default function EditarSolicitacao() {
       setSuccess('Tipo de documento atualizado.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao reclassificar.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReplaceClick = (url: string) => {
+    setReplaceTargetUrl(url)
+    replaceInputRef.current?.click()
+  }
+
+  const handleReplaceFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const targetUrl = replaceTargetUrl
+    e.target.value = ''
+    setReplaceTargetUrl(null)
+    if (!id || !file || !targetUrl) return
+    setSaving(true)
+    setError(null)
+    try {
+      const meta = arquivosMeta.find((m) => m.url === targetUrl)
+      const updated = await replaceArquivoSolicitacao(
+        id,
+        targetUrl,
+        file,
+        meta?.tipoDocumento,
+        meta?.tipoDocumentoLabel,
+      )
+      setArquivosMeta(updated.arquivosMeta ?? [])
+      setHistorico(updated.historicoEdicoes ?? [])
+      setSuccess(`Arquivo substituído por "${file.name}".`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao substituir arquivo.')
     } finally {
       setSaving(false)
     }
@@ -312,12 +379,33 @@ export default function EditarSolicitacao() {
               <input id="edit-rodovia" value={rodovia} onChange={(e) => setRodovia(e.target.value)} />
             </div>
             <div className="form-group">
-              <label htmlFor="edit-conc">Organização / concessionária</label>
-              <input
-                id="edit-conc"
-                value={nomeConcessionaria}
-                onChange={(e) => setNomeConcessionaria(e.target.value)}
-              />
+              <label htmlFor="edit-org">Organização / concessionária</label>
+              <select
+                id="edit-org"
+                value={concessionariaId}
+                onChange={(e) => {
+                  const nextId = e.target.value
+                  setConcessionariaId(nextId)
+                  const org = organizacoes.find((o) => o.id === nextId)
+                  if (org?.nome) setNomeConcessionaria(org.nome)
+                }}
+              >
+                <option value="">Sem organização vinculada</option>
+                {organizacoes.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.nome}
+                    {org.categoria ? ` (${org.categoria})` : ''}
+                  </option>
+                ))}
+              </select>
+              {!concessionariaId && (
+                <input
+                  style={{ marginTop: 8 }}
+                  value={nomeConcessionaria}
+                  onChange={(e) => setNomeConcessionaria(e.target.value)}
+                  placeholder="Nome livre (opcional se sem perfil)"
+                />
+              )}
             </div>
           </div>
           <div className="form-group">
@@ -350,15 +438,32 @@ export default function EditarSolicitacao() {
 
         <div className="form-section">
           <h2 className="section-title">Arquivos</h2>
+          <input
+            ref={replaceInputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.xlsx"
+            style={{ display: 'none' }}
+            onChange={(e) => void handleReplaceFileSelected(e)}
+          />
           <div className="files-list">
             {arquivosMeta.length === 0 && <p>Nenhum arquivo anexado.</p>}
             {arquivosMeta.map((meta) => (
               <div key={meta.url} className="file-item" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                   <strong>{meta.nome}</strong>
-                  <button type="button" className="link-button" onClick={() => void handleRemove(meta.url)}>
-                    <Trash2 size={14} /> Remover
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="link-button"
+                      disabled={saving}
+                      onClick={() => handleReplaceClick(meta.url)}
+                    >
+                      Substituir
+                    </button>
+                    <button type="button" className="link-button" onClick={() => void handleRemove(meta.url)}>
+                      <Trash2 size={14} /> Remover
+                    </button>
+                  </div>
                 </div>
                 <div className="form-row" style={{ marginTop: 8 }}>
                   <select
