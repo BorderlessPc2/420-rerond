@@ -81,6 +81,7 @@ import {
   listGoldenCasesAprovadosParaAnalise,
 } from "./goldenCaseService";
 import { verificarEvidencias } from "./pipeline/evidenceVerifier";
+import { sanitizeForFirestore } from "./firestoreSanitizer";
 
 export type AnaliseJobState =
   | "uploaded"
@@ -93,10 +94,10 @@ export type AnaliseJobState =
 
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
-/** Orçamento por lote de PDFs do projeto (folga para normas no teto ~50MB da API). */
-const BATCH_MAX_TOKENS = 280_000;
-const BATCH_MAX_BYTES = 28 * 1024 * 1024;
-const BATCH_MAX_ITEMS = 6;
+/** Orcamento por lote de PDFs do projeto (folga para normas/perfil e limite de tokens). */
+const BATCH_MAX_TOKENS = 120_000;
+const BATCH_MAX_BYTES = 12 * 1024 * 1024;
+const BATCH_MAX_ITEMS = 3;
 /** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
 const PDF_PART_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_PART_MAX_TOKENS = 100_000;
@@ -104,6 +105,10 @@ const DOCUMENT_RAG_MAX_PDFS = 6;
 const DOCUMENT_RAG_MAX_CHUNKS = 12;
 const DOCUMENT_RAG_MAX_BYTES_PER_PDF = 8 * 1024 * 1024;
 const DOCUMENT_RAG_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
+const ANALYSIS_RETRY_MAX_ATTEMPTS = 6;
+const ANALYSIS_RETRY_BASE_DELAY_MS = 2500;
+const RATE_LIMIT_FALLBACK_MAX_DEPTH = 4;
+const RATE_LIMIT_COOLDOWN_MS = 15000;
 const VALID_TIPOS: TipoRelatorio[] = ["pit", "obra_per", "obra_nao_per"];
 
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
@@ -114,6 +119,8 @@ function getBucket() {
 function isValidTipo(value: unknown): value is TipoRelatorio {
   return typeof value === "string" && VALID_TIPOS.includes(value as TipoRelatorio);
 }
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface ArquivoMetaDoc {
   url: string;
@@ -129,19 +136,19 @@ async function updateJob(
   stage: string,
   extra: Record<string, unknown> = {},
 ) {
-  const payload = {
+  const payload = sanitizeForFirestore({
     state,
     progress,
     stage,
     updatedAt: FieldValue.serverTimestamp(),
     ...extra,
-  };
+  });
   await jobRef.update(payload);
-  await solicitacaoRef.update({
+  await solicitacaoRef.update(sanitizeForFirestore({
     analiseJobStatus: state,
     analiseJobProgress: progress,
     updatedAt: FieldValue.serverTimestamp(),
-  });
+  }));
 }
 
 async function downloadStorageFile(url: string): Promise<Buffer> {
@@ -528,7 +535,14 @@ async function inferTipoRelatorio(
     parts.push(buildFileInput(pdf.filename, pdf.buffer));
   }
   parts.push(buildTextInput(buildInferTipoPrompt()));
-  const result = await analyze(parts, { maxOutputTokens: 50, temperature: 0 });
+  const result = await withRetry(
+    () => analyze(parts, { maxOutputTokens: 50, temperature: 0 }),
+    {
+      maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
+      baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
+      isRetryable: isLikelyRateLimitError,
+    },
+  );
   const inferred = result.content.trim().toLowerCase();
   if (isValidTipo(inferred)) return inferred;
   if (inferred.includes("pit")) return "pit";
@@ -569,12 +583,12 @@ export async function runAnaliseJob(params: {
       return;
     }
 
-    await jobRef.update({ startedAt: FieldValue.serverTimestamp() });
-    await solicitacaoRef.update({
+    await jobRef.update(sanitizeForFirestore({ startedAt: FieldValue.serverTimestamp() }));
+    await solicitacaoRef.update(sanitizeForFirestore({
       status: "em_analise",
       activeAnaliseJobId: params.jobId,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
     const snapshot = await solicitacaoRef.get();
     if (!snapshot.exists) throw new Error("Solicitação não encontrada.");
@@ -1045,7 +1059,7 @@ export async function runAnaliseJob(params: {
           })
         : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
 
-    await jobRef.update({
+    await jobRef.update(sanitizeForFirestore({
       batchPlan: {
         count: plannedBatches.length,
         batches: plannedBatches.map((b) => ({
@@ -1056,7 +1070,7 @@ export async function runAnaliseJob(params: {
         })),
       },
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
     type PdfWorkItem = (typeof pdfBuffers)[number];
 
@@ -1103,8 +1117,8 @@ export async function runAnaliseJob(params: {
             jsonMode: true,
           }),
         {
-          maxAttempts: 3,
-          baseDelayMs: 800,
+          maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
+          baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
           isRetryable: isLikelyRateLimitError,
         },
       );
@@ -1141,6 +1155,68 @@ export async function runAnaliseJob(params: {
           },
         ];
       } catch (err) {
+        const shouldSplitForRateLimit =
+          isLikelyRateLimitError(err) &&
+          depth < RATE_LIMIT_FALLBACK_MAX_DEPTH &&
+          sourcePdfs.length > 0;
+        if (shouldSplitForRateLimit) {
+          console.warn(
+            `Rate limit/429 (depth=${depth}); aguardando e reduzindo lote de ${sourcePdfs.length} PDF(s).`,
+            err instanceof Error ? err.message : err,
+          );
+          await sleep(RATE_LIMIT_COOLDOWN_MS * (depth + 1));
+
+          if (sourcePdfs.length === 1) {
+            const only = sourcePdfs[0];
+            const finer = await splitPdfByPages(only.buffer, only.sourceFilename || only.filename, {
+              maxBytesPerPart: Math.max(2 * 1024 * 1024, Math.floor(only.buffer.length / 2)),
+              maxTokensPerPart: Math.max(25_000, Math.floor(PDF_PART_MAX_TOKENS / 3)),
+              overlapPages: 1,
+              maxParts: 8,
+            });
+            if (finer.length <= 1) throw err;
+            const results: BatchParsed[] = [];
+            for (let s = 0; s < finer.length; s++) {
+              const slice = finer[s];
+              const item: PdfWorkItem = {
+                ...only,
+                filename: slice.filename,
+                buffer: slice.buffer,
+                sourceFilename: slice.sourceFilename,
+                partIndex: slice.partIndex,
+                partCount: slice.partCount,
+                pageStart: slice.pageStart,
+                pageEnd: slice.pageEnd,
+                sizeBytes: slice.sizeBytes,
+              };
+              const sub = await analyzePdfSetWithContextFallback(
+                [item],
+                `[RECORTE ${s + 1}/${finer.length} apos limite/rate 429 - consolidar com os demais.]`,
+                depth + 1,
+              );
+              results.push(...sub);
+              if (s < finer.length - 1) await sleep(RATE_LIMIT_COOLDOWN_MS);
+            }
+            return results;
+          }
+
+          const mid = Math.ceil(sourcePdfs.length / 2);
+          const groups = [sourcePdfs.slice(0, mid), sourcePdfs.slice(mid)].filter(
+            (group) => group.length > 0,
+          );
+          const results: BatchParsed[] = [];
+          for (let g = 0; g < groups.length; g++) {
+            const sub = await analyzePdfSetWithContextFallback(
+              groups[g],
+              `[SUBLOTE ${g + 1}/${groups.length} apos limite/rate 429 - consolidar com os demais.]`,
+              depth + 1,
+            );
+            results.push(...sub);
+            if (g < groups.length - 1) await sleep(RATE_LIMIT_COOLDOWN_MS);
+          }
+          return results;
+        }
+
         if (!isLikelyContextWindowError(err) || depth >= 2 || sourcePdfs.length === 0) {
           throw err;
         }
@@ -1235,7 +1311,7 @@ export async function runAnaliseJob(params: {
         });
       }
 
-      await jobRef.update({
+      await jobRef.update(sanitizeForFirestore({
         batchResults: batchResults.map((b) => ({
           batchIndex: b.batchIndex,
           filenames: b.filenames,
@@ -1246,7 +1322,7 @@ export async function runAnaliseJob(params: {
           conferenciaInputs: b.conferenciaInputs,
         })),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      }));
     }
 
     await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
@@ -1278,8 +1354,8 @@ export async function runAnaliseJob(params: {
               temperature: 0.1,
             }),
           {
-            maxAttempts: 2,
-            baseDelayMs: 800,
+            maxAttempts: 4,
+            baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
             isRetryable: isLikelyRateLimitError,
           },
         );
@@ -1379,6 +1455,7 @@ export async function runAnaliseJob(params: {
       // Preserva o estado anterior como versão N (se ainda não havia contador, vira v1)
       const versaoParaArquivar = versaoAnterior > 0 ? versaoAnterior : 1;
       await versoesRef.doc(`v${versaoParaArquivar}`).set(
+        sanitizeForFirestore(
         {
           solicitacaoId: params.solicitacaoId,
           versao: versaoParaArquivar,
@@ -1391,12 +1468,13 @@ export async function runAnaliseJob(params: {
           createdAt: FieldValue.serverTimestamp(),
           arquivadoEm: FieldValue.serverTimestamp(),
         },
+        ),
         { merge: true },
       );
     }
 
     const versaoCorrente = versaoAnterior > 0 ? novaVersao : 1;
-    await versoesRef.doc(`v${versaoCorrente}`).set({
+    await versoesRef.doc(`v${versaoCorrente}`).set(sanitizeForFirestore({
       solicitacaoId: params.solicitacaoId,
       versao: versaoCorrente,
       jobId: params.jobId,
@@ -1415,7 +1493,7 @@ export async function runAnaliseJob(params: {
       evidenceVerification,
       createdAt: FieldValue.serverTimestamp(),
       ...(assertividadeScore ? { assertividadeScore } : {}),
-    });
+    }));
 
     lastStage = "consolidate";
     const telemetry: AnaliseTelemetry = {
@@ -1433,7 +1511,7 @@ export async function runAnaliseJob(params: {
       errorCode: null,
     };
 
-    await solicitacaoRef.update({
+    await solicitacaoRef.update(sanitizeForFirestore({
       status: "em_analise",
       tipoRelatorio: tipoBase,
       tiposProjetoComparados: tiposAnalise,
@@ -1468,9 +1546,9 @@ export async function runAnaliseJob(params: {
         ? { assertividadeScore }
         : { assertividadeScore: FieldValue.delete() }),
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
-    await jobRef.update({
+    await jobRef.update(sanitizeForFirestore({
       state: "completed",
       progress: 100,
       stage: "final",
@@ -1479,7 +1557,7 @@ export async function runAnaliseJob(params: {
       documentRagChunkIds,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
   } catch (error: unknown) {
     const rawMessage = error instanceof Error ? error.message : "Erro desconhecido na análise.";
     console.error(`Job ${params.jobId} falhou:`, error);
@@ -1528,7 +1606,7 @@ export async function runAnaliseJob(params: {
       errorCode: code,
     };
 
-    await jobRef.update({
+    await jobRef.update(sanitizeForFirestore({
       state: "failed",
       progress: 0,
       stage: "prep",
@@ -1536,9 +1614,9 @@ export async function runAnaliseJob(params: {
       telemetry,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
-    await solicitacaoRef.update({
+    await solicitacaoRef.update(sanitizeForFirestore({
       status: "pendente",
       activeAnaliseJobId: null,
       analiseJobStatus: "failed",
@@ -1547,6 +1625,6 @@ export async function runAnaliseJob(params: {
       analiseErroMensagem: message,
       analiseTelemetry: telemetry,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
   }
 }

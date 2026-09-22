@@ -46,6 +46,8 @@ import {
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
 import { selectDocumentosPorPrioridade } from "./services/pipeline/documentPriority";
+import { sanitizeForFirestore } from "./services/firestoreSanitizer";
+import { isLikelyRateLimitError, withRetry } from "./services/pipeline";
 
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
@@ -71,6 +73,9 @@ const DEFAULT_ESCOPO_ANALISE: EscopoAnalisePrompt = {
   gerarChecklistConformidade: true,
   gerarParecerTecnico: true,
 };
+
+const OPENAI_RETRY_MAX_ATTEMPTS = 6;
+const OPENAI_RETRY_BASE_DELAY_MS = 2500;
 
 function parseEscopoAnalise(value: unknown): EscopoAnalisePrompt {
   if (!value || typeof value !== "object") {
@@ -301,10 +306,17 @@ async function inferTipoRelatorio(
   }
   parts.push(buildTextInput(buildInferTipoPrompt()));
 
-  const result = await analyze(parts, {
-    maxOutputTokens: 50,
-    temperature: 0,
-  });
+  const result = await withRetry(
+    () => analyze(parts, {
+      maxOutputTokens: 50,
+      temperature: 0,
+    }),
+    {
+      maxAttempts: OPENAI_RETRY_MAX_ATTEMPTS,
+      baseDelayMs: OPENAI_RETRY_BASE_DELAY_MS,
+      isRetryable: isLikelyRateLimitError,
+    },
+  );
 
   const inferred = result.content.trim().toLowerCase();
   if (isValidTipo(inferred)) return inferred;
@@ -371,7 +383,7 @@ export const analisarSolicitacao = onCall(
     const jobRef = docRef.collection("analiseJobs").doc();
     const jobId = jobRef.id;
 
-    await jobRef.set({
+    await jobRef.set(sanitizeForFirestore({
       id: jobId,
       solicitacaoId,
       state: "queued",
@@ -383,14 +395,14 @@ export const analisarSolicitacao = onCall(
       createdBy: request.auth.uid,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
-    await docRef.update({
+    await docRef.update(sanitizeForFirestore({
       activeAnaliseJobId: jobId,
       analiseJobStatus: "queued",
       analiseJobProgress: 12,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
     return { jobId, solicitacaoId, reused: false };
   },
@@ -580,16 +592,23 @@ export const formatarRelatorioComplementos = onCall(
       `Formatando relatório com ${complementos.length} complemento(s) para ${solicitacaoId}`,
     );
 
-    const result = await analyze(parts, {
-      maxOutputTokens: 12000,
-      temperature: 0.1,
-      jsonMode: true,
-    });
+    const result = await withRetry(
+      () => analyze(parts, {
+        maxOutputTokens: 12000,
+        temperature: 0.1,
+        jsonMode: true,
+      }),
+      {
+        maxAttempts: OPENAI_RETRY_MAX_ATTEMPTS,
+        baseDelayMs: OPENAI_RETRY_BASE_DELAY_MS,
+        isRetryable: isLikelyRateLimitError,
+      },
+    );
 
     const { checklist, parecerTecnico } = parseAIResponse(result.content);
     const complementosSerializados = JSON.stringify(complementos);
 
-    await docRef.update({
+    await docRef.update(sanitizeForFirestore({
       status: "em_analise",
       checklistConformidade: JSON.stringify(checklist),
       parecerTecnico,
@@ -598,7 +617,7 @@ export const formatarRelatorioComplementos = onCall(
       analisadoPorIA: true,
       analisadoEm: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }));
 
     const updatedSnap = await docRef.get();
     const updatedData = updatedSnap.data()!;

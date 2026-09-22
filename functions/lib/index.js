@@ -13,6 +13,8 @@ const prompts_1 = require("./config/prompts");
 const normasService_2 = require("./services/normasService");
 const analiseJobProcessor_1 = require("./services/analiseJobProcessor");
 const documentPriority_1 = require("./services/pipeline/documentPriority");
+const firestoreSanitizer_1 = require("./services/firestoreSanitizer");
+const pipeline_1 = require("./services/pipeline");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 const app = (0, app_1.initializeApp)();
@@ -30,6 +32,8 @@ const DEFAULT_ESCOPO_ANALISE = {
     gerarChecklistConformidade: true,
     gerarParecerTecnico: true,
 };
+const OPENAI_RETRY_MAX_ATTEMPTS = 6;
+const OPENAI_RETRY_BASE_DELAY_MS = 2500;
 function parseEscopoAnalise(value) {
     if (!value || typeof value !== "object") {
         return DEFAULT_ESCOPO_ANALISE;
@@ -192,9 +196,13 @@ async function inferTipoRelatorio(pdfBuffers) {
         parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
     }
     parts.push((0, openaiService_1.buildTextInput)((0, prompts_1.buildInferTipoPrompt)()));
-    const result = await (0, openaiService_1.analyze)(parts, {
+    const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
         maxOutputTokens: 50,
         temperature: 0,
+    }), {
+        maxAttempts: OPENAI_RETRY_MAX_ATTEMPTS,
+        baseDelayMs: OPENAI_RETRY_BASE_DELAY_MS,
+        isRetryable: pipeline_1.isLikelyRateLimitError,
     });
     const inferred = result.content.trim().toLowerCase();
     if (isValidTipo(inferred))
@@ -250,7 +258,7 @@ exports.analisarSolicitacao = (0, https_1.onCall)({
     }
     const jobRef = docRef.collection("analiseJobs").doc();
     const jobId = jobRef.id;
-    await jobRef.set({
+    await jobRef.set((0, firestoreSanitizer_1.sanitizeForFirestore)({
         id: jobId,
         solicitacaoId,
         state: "queued",
@@ -262,13 +270,13 @@ exports.analisarSolicitacao = (0, https_1.onCall)({
         createdBy: request.auth.uid,
         createdAt: firestore_1.FieldValue.serverTimestamp(),
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
-    });
-    await docRef.update({
+    }));
+    await docRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
         activeAnaliseJobId: jobId,
         analiseJobStatus: "queued",
         analiseJobProgress: 12,
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
-    });
+    }));
     return { jobId, solicitacaoId, reused: false };
 });
 exports.processAnaliseJob = (0, firestore_2.onDocumentCreated)({
@@ -399,14 +407,18 @@ exports.formatarRelatorioComplementos = (0, https_1.onCall)({
         (0, openaiService_1.buildTextInput)(complementacaoPrompt),
     ];
     console.log(`Formatando relatório com ${complementos.length} complemento(s) para ${solicitacaoId}`);
-    const result = await (0, openaiService_1.analyze)(parts, {
+    const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
         maxOutputTokens: 12000,
         temperature: 0.1,
         jsonMode: true,
+    }), {
+        maxAttempts: OPENAI_RETRY_MAX_ATTEMPTS,
+        baseDelayMs: OPENAI_RETRY_BASE_DELAY_MS,
+        isRetryable: pipeline_1.isLikelyRateLimitError,
     });
     const { checklist, parecerTecnico } = parseAIResponse(result.content);
     const complementosSerializados = JSON.stringify(complementos);
-    await docRef.update({
+    await docRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
         status: "em_analise",
         checklistConformidade: JSON.stringify(checklist),
         parecerTecnico,
@@ -415,7 +427,7 @@ exports.formatarRelatorioComplementos = (0, https_1.onCall)({
         analisadoPorIA: true,
         analisadoEm: firestore_1.FieldValue.serverTimestamp(),
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
-    });
+    }));
     const updatedSnap = await docRef.get();
     const updatedData = updatedSnap.data();
     return {

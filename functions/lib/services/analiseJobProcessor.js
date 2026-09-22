@@ -21,12 +21,13 @@ const tipoAnaliseService_1 = require("./tipoAnaliseService");
 const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
 const goldenCaseService_1 = require("./goldenCaseService");
 const evidenceVerifier_1 = require("./pipeline/evidenceVerifier");
+const firestoreSanitizer_1 = require("./firestoreSanitizer");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
-/** Orçamento por lote de PDFs do projeto (folga para normas no teto ~50MB da API). */
-const BATCH_MAX_TOKENS = 280_000;
-const BATCH_MAX_BYTES = 28 * 1024 * 1024;
-const BATCH_MAX_ITEMS = 6;
+/** Orcamento por lote de PDFs do projeto (folga para normas/perfil e limite de tokens). */
+const BATCH_MAX_TOKENS = 120_000;
+const BATCH_MAX_BYTES = 12 * 1024 * 1024;
+const BATCH_MAX_ITEMS = 3;
 /** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
 const PDF_PART_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_PART_MAX_TOKENS = 100_000;
@@ -34,6 +35,10 @@ const DOCUMENT_RAG_MAX_PDFS = 6;
 const DOCUMENT_RAG_MAX_CHUNKS = 12;
 const DOCUMENT_RAG_MAX_BYTES_PER_PDF = 8 * 1024 * 1024;
 const DOCUMENT_RAG_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
+const ANALYSIS_RETRY_MAX_ATTEMPTS = 6;
+const ANALYSIS_RETRY_BASE_DELAY_MS = 2500;
+const RATE_LIMIT_FALLBACK_MAX_DEPTH = 4;
+const RATE_LIMIT_COOLDOWN_MS = 15000;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
 function getBucket() {
@@ -42,20 +47,21 @@ function getBucket() {
 function isValidTipo(value) {
     return typeof value === "string" && VALID_TIPOS.includes(value);
 }
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function updateJob(jobRef, solicitacaoRef, state, progress, stage, extra = {}) {
-    const payload = {
+    const payload = (0, firestoreSanitizer_1.sanitizeForFirestore)({
         state,
         progress,
         stage,
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
         ...extra,
-    };
+    });
     await jobRef.update(payload);
-    await solicitacaoRef.update({
+    await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
         analiseJobStatus: state,
         analiseJobProgress: progress,
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
-    });
+    }));
 }
 async function downloadStorageFile(url) {
     const bucket = getBucket();
@@ -370,7 +376,11 @@ async function inferTipoRelatorio(pdfBuffers) {
         parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
     }
     parts.push((0, openaiService_1.buildTextInput)((0, prompts_1.buildInferTipoPrompt)()));
-    const result = await (0, openaiService_1.analyze)(parts, { maxOutputTokens: 50, temperature: 0 });
+    const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, { maxOutputTokens: 50, temperature: 0 }), {
+        maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
+        baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
+        isRetryable: pipeline_1.isLikelyRateLimitError,
+    });
     const inferred = result.content.trim().toLowerCase();
     if (isValidTipo(inferred))
         return inferred;
@@ -406,12 +416,12 @@ async function runAnaliseJob(params) {
             console.log(`Job ${params.jobId} ignorado (state=${jobData.state})`);
             return;
         }
-        await jobRef.update({ startedAt: firestore_1.FieldValue.serverTimestamp() });
-        await solicitacaoRef.update({
+        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({ startedAt: firestore_1.FieldValue.serverTimestamp() }));
+        await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             status: "em_analise",
             activeAnaliseJobId: params.jobId,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
+        }));
         const snapshot = await solicitacaoRef.get();
         if (!snapshot.exists)
             throw new Error("Solicitação não encontrada.");
@@ -803,7 +813,7 @@ async function runAnaliseJob(params) {
                 maxItemsPerBatch: BATCH_MAX_ITEMS,
             })
             : [{ batchIndex: 0, items: [], estimatedTokens: 0, totalBytes: 0 }];
-        await jobRef.update({
+        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             batchPlan: {
                 count: plannedBatches.length,
                 batches: plannedBatches.map((b) => ({
@@ -814,7 +824,7 @@ async function runAnaliseJob(params) {
                 })),
             },
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
+        }));
         const maxOut = isProfile ? 20000 : 16000;
         const appendPdfParts = (parts, sourcePdfs) => {
             for (const pdf of sourcePdfs) {
@@ -830,8 +840,8 @@ async function runAnaliseJob(params) {
             temperature: 0.1,
             jsonMode: true,
         }), {
-            maxAttempts: 3,
-            baseDelayMs: 800,
+            maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
+            baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
             isRetryable: pipeline_1.isLikelyRateLimitError,
         });
         /**
@@ -863,6 +873,54 @@ async function runAnaliseJob(params) {
                 ];
             }
             catch (err) {
+                const shouldSplitForRateLimit = (0, pipeline_1.isLikelyRateLimitError)(err) &&
+                    depth < RATE_LIMIT_FALLBACK_MAX_DEPTH &&
+                    sourcePdfs.length > 0;
+                if (shouldSplitForRateLimit) {
+                    console.warn(`Rate limit/429 (depth=${depth}); aguardando e reduzindo lote de ${sourcePdfs.length} PDF(s).`, err instanceof Error ? err.message : err);
+                    await sleep(RATE_LIMIT_COOLDOWN_MS * (depth + 1));
+                    if (sourcePdfs.length === 1) {
+                        const only = sourcePdfs[0];
+                        const finer = await (0, pipeline_1.splitPdfByPages)(only.buffer, only.sourceFilename || only.filename, {
+                            maxBytesPerPart: Math.max(2 * 1024 * 1024, Math.floor(only.buffer.length / 2)),
+                            maxTokensPerPart: Math.max(25_000, Math.floor(PDF_PART_MAX_TOKENS / 3)),
+                            overlapPages: 1,
+                            maxParts: 8,
+                        });
+                        if (finer.length <= 1)
+                            throw err;
+                        const results = [];
+                        for (let s = 0; s < finer.length; s++) {
+                            const slice = finer[s];
+                            const item = {
+                                ...only,
+                                filename: slice.filename,
+                                buffer: slice.buffer,
+                                sourceFilename: slice.sourceFilename,
+                                partIndex: slice.partIndex,
+                                partCount: slice.partCount,
+                                pageStart: slice.pageStart,
+                                pageEnd: slice.pageEnd,
+                                sizeBytes: slice.sizeBytes,
+                            };
+                            const sub = await analyzePdfSetWithContextFallback([item], `[RECORTE ${s + 1}/${finer.length} apos limite/rate 429 - consolidar com os demais.]`, depth + 1);
+                            results.push(...sub);
+                            if (s < finer.length - 1)
+                                await sleep(RATE_LIMIT_COOLDOWN_MS);
+                        }
+                        return results;
+                    }
+                    const mid = Math.ceil(sourcePdfs.length / 2);
+                    const groups = [sourcePdfs.slice(0, mid), sourcePdfs.slice(mid)].filter((group) => group.length > 0);
+                    const results = [];
+                    for (let g = 0; g < groups.length; g++) {
+                        const sub = await analyzePdfSetWithContextFallback(groups[g], `[SUBLOTE ${g + 1}/${groups.length} apos limite/rate 429 - consolidar com os demais.]`, depth + 1);
+                        results.push(...sub);
+                        if (g < groups.length - 1)
+                            await sleep(RATE_LIMIT_COOLDOWN_MS);
+                    }
+                    return results;
+                }
                 if (!(0, pipeline_1.isLikelyContextWindowError)(err) || depth >= 2 || sourcePdfs.length === 0) {
                     throw err;
                 }
@@ -935,7 +993,7 @@ async function runAnaliseJob(params) {
                     batchIndex: batchResults.length,
                 });
             }
-            await jobRef.update({
+            await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
                 batchResults: batchResults.map((b) => ({
                     batchIndex: b.batchIndex,
                     filenames: b.filenames,
@@ -946,7 +1004,7 @@ async function runAnaliseJob(params) {
                     conferenciaInputs: b.conferenciaInputs,
                 })),
                 updatedAt: firestore_1.FieldValue.serverTimestamp(),
-            });
+            }));
         }
         await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
         lastStage = "consolidate";
@@ -962,8 +1020,8 @@ async function runAnaliseJob(params) {
                     maxOutputTokens: Math.min(maxOut, 12000),
                     temperature: 0.1,
                 }), {
-                    maxAttempts: 2,
-                    baseDelayMs: 800,
+                    maxAttempts: 4,
+                    baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
                     isRetryable: pipeline_1.isLikelyRateLimitError,
                 });
                 const synthesized = synth.content?.trim();
@@ -1035,7 +1093,7 @@ async function runAnaliseJob(params) {
             dataAntes.relatorioIA) {
             // Preserva o estado anterior como versão N (se ainda não havia contador, vira v1)
             const versaoParaArquivar = versaoAnterior > 0 ? versaoAnterior : 1;
-            await versoesRef.doc(`v${versaoParaArquivar}`).set({
+            await versoesRef.doc(`v${versaoParaArquivar}`).set((0, firestoreSanitizer_1.sanitizeForFirestore)({
                 solicitacaoId: params.solicitacaoId,
                 versao: versaoParaArquivar,
                 jobId: dataAntes.activeAnaliseJobId ?? null,
@@ -1046,10 +1104,10 @@ async function runAnaliseJob(params) {
                 relatorioIA: dataAntes.relatorioIA ?? null,
                 createdAt: firestore_1.FieldValue.serverTimestamp(),
                 arquivadoEm: firestore_1.FieldValue.serverTimestamp(),
-            }, { merge: true });
+            }), { merge: true });
         }
         const versaoCorrente = versaoAnterior > 0 ? novaVersao : 1;
-        await versoesRef.doc(`v${versaoCorrente}`).set({
+        await versoesRef.doc(`v${versaoCorrente}`).set((0, firestoreSanitizer_1.sanitizeForFirestore)({
             solicitacaoId: params.solicitacaoId,
             versao: versaoCorrente,
             jobId: params.jobId,
@@ -1068,7 +1126,7 @@ async function runAnaliseJob(params) {
             evidenceVerification,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
             ...(assertividadeScore ? { assertividadeScore } : {}),
-        });
+        }));
         lastStage = "consolidate";
         const telemetry = {
             durationMs: Date.now() - startedMs,
@@ -1084,7 +1142,7 @@ async function runAnaliseJob(params) {
             failedStage: null,
             errorCode: null,
         };
-        await solicitacaoRef.update({
+        await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             status: "em_analise",
             tipoRelatorio: tipoBase,
             tiposProjetoComparados: tiposAnalise,
@@ -1119,8 +1177,8 @@ async function runAnaliseJob(params) {
                 ? { assertividadeScore }
                 : { assertividadeScore: firestore_1.FieldValue.delete() }),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
-        await jobRef.update({
+        }));
+        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             state: "completed",
             progress: 100,
             stage: "final",
@@ -1129,7 +1187,7 @@ async function runAnaliseJob(params) {
             documentRagChunkIds,
             completedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
+        }));
     }
     catch (error) {
         const rawMessage = error instanceof Error ? error.message : "Erro desconhecido na análise.";
@@ -1171,7 +1229,7 @@ async function runAnaliseJob(params) {
             failedStage: lastStage,
             errorCode: code,
         };
-        await jobRef.update({
+        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             state: "failed",
             progress: 0,
             stage: "prep",
@@ -1179,8 +1237,8 @@ async function runAnaliseJob(params) {
             telemetry,
             completedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
-        await solicitacaoRef.update({
+        }));
+        await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
             status: "pendente",
             activeAnaliseJobId: null,
             analiseJobStatus: "failed",
@@ -1189,7 +1247,7 @@ async function runAnaliseJob(params) {
             analiseErroMensagem: message,
             analiseTelemetry: telemetry,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
+        }));
     }
 }
 //# sourceMappingURL=analiseJobProcessor.js.map
