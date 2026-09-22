@@ -6,6 +6,7 @@ import {
   Clock3,
   Download,
   FileText,
+  FileWarning,
   Percent,
   RefreshCw,
   ShieldCheck,
@@ -24,6 +25,8 @@ type TipoMetricas = {
   feedbacksAprovados: number
   goldensAprovados: number
   goldensInjetados: number
+  documentChunksInjetados: number
+  documentRagPdfsPulados: number
   falhas: number
   falhasLimite: number
   falhasTimeout: number
@@ -34,6 +37,10 @@ type TipoMetricas = {
   assertividadeComScore: number
   assertividadeMedia: number
   criticosOkPct: number
+  evidenciaComScore: number
+  evidenciaCompletaMedia: number
+  itensFrageis: number
+  complementosHumanos: number
 }
 
 const tipoDaSolicitacao = (s: SolicitacaoWithFiles) =>
@@ -59,6 +66,8 @@ const downloadCsv = (rows: TipoMetricas[]) => {
     'feedbacks_aprovados',
     'goldens_aprovados',
     'goldens_injetados',
+    'document_chunks_injetados',
+    'document_rag_pdfs_pulados',
     'falhas',
     'falhas_429_timeout',
     'duracao_media_ms',
@@ -68,6 +77,10 @@ const downloadCsv = (rows: TipoMetricas[]) => {
     'assertividade_n_scored',
     'assertividade_media_pct',
     'criticos_ok_pct',
+    'evidencia_n_scored',
+    'evidencia_completa_pct',
+    'itens_frageis',
+    'complementos_humanos',
   ]
   const lines = rows.map((row) =>
     [
@@ -77,6 +90,8 @@ const downloadCsv = (rows: TipoMetricas[]) => {
       row.feedbacksAprovados,
       row.goldensAprovados,
       row.goldensInjetados,
+      row.documentChunksInjetados,
+      row.documentRagPdfsPulados,
       row.falhas,
       row.falhasLimite + row.falhasTimeout,
       Math.round(row.duracaoMediaMs),
@@ -86,6 +101,10 @@ const downloadCsv = (rows: TipoMetricas[]) => {
       row.assertividadeComScore,
       row.assertividadeComScore ? Math.round(row.assertividadeMedia * 10) / 10 : '',
       row.assertividadeComScore ? Math.round(row.criticosOkPct * 10) / 10 : '',
+      row.evidenciaComScore,
+      row.evidenciaComScore ? Math.round(row.evidenciaCompletaMedia * 10) / 10 : '',
+      row.itensFrageis,
+      row.complementosHumanos,
     ]
       .map((value) => `"${String(value).replace(/"/g, '""')}"`)
       .join(','),
@@ -141,6 +160,7 @@ export default function MetricasIA() {
         const porTipo = solicitacoes.filter((s) => tipoDaSolicitacao(s) === tipo)
         const comTelemetry = porTipo.filter((s) => s.analiseTelemetry)
         const comScore = porTipo.filter((s) => s.assertividadeScore)
+        const comEvidencia = porTipo.filter((s) => s.evidenceVerification)
         const sum = (selector: (s: SolicitacaoWithFiles) => number | undefined | null) =>
           comTelemetry.reduce((acc, s) => acc + (selector(s) ?? 0), 0)
         const avg = (selector: (s: SolicitacaoWithFiles) => number | undefined | null) =>
@@ -159,6 +179,15 @@ export default function MetricasIA() {
               comScore.length) *
             100
           : 0
+        const evidenciaCompletaMedia = comEvidencia.length
+          ? (comEvidencia.reduce(
+              (acc, s) =>
+                acc + (s.evidenceVerification?.percentualComEvidenciaCompleta ?? 0),
+              0,
+            ) /
+              comEvidencia.length) *
+            100
+          : 0
 
         return {
           tipo,
@@ -174,6 +203,15 @@ export default function MetricasIA() {
             (acc, s) => acc + (s.goldenCaseIdsInjetados?.length ?? 0),
             0,
           ),
+          documentChunksInjetados: porTipo.reduce(
+            (acc, s) =>
+              acc + (s.analiseTelemetry?.documentRag?.chunks ?? s.documentRagChunkIds?.length ?? 0),
+            0,
+          ),
+          documentRagPdfsPulados: porTipo.reduce(
+            (acc, s) => acc + (s.analiseTelemetry?.documentRag?.pdfsSkipped ?? 0),
+            0,
+          ),
           falhas: falhas.length,
           falhasLimite: falhaCodigo('rate_limit_or_tokens'),
           falhasTimeout: falhaCodigo('context_window'),
@@ -187,6 +225,14 @@ export default function MetricasIA() {
           assertividadeComScore: comScore.length,
           assertividadeMedia,
           criticosOkPct,
+          evidenciaComScore: comEvidencia.length,
+          evidenciaCompletaMedia,
+          itensFrageis: comEvidencia.reduce(
+            (acc, s) => acc + (s.evidenceVerification?.itensFrageis.length ?? 0),
+            0,
+          ),
+          complementosHumanos: porTipo.filter((s) => Boolean(s.complementosChecklist?.trim()))
+            .length,
         }
       })
   }, [feedbacks, goldens, solicitacoes])
@@ -195,6 +241,14 @@ export default function MetricasIA() {
   const totalReanalises = metricas.reduce((acc, row) => acc + row.reanalises, 0)
   const totalFalhas = metricas.reduce((acc, row) => acc + row.falhas, 0)
   const totalGoldens = metricas.reduce((acc, row) => acc + row.goldensInjetados, 0)
+  const totalDocumentChunks = metricas.reduce(
+    (acc, row) => acc + row.documentChunksInjetados,
+    0,
+  )
+  const totalDocumentRagPdfsPulados = metricas.reduce(
+    (acc, row) => acc + row.documentRagPdfsPulados,
+    0,
+  )
   const duracaoMedia =
     metricas.length > 0
       ? metricas.reduce((acc, row) => acc + row.duracaoMediaMs, 0) / metricas.length
@@ -213,6 +267,22 @@ export default function MetricasIA() {
     ? (scoredAll.filter((s) => s.assertividadeScore?.passouCriticos).length / scoredAll.length) *
       100
     : 0
+  const evidenceAll = solicitacoes.filter((s) => s.evidenceVerification)
+  const evidenciaCompletaGlobal = evidenceAll.length
+    ? (evidenceAll.reduce(
+        (acc, s) => acc + (s.evidenceVerification?.percentualComEvidenciaCompleta ?? 0),
+        0,
+      ) /
+        evidenceAll.length) *
+      100
+    : 0
+  const itensFrageisGlobal = evidenceAll.reduce(
+    (acc, s) => acc + (s.evidenceVerification?.itensFrageis.length ?? 0),
+    0,
+  )
+  const complementosHumanosGlobal = solicitacoes.filter((s) =>
+    Boolean(s.complementosChecklist?.trim()),
+  ).length
 
   if (loading) {
     return (
@@ -256,12 +326,12 @@ export default function MetricasIA() {
         <div className="metricas-ia-card accent">
           <Percent size={20} />
           <span>{formatPct(assertividadeGlobal, scoredAll.length > 0)}</span>
-          <p>Assertividade média</p>
+          <p>Score interno medio</p>
         </div>
         <div className="metricas-ia-card accent">
           <Target size={20} />
           <span>{formatPct(criticosOkGlobal, scoredAll.length > 0)}</span>
-          <p>Críticos OK</p>
+          <p>Criticos OK internos</p>
         </div>
         <div className="metricas-ia-card">
           <ShieldCheck size={20} />
@@ -274,6 +344,31 @@ export default function MetricasIA() {
           <Brain size={20} />
           <span>{totalGoldens}</span>
           <p>Goldens usados</p>
+        </div>
+        <div className="metricas-ia-card">
+          <FileText size={20} />
+          <span>{totalDocumentChunks}</span>
+          <p>Chunks RAG</p>
+        </div>
+        <div className="metricas-ia-card">
+          <FileWarning size={20} />
+          <span>{totalDocumentRagPdfsPulados}</span>
+          <p>PDFs fora do RAG auxiliar</p>
+        </div>
+        <div className="metricas-ia-card">
+          <ShieldCheck size={20} />
+          <span>{formatPct(evidenciaCompletaGlobal, evidenceAll.length > 0)}</span>
+          <p>Campos de evidencia</p>
+        </div>
+        <div className="metricas-ia-card">
+          <AlertTriangle size={20} />
+          <span>{itensFrageisGlobal}</span>
+          <p>Itens frágeis</p>
+        </div>
+        <div className="metricas-ia-card">
+          <AlertTriangle size={20} />
+          <span>{complementosHumanosGlobal}</span>
+          <p>Proxy revisao humana</p>
         </div>
         <div className="metricas-ia-card">
           <AlertTriangle size={20} />
@@ -309,7 +404,12 @@ export default function MetricasIA() {
                 <th>Feedbacks</th>
                 <th>Goldens aprov.</th>
                 <th>Goldens usados</th>
+                <th>Chunks RAG</th>
+                <th>PDFs fora RAG</th>
                 <th>Score n</th>
+                <th>Compl. humanos</th>
+                <th>Evid. completa</th>
+                <th>Itens frÃ¡geis</th>
                 <th>Assert. média</th>
                 <th>Críticos OK</th>
                 <th>Falhas</th>
@@ -328,7 +428,14 @@ export default function MetricasIA() {
                   <td>{row.feedbacksAprovados}</td>
                   <td>{row.goldensAprovados}</td>
                   <td>{row.goldensInjetados}</td>
+                  <td>{row.documentChunksInjetados || '-'}</td>
+                  <td>{row.documentRagPdfsPulados || '-'}</td>
                   <td>{row.assertividadeComScore || '-'}</td>
+                  <td>{row.complementosHumanos || '-'}</td>
+                  <td>{formatPct(row.evidenciaCompletaMedia, row.evidenciaComScore > 0)}</td>
+                  <td className={row.itensFrageis > 0 ? 'metricas-ia-danger' : undefined}>
+                    {row.itensFrageis}
+                  </td>
                   <td>{formatPct(row.assertividadeMedia, row.assertividadeComScore > 0)}</td>
                   <td
                     className={
@@ -355,3 +462,4 @@ export default function MetricasIA() {
     </div>
   )
 }
+

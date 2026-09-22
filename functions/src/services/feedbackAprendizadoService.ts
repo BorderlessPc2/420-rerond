@@ -5,6 +5,7 @@ import {
   createEmbedding,
   rankBySimilarity,
 } from "./embeddingService";
+import { rankByContext } from "./contextSelection/rankByContext";
 
 export type FeedbackValidacaoStatus =
   | "rascunho"
@@ -16,6 +17,7 @@ export type FeedbackAprendizadoFirestore = {
   id: string;
   tipoAnaliseId?: string | null;
   organizacaoId?: string | null;
+  concessionariaId?: string | null;
   regraOuItem: string;
   original: string;
   correcao: string;
@@ -77,6 +79,10 @@ function parseDoc(
       typeof raw.organizacaoId === "string" && raw.organizacaoId.trim()
         ? raw.organizacaoId.trim()
         : null,
+    concessionariaId:
+      typeof raw.concessionariaId === "string" && raw.concessionariaId.trim()
+        ? raw.concessionariaId.trim()
+        : null,
     regraOuItem,
     original,
     correcao,
@@ -131,6 +137,7 @@ async function ensureEmbeddings(
 export async function listFeedbacksAprovadosParaAnalise(params: {
   tipoAnaliseId: string;
   organizacaoId?: string | null;
+  concessionariaId?: string | null;
   maxItems?: number;
   queryText?: string | null;
 }): Promise<FeedbackAprendizadoFirestore[]> {
@@ -139,6 +146,7 @@ export async function listFeedbacksAprovadosParaAnalise(params: {
 
   const maxItems = Math.max(1, Math.min(params.maxItems ?? DEFAULT_MAX_ITEMS, 20));
   const orgId = params.organizacaoId?.trim() || null;
+  const concessionariaId = params.concessionariaId?.trim() || null;
 
   try {
     const db = getFirestore();
@@ -164,8 +172,20 @@ export async function listFeedbacksAprovadosParaAnalise(params: {
       return candidates.slice(0, maxItems);
     }
 
+    const contextRanked = rankByContext({
+      items: candidates.map((item) => ({
+        ...item,
+        text: buildFeedbackEmbeddingText(item),
+      })),
+      tipoAnaliseId: tipoId,
+      organizacaoId: orgId,
+      concessionariaId,
+      query: queryText,
+      maxItems: Math.min(candidates.length, Math.max(maxItems * 3, maxItems)),
+    });
+
     try {
-      const withEmb = await ensureEmbeddings(candidates);
+      const withEmb = await ensureEmbeddings(contextRanked);
       if (withEmb.length <= maxItems) return withEmb;
       const queryEmbedding = await createEmbedding(queryText);
       return rankBySimilarity(
@@ -176,7 +196,7 @@ export async function listFeedbacksAprovadosParaAnalise(params: {
       );
     } catch (ragErr) {
       console.warn("RAG feedbacks falhou; fallback por recência:", ragErr);
-      return candidates.slice(0, maxItems);
+      return contextRanked.slice(0, maxItems);
     }
   } catch (err) {
     console.warn("Falha ao carregar feedbacksAprendizado aprovados:", err);

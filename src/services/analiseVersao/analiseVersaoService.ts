@@ -30,6 +30,24 @@ const toDate = (value: unknown): Date | undefined => {
   return undefined
 }
 
+const parseStringArray = (value: unknown): string[] | undefined =>
+  Array.isArray(value) ? value.map(String) : undefined
+
+const parseEvidenceVerification = (
+  value: unknown,
+): AnaliseVersao['evidenceVerification'] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  return {
+    totalItens: typeof raw.totalItens === 'number' ? raw.totalItens : 0,
+    itensFrageis: parseStringArray(raw.itensFrageis) ?? [],
+    percentualComEvidenciaCompleta:
+      typeof raw.percentualComEvidenciaCompleta === 'number'
+        ? raw.percentualComEvidenciaCompleta
+        : 0,
+  }
+}
+
 const parse = (id: string, raw: Record<string, unknown>): AnaliseVersao => ({
   id,
   solicitacaoId: String(raw.solicitacaoId ?? ''),
@@ -42,6 +60,10 @@ const parse = (id: string, raw: Record<string, unknown>): AnaliseVersao => ({
     raw.checklistConformidade != null ? String(raw.checklistConformidade) : null,
   relatorioIA: raw.relatorioIA != null ? String(raw.relatorioIA) : null,
   promptCustomizado: raw.promptCustomizado != null ? String(raw.promptCustomizado) : null,
+  evidenceVerification: parseEvidenceVerification(raw.evidenceVerification),
+  feedbackIdsInjetados: parseStringArray(raw.feedbackIdsInjetados),
+  goldenCaseIdsInjetados: parseStringArray(raw.goldenCaseIdsInjetados),
+  documentRagChunkIds: parseStringArray(raw.documentRagChunkIds),
   createdAt: toDate(raw.createdAt),
 })
 

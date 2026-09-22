@@ -5,6 +5,7 @@ import {
   createEmbedding,
   rankBySimilarity,
 } from "./embeddingService";
+import { rankByContext } from "./contextSelection/rankByContext";
 
 export type GoldenCaseValidacaoStatus =
   | "rascunho"
@@ -26,6 +27,7 @@ export type GoldenCaseFirestore = {
   titulo: string;
   tipoAnaliseId: string;
   organizacaoId?: string | null;
+  concessionariaId?: string | null;
   erroIa?: string | null;
   analiseCorreta: string;
   pares: GoldenCaseParFirestore[];
@@ -139,6 +141,10 @@ function parseDoc(
       typeof raw.organizacaoId === "string" && raw.organizacaoId.trim()
         ? raw.organizacaoId.trim()
         : null,
+    concessionariaId:
+      typeof raw.concessionariaId === "string" && raw.concessionariaId.trim()
+        ? raw.concessionariaId.trim()
+        : null,
     erroIa,
     analiseCorreta: analiseCorreta || pares.map((p) => p.correto).join("\n"),
     pares,
@@ -189,6 +195,7 @@ async function ensureEmbeddings(
 export async function listGoldenCasesAprovadosParaAnalise(params: {
   tipoAnaliseId: string;
   organizacaoId?: string | null;
+  concessionariaId?: string | null;
   maxItems?: number;
   /** Texto da solicitação atual para ranking semântico (RAG). */
   queryText?: string | null;
@@ -198,6 +205,7 @@ export async function listGoldenCasesAprovadosParaAnalise(params: {
 
   const maxItems = Math.max(1, Math.min(params.maxItems ?? DEFAULT_MAX_ITEMS, 10));
   const orgId = params.organizacaoId?.trim() || null;
+  const concessionariaId = params.concessionariaId?.trim() || null;
 
   try {
     const db = getFirestore();
@@ -222,8 +230,20 @@ export async function listGoldenCasesAprovadosParaAnalise(params: {
       return candidates.slice(0, maxItems);
     }
 
+    const contextRanked = rankByContext({
+      items: candidates.map((item) => ({
+        ...item,
+        text: buildGoldenEmbeddingText(item),
+      })),
+      tipoAnaliseId: tipoId,
+      organizacaoId: orgId,
+      concessionariaId,
+      query: queryText,
+      maxItems: Math.min(candidates.length, Math.max(maxItems * 3, maxItems)),
+    });
+
     try {
-      const withEmb = await ensureEmbeddings(candidates);
+      const withEmb = await ensureEmbeddings(contextRanked);
       if (withEmb.length <= maxItems) {
         return withEmb;
       }
@@ -240,7 +260,7 @@ export async function listGoldenCasesAprovadosParaAnalise(params: {
       return ranked;
     } catch (ragErr) {
       console.warn("RAG goldens falhou; fallback por recência:", ragErr);
-      return candidates.slice(0, maxItems);
+      return contextRanked.slice(0, maxItems);
     }
   } catch (err) {
     console.warn("Falha ao carregar goldenCases aprovados:", err);

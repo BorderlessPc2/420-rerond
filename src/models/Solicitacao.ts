@@ -87,6 +87,12 @@ export interface ConferenciaInput {
   }
 }
 
+export interface EvidenceVerification {
+  totalItens: number
+  itensFrageis: string[]
+  percentualComEvidenciaCompleta: number
+}
+
 import type { AnaliseJobState } from './AnaliseJob'
 
 export interface Solicitacao {
@@ -131,6 +137,7 @@ export interface Solicitacao {
   goldenCaseIdsInjetados?: string[] | null
   /** IDs de feedbacks aprovados injetados na última análise. */
   feedbackIdsInjetados?: string[] | null
+  documentRagChunkIds?: string[] | null
   analiseErroMensagem?: string | null
   analiseErroCodigo?: string | null
   documentosProcessados?: string[] | null
@@ -146,9 +153,18 @@ export interface Solicitacao {
     normasPdfCount?: number
     normasCustomPdfIds?: string[]
     normasCustomPdfFalhas?: string[]
+    documentRag?: {
+      chunks: number
+      pdfsSelected: number
+      pdfsSkipped: number
+      totalSelectedBytes: number
+      skippedReasons: Record<string, number>
+    }
     failedStage?: string | null
     errorCode?: string | null
   } | null
+  /** Qualidade de evidência/localização/justificativa da última análise. */
+  evidenceVerification?: EvidenceVerification | null
   /** Score lexical vs eval de assertividade (quando tipo mapeado). */
   assertividadeScore?: {
     casoId: string

@@ -20,6 +20,7 @@ const concessionariaPerfilService_1 = require("./concessionariaPerfilService");
 const tipoAnaliseService_1 = require("./tipoAnaliseService");
 const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
 const goldenCaseService_1 = require("./goldenCaseService");
+const evidenceVerifier_1 = require("./pipeline/evidenceVerifier");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 /** Orçamento por lote de PDFs do projeto (folga para normas no teto ~50MB da API). */
@@ -29,6 +30,10 @@ const BATCH_MAX_ITEMS = 6;
 /** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
 const PDF_PART_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_PART_MAX_TOKENS = 100_000;
+const DOCUMENT_RAG_MAX_PDFS = 6;
+const DOCUMENT_RAG_MAX_CHUNKS = 12;
+const DOCUMENT_RAG_MAX_BYTES_PER_PDF = 8 * 1024 * 1024;
+const DOCUMENT_RAG_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 const VALID_TIPOS = ["pit", "obra_per", "obra_nao_per"];
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
 function getBucket() {
@@ -97,6 +102,37 @@ function parseArquivosMeta(value) {
         };
     })
         .filter((item) => item.url);
+}
+function extractRetrievalTerms(text, maxTerms = 60) {
+    const seen = new Set();
+    const terms = [];
+    const normalized = text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    for (const term of normalized.split(/\W+/)) {
+        if (term.length < 5)
+            continue;
+        if ([
+            "para",
+            "como",
+            "deve",
+            "devem",
+            "analise",
+            "projeto",
+            "documento",
+            "documentos",
+        ].includes(term)) {
+            continue;
+        }
+        if (seen.has(term))
+            continue;
+        seen.add(term);
+        terms.push(term);
+        if (terms.length >= maxTerms)
+            break;
+    }
+    return terms;
 }
 function isPecaGraficaTipoDocumento(tipo) {
     return new Set([
@@ -593,7 +629,7 @@ async function runAnaliseJob(params) {
             .filter(Boolean)
             .join(" · ");
         const systemPrompt = (0, concessionariaProfiles_1.buildProfileSystemPrompt)(promptProfile);
-        const promptCustomizadoComPerfil = [
+        const promptCustomizadoComPerfilBase = [
             promptCustomizado,
             (0, tipoAnaliseService_1.buildTipoAnalisePromptAddon)(tipoAnaliseDoc, tipoAnaliseDescricao || null),
             perfilFirestore?.perfilCompleto ? (0, concessionariaPerfilService_1.buildCustomAnalysisPromptAddon)(perfilFirestore) : "",
@@ -624,26 +660,74 @@ async function runAnaliseJob(params) {
         let feedbackIdsInjetados = [];
         let goldenBlock = "";
         let goldenCaseIdsInjetados = [];
+        let documentRagBlock = "";
+        let documentRagChunkIds = [];
+        let documentRagTelemetry = {
+            chunks: 0,
+            pdfsSelected: 0,
+            pdfsSkipped: 0,
+            totalSelectedBytes: 0,
+            skippedReasons: {},
+        };
+        const ragQueryText = (0, embeddingService_1.buildAnaliseQueryText)({
+            tipoAnaliseId,
+            tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
+            titulo: data.titulo ? String(data.titulo) : null,
+            descricao: data.descricao ? String(data.descricao) : null,
+            tipoObra: data.tipoObra ? String(data.tipoObra) : null,
+            rodovia: data.rodovia ? String(data.rodovia) : null,
+            kilometragem: data.kilometragem ? String(data.kilometragem) : null,
+            municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
+            memorial: data.memorial ? String(data.memorial) : null,
+            faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
+            tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
+                ? String(data.tipoIntervencaoDetalhado)
+                : null,
+        });
+        if (escopoAnalise.incluirDocumentosProjeto && pdfBuffersLimited.length > 0) {
+            try {
+                const extractionPlan = (0, pipeline_1.planPdfTextExtraction)(pdfBuffersLimited, {
+                    maxPdfs: DOCUMENT_RAG_MAX_PDFS,
+                    maxBytesPerPdf: DOCUMENT_RAG_MAX_BYTES_PER_PDF,
+                    maxTotalBytes: DOCUMENT_RAG_MAX_TOTAL_BYTES,
+                });
+                documentRagTelemetry = {
+                    chunks: 0,
+                    pdfsSelected: extractionPlan.selected.length,
+                    pdfsSkipped: extractionPlan.skipped.length,
+                    totalSelectedBytes: extractionPlan.totalSelectedBytes,
+                    skippedReasons: extractionPlan.skipped.reduce((acc, item) => {
+                        acc[item.reason] = (acc[item.reason] ?? 0) + 1;
+                        return acc;
+                    }, {}),
+                };
+                const chunks = await (0, pipeline_1.extractPdfTextChunks)(extractionPlan.selected, {
+                    maxChunksPerPdf: 5,
+                    maxTextCharsPerPdf: 50_000,
+                });
+                const selectedChunks = await (0, pipeline_1.selecionarChunksRelevantes)({
+                    chunks,
+                    query: ragQueryText || requisitosFormatados,
+                    checklistTerms: extractRetrievalTerms(requisitosFormatados),
+                    maxChunks: DOCUMENT_RAG_MAX_CHUNKS,
+                });
+                documentRagBlock = (0, pipeline_1.buildDocumentRetrievalPromptBlock)(selectedChunks);
+                documentRagChunkIds = selectedChunks.map((chunk) => chunk.id);
+                documentRagTelemetry.chunks = documentRagChunkIds.length;
+                if (documentRagChunkIds.length > 0) {
+                    console.log(`RAG documental: ${documentRagChunkIds.length} chunks recuperados para ${params.solicitacaoId}`);
+                }
+            }
+            catch (ragDocErr) {
+                console.warn("RAG documental falhou; seguindo com PDFs anexados:", ragDocErr);
+            }
+        }
         if (tipoAnaliseId) {
-            const ragQueryText = (0, embeddingService_1.buildAnaliseQueryText)({
-                tipoAnaliseId,
-                tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
-                titulo: data.titulo ? String(data.titulo) : null,
-                descricao: data.descricao ? String(data.descricao) : null,
-                tipoObra: data.tipoObra ? String(data.tipoObra) : null,
-                rodovia: data.rodovia ? String(data.rodovia) : null,
-                kilometragem: data.kilometragem ? String(data.kilometragem) : null,
-                municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
-                memorial: data.memorial ? String(data.memorial) : null,
-                faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
-                tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
-                    ? String(data.tipoIntervencaoDetalhado)
-                    : null,
-            });
             try {
                 const feedbacks = await (0, feedbackAprendizadoService_1.listFeedbacksAprovadosParaAnalise)({
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
+                    concessionariaId,
                     maxItems: 12,
                     queryText: ragQueryText,
                 });
@@ -660,6 +744,7 @@ async function runAnaliseJob(params) {
                 const goldens = await (0, goldenCaseService_1.listGoldenCasesAprovadosParaAnalise)({
                     tipoAnaliseId,
                     organizacaoId: concessionariaId,
+                    concessionariaId,
                     maxItems: 5,
                     queryText: ragQueryText,
                 });
@@ -680,7 +765,8 @@ async function runAnaliseJob(params) {
             tiposAnalise,
             tiposProjetoNome,
             escopo: escopoAnalise,
-            promptCustomizado: promptCustomizadoComPerfil || undefined,
+            promptCustomizado: [promptCustomizadoComPerfilBase, documentRagBlock].filter(Boolean).join("\n\n") ||
+                undefined,
             contextoRevisaoAnterior: contextoMemoriaAnterior || undefined,
             feedbackAprendizado: feedbackBlock || undefined,
             goldenCases: goldenBlock || undefined,
@@ -891,6 +977,7 @@ async function runAnaliseJob(params) {
             }
         }
         const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
+        const evidenceVerification = (0, evidenceVerifier_1.verificarEvidencias)(checklistFinal);
         const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
         const conferenciaFinal = (0, consistencyAnalyzer_1.complementarConferenciaDeterministica)(mergedConferencia, {
             interessado: dadosForm.interessado,
@@ -977,6 +1064,8 @@ async function runAnaliseJob(params) {
             promptCustomizado: promptCustomizado || null,
             feedbackIdsInjetados,
             goldenCaseIdsInjetados,
+            documentRagChunkIds,
+            evidenceVerification,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
             ...(assertividadeScore ? { assertividadeScore } : {}),
         });
@@ -991,6 +1080,7 @@ async function runAnaliseJob(params) {
             normasPdfCount,
             normasCustomPdfIds,
             normasCustomPdfFalhas,
+            documentRag: documentRagTelemetry,
             failedStage: null,
             errorCode: null,
         };
@@ -1016,6 +1106,7 @@ async function runAnaliseJob(params) {
             analiseVersaoAtual: versaoCorrente,
             feedbackIdsInjetados,
             goldenCaseIdsInjetados,
+            documentRagChunkIds,
             documentosProcessados: [
                 ...new Set(pdfBuffers.map((pdf) => pdf.sourceFilename || pdf.filename)),
             ],
@@ -1023,6 +1114,7 @@ async function runAnaliseJob(params) {
             analiseErroCodigo: null,
             analiseErroMensagem: null,
             analiseTelemetry: telemetry,
+            evidenceVerification,
             ...(assertividadeScore
                 ? { assertividadeScore }
                 : { assertividadeScore: firestore_1.FieldValue.delete() }),
@@ -1033,6 +1125,8 @@ async function runAnaliseJob(params) {
             progress: 100,
             stage: "final",
             telemetry,
+            evidenceVerification,
+            documentRagChunkIds,
             completedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });

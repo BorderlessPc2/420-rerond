@@ -4,6 +4,12 @@ export {
   sumEstimatedTokens,
 } from "./estimateTokens";
 export { chunkText } from "./chunkText";
+export {
+  selecionarChunksRelevantes,
+  selecionarChunksRelevantesSync,
+  buildDocumentRetrievalPromptBlock,
+} from "./documentRetrieval";
+export { extractPdfTextChunks, planPdfTextExtraction } from "./pdfTextExtractor";
 export { planDocumentBatches } from "./batchPlanner";
 export {
   rankDocumentoPrioridade,

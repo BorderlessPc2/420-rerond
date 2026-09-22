@@ -141,6 +141,10 @@ const parseStringArray = (value: unknown): string[] | undefined =>
 const parseAnaliseTelemetry = (value: unknown): Solicitacao['analiseTelemetry'] => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Record<string, unknown>
+  const documentRagRaw =
+    raw.documentRag && typeof raw.documentRag === 'object' && !Array.isArray(raw.documentRag)
+      ? (raw.documentRag as Record<string, unknown>)
+      : null
   return {
     durationMs: typeof raw.durationMs === 'number' ? raw.durationMs : undefined,
     totalBytes: typeof raw.totalBytes === 'number' ? raw.totalBytes : undefined,
@@ -151,8 +155,44 @@ const parseAnaliseTelemetry = (value: unknown): Solicitacao['analiseTelemetry'] 
     normasPdfCount: typeof raw.normasPdfCount === 'number' ? raw.normasPdfCount : undefined,
     normasCustomPdfIds: parseStringArray(raw.normasCustomPdfIds),
     normasCustomPdfFalhas: parseStringArray(raw.normasCustomPdfFalhas),
+    documentRag: documentRagRaw
+      ? {
+          chunks: typeof documentRagRaw.chunks === 'number' ? documentRagRaw.chunks : 0,
+          pdfsSelected:
+            typeof documentRagRaw.pdfsSelected === 'number' ? documentRagRaw.pdfsSelected : 0,
+          pdfsSkipped:
+            typeof documentRagRaw.pdfsSkipped === 'number' ? documentRagRaw.pdfsSkipped : 0,
+          totalSelectedBytes:
+            typeof documentRagRaw.totalSelectedBytes === 'number'
+              ? documentRagRaw.totalSelectedBytes
+              : 0,
+          skippedReasons:
+            documentRagRaw.skippedReasons &&
+            typeof documentRagRaw.skippedReasons === 'object' &&
+            !Array.isArray(documentRagRaw.skippedReasons)
+              ? Object.fromEntries(
+                  Object.entries(documentRagRaw.skippedReasons as Record<string, unknown>).map(
+                    ([key, val]) => [key, typeof val === 'number' ? val : Number(val) || 0],
+                  ),
+                )
+              : {},
+        }
+      : undefined,
     failedStage: raw.failedStage != null ? String(raw.failedStage) : null,
     errorCode: raw.errorCode != null ? String(raw.errorCode) : null,
+  }
+}
+
+const parseEvidenceVerification = (value: unknown): Solicitacao['evidenceVerification'] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  return {
+    totalItens: typeof raw.totalItens === 'number' ? raw.totalItens : 0,
+    itensFrageis: parseStringArray(raw.itensFrageis) ?? [],
+    percentualComEvidenciaCompleta:
+      typeof raw.percentualComEvidenciaCompleta === 'number'
+        ? raw.percentualComEvidenciaCompleta
+        : 0,
   }
 }
 
@@ -191,6 +231,9 @@ const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles =>
     feedbackIdsInjetados: Array.isArray(data.feedbackIdsInjetados)
       ? data.feedbackIdsInjetados.map(String)
       : undefined,
+    documentRagChunkIds: Array.isArray(data.documentRagChunkIds)
+      ? data.documentRagChunkIds.map(String)
+      : undefined,
     analiseErroMensagem: data.analiseErroMensagem ? String(data.analiseErroMensagem) : undefined,
     analiseErroCodigo: data.analiseErroCodigo ? String(data.analiseErroCodigo) : undefined,
     documentosProcessados: Array.isArray(data.documentosProcessados)
@@ -200,6 +243,7 @@ const mapSolicitacao = (id: string, data: DocumentData): SolicitacaoWithFiles =>
       ? data.documentosOmitidos.map(String)
       : undefined,
     analiseTelemetry: parseAnaliseTelemetry(data.analiseTelemetry),
+    evidenceVerification: parseEvidenceVerification(data.evidenceVerification),
     assertividadeScore:
       data.assertividadeScore && typeof data.assertividadeScore === 'object'
         ? {

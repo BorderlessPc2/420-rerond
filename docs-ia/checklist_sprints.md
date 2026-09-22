@@ -278,6 +278,27 @@
 
 ---
 
+### Sprint 14 — Robustez e assertividade contínua da IA
+
+**Objetivo:** aumentar assertividade sem depender de fine-tune, usando golden cases validados pelo cliente, RAG documental, verificação de evidência e métricas finas.
+
+- [x] Baseline reprodutível por tipo de análise
+- [x] Ranking contextual de golden cases e feedbacks aprovados
+- [x] Verificador de evidência/localização/justificativa/norma
+- [x] Métricas finas: evidência completa e itens frágeis
+- [x] Scaffolding de RAG documental dos PDFs de projeto
+- [x] Integrar chunks documentais recuperados ao prompt final da análise
+- [x] Medir correções humanas / aceitos vs corrigidos como proxy operacional
+
+**Critérios de aceite**
+
+1. A análise usa golden cases e feedbacks somente do tipo de análise correto.
+2. Itens não conformes ou ausentes vêm com evidência, localização, justificativa e norma.
+3. O painel mostra evolução de assertividade e sinais de revisão humana.
+4. O pipeline continua funcionando com muitos PDFs e PDFs grandes.
+
+---
+
 ## Backlog (menor prioridade — não bloquear assertividade)
 
 Itens das antigas sprints 6–8 e pedidos secundários:

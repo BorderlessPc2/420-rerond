@@ -18,6 +18,13 @@ export type AnaliseTelemetry = {
   normasPdfCount?: number;
   normasCustomPdfIds?: string[];
   normasCustomPdfFalhas?: string[];
+  documentRag?: {
+    chunks: number;
+    pdfsSelected: number;
+    pdfsSkipped: number;
+    totalSelectedBytes: number;
+    skippedReasons: Record<string, number>;
+  };
   failedStage?: PipelineStage | string | null;
   errorCode?: string | null;
 };

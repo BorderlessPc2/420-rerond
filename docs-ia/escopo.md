@@ -78,6 +78,7 @@ O principal problema atual é a **qualidade do resultado produzido pela IA**: el
 - Sprint 9 residual: store de embeddings de documentos de projeto
 - Sprint 12 fino: correções humanas / FP-FN estimados no painel
 - Observabilidade: taxonomia completa de códigos de erro na UI
+- Sprint 14: robustez de assertividade com ranking contextual, RAG documental, verificação de evidência e métricas finas
 
 ### Problemas identificados (testes / reunião)
 

@@ -51,6 +51,10 @@ import {
   consolidatePareceres,
   buildSynthesizeParecerPrompt,
   summarizeChecklistForSynthesis,
+  extractPdfTextChunks,
+  planPdfTextExtraction,
+  selecionarChunksRelevantes,
+  buildDocumentRetrievalPromptBlock,
   expandPdfsForContext,
   buildPdfPartContextLabel,
   isLikelyContextWindowError,
@@ -76,6 +80,7 @@ import {
   buildGoldenCasesPromptBlock,
   listGoldenCasesAprovadosParaAnalise,
 } from "./goldenCaseService";
+import { verificarEvidencias } from "./pipeline/evidenceVerifier";
 
 export type AnaliseJobState =
   | "uploaded"
@@ -95,6 +100,10 @@ const BATCH_MAX_ITEMS = 6;
 /** Fatias de PDF grande: alvo por parte (cabe no lote com normas + prompt). */
 const PDF_PART_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_PART_MAX_TOKENS = 100_000;
+const DOCUMENT_RAG_MAX_PDFS = 6;
+const DOCUMENT_RAG_MAX_CHUNKS = 12;
+const DOCUMENT_RAG_MAX_BYTES_PER_PDF = 8 * 1024 * 1024;
+const DOCUMENT_RAG_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 const VALID_TIPOS: TipoRelatorio[] = ["pit", "obra_per", "obra_nao_per"];
 
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
@@ -180,6 +189,37 @@ function parseArquivosMeta(value: unknown): ArquivoMetaDoc[] {
       };
     })
     .filter((item) => item.url);
+}
+
+function extractRetrievalTerms(text: string, maxTerms = 60): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  for (const term of normalized.split(/\W+/)) {
+    if (term.length < 5) continue;
+    if (
+      [
+        "para",
+        "como",
+        "deve",
+        "devem",
+        "analise",
+        "projeto",
+        "documento",
+        "documentos",
+      ].includes(term)
+    ) {
+      continue;
+    }
+    if (seen.has(term)) continue;
+    seen.add(term);
+    terms.push(term);
+    if (terms.length >= maxTerms) break;
+  }
+  return terms;
 }
 
 export function isPecaGraficaTipoDocumento(tipo: string): boolean {
@@ -788,7 +828,7 @@ export async function runAnaliseJob(params: {
       .join(" · ");
 
     const systemPrompt = buildProfileSystemPrompt(promptProfile);
-    const promptCustomizadoComPerfil = [
+    const promptCustomizadoComPerfilBase = [
       promptCustomizado,
       buildTipoAnalisePromptAddon(tipoAnaliseDoc, tipoAnaliseDescricao || null),
       perfilFirestore?.perfilCompleto ? buildCustomAnalysisPromptAddon(perfilFirestore) : "",
@@ -828,27 +868,81 @@ export async function runAnaliseJob(params: {
     let feedbackIdsInjetados: string[] = [];
     let goldenBlock = "";
     let goldenCaseIdsInjetados: string[] = [];
-    if (tipoAnaliseId) {
-      const ragQueryText = buildAnaliseQueryText({
-        tipoAnaliseId,
-        tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
-        titulo: data.titulo ? String(data.titulo) : null,
-        descricao: data.descricao ? String(data.descricao) : null,
-        tipoObra: data.tipoObra ? String(data.tipoObra) : null,
-        rodovia: data.rodovia ? String(data.rodovia) : null,
-        kilometragem: data.kilometragem ? String(data.kilometragem) : null,
-        municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
-        memorial: data.memorial ? String(data.memorial) : null,
-        faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
-        tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
-          ? String(data.tipoIntervencaoDetalhado)
-          : null,
-      });
+    let documentRagBlock = "";
+    let documentRagChunkIds: string[] = [];
+    let documentRagTelemetry: NonNullable<AnaliseTelemetry["documentRag"]> = {
+      chunks: 0,
+      pdfsSelected: 0,
+      pdfsSkipped: 0,
+      totalSelectedBytes: 0,
+      skippedReasons: {},
+    };
+    const ragQueryText = buildAnaliseQueryText({
+      tipoAnaliseId,
+      tipoAnaliseNome: tipoAnaliseDoc?.nome ?? null,
+      titulo: data.titulo ? String(data.titulo) : null,
+      descricao: data.descricao ? String(data.descricao) : null,
+      tipoObra: data.tipoObra ? String(data.tipoObra) : null,
+      rodovia: data.rodovia ? String(data.rodovia) : null,
+      kilometragem: data.kilometragem ? String(data.kilometragem) : null,
+      municipioEstado: data.municipioEstado ? String(data.municipioEstado) : null,
+      memorial: data.memorial ? String(data.memorial) : null,
+      faseProjeto: data.faseProjeto ? String(data.faseProjeto) : null,
+      tipoIntervencaoDetalhado: data.tipoIntervencaoDetalhado
+        ? String(data.tipoIntervencaoDetalhado)
+        : null,
+    });
 
+    if (escopoAnalise.incluirDocumentosProjeto && pdfBuffersLimited.length > 0) {
+      try {
+        const extractionPlan = planPdfTextExtraction(pdfBuffersLimited, {
+          maxPdfs: DOCUMENT_RAG_MAX_PDFS,
+          maxBytesPerPdf: DOCUMENT_RAG_MAX_BYTES_PER_PDF,
+          maxTotalBytes: DOCUMENT_RAG_MAX_TOTAL_BYTES,
+        });
+        documentRagTelemetry = {
+          chunks: 0,
+          pdfsSelected: extractionPlan.selected.length,
+          pdfsSkipped: extractionPlan.skipped.length,
+          totalSelectedBytes: extractionPlan.totalSelectedBytes,
+          skippedReasons: extractionPlan.skipped.reduce<Record<string, number>>(
+            (acc, item) => {
+              acc[item.reason] = (acc[item.reason] ?? 0) + 1;
+              return acc;
+            },
+            {},
+          ),
+        };
+
+        const chunks = await extractPdfTextChunks(extractionPlan.selected, {
+          maxChunksPerPdf: 5,
+          maxTextCharsPerPdf: 50_000,
+        });
+        const selectedChunks = await selecionarChunksRelevantes({
+          chunks,
+          query: ragQueryText || requisitosFormatados,
+          checklistTerms: extractRetrievalTerms(requisitosFormatados),
+          maxChunks: DOCUMENT_RAG_MAX_CHUNKS,
+        });
+        documentRagBlock = buildDocumentRetrievalPromptBlock(selectedChunks);
+        documentRagChunkIds = selectedChunks.map((chunk) => chunk.id);
+        documentRagTelemetry.chunks = documentRagChunkIds.length;
+        if (documentRagChunkIds.length > 0) {
+          console.log(
+            `RAG documental: ${documentRagChunkIds.length} chunks recuperados para ${params.solicitacaoId}`,
+          );
+        }
+      } catch (ragDocErr) {
+        console.warn("RAG documental falhou; seguindo com PDFs anexados:", ragDocErr);
+      }
+    }
+
+    if (tipoAnaliseId) {
       try {
         const feedbacks = await listFeedbacksAprovadosParaAnalise({
           tipoAnaliseId,
           organizacaoId: concessionariaId,
+          concessionariaId,
           maxItems: 12,
           queryText: ragQueryText,
         });
@@ -867,6 +961,7 @@ export async function runAnaliseJob(params: {
         const goldens = await listGoldenCasesAprovadosParaAnalise({
           tipoAnaliseId,
           organizacaoId: concessionariaId,
+          concessionariaId,
           maxItems: 5,
           queryText: ragQueryText,
         });
@@ -889,7 +984,9 @@ export async function runAnaliseJob(params: {
       tiposAnalise,
       tiposProjetoNome,
       escopo: escopoAnalise,
-      promptCustomizado: promptCustomizadoComPerfil || undefined,
+      promptCustomizado:
+        [promptCustomizadoComPerfilBase, documentRagBlock].filter(Boolean).join("\n\n") ||
+        undefined,
       contextoRevisaoAnterior: contextoMemoriaAnterior || undefined,
       feedbackAprendizado: feedbackBlock || undefined,
       goldenCases: goldenBlock || undefined,
@@ -1200,6 +1297,7 @@ export async function runAnaliseJob(params: {
     }
 
     const checklistFinal = escopoAnalise.gerarChecklistConformidade ? mergedChecklist : [];
+    const evidenceVerification = verificarEvidencias(checklistFinal);
     const parecerFinal = escopoAnalise.gerarParecerTecnico ? mergedParecer : "";
     const conferenciaFinal = complementarConferenciaDeterministica(
       mergedConferencia,
@@ -1313,6 +1411,8 @@ export async function runAnaliseJob(params: {
       promptCustomizado: promptCustomizado || null,
       feedbackIdsInjetados,
       goldenCaseIdsInjetados,
+      documentRagChunkIds,
+      evidenceVerification,
       createdAt: FieldValue.serverTimestamp(),
       ...(assertividadeScore ? { assertividadeScore } : {}),
     });
@@ -1328,6 +1428,7 @@ export async function runAnaliseJob(params: {
       normasPdfCount,
       normasCustomPdfIds,
       normasCustomPdfFalhas,
+      documentRag: documentRagTelemetry,
       failedStage: null,
       errorCode: null,
     };
@@ -1354,6 +1455,7 @@ export async function runAnaliseJob(params: {
       analiseVersaoAtual: versaoCorrente,
       feedbackIdsInjetados,
       goldenCaseIdsInjetados,
+      documentRagChunkIds,
       documentosProcessados: [
         ...new Set(pdfBuffers.map((pdf) => pdf.sourceFilename || pdf.filename)),
       ],
@@ -1361,6 +1463,7 @@ export async function runAnaliseJob(params: {
       analiseErroCodigo: null,
       analiseErroMensagem: null,
       analiseTelemetry: telemetry,
+      evidenceVerification,
       ...(assertividadeScore
         ? { assertividadeScore }
         : { assertividadeScore: FieldValue.delete() }),
@@ -1372,6 +1475,8 @@ export async function runAnaliseJob(params: {
       progress: 100,
       stage: "final",
       telemetry,
+      evidenceVerification,
+      documentRagChunkIds,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

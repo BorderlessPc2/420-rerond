@@ -4,6 +4,7 @@ exports.listFeedbacksAprovadosParaAnalise = listFeedbacksAprovadosParaAnalise;
 exports.buildFeedbackAprendizadoPromptBlock = buildFeedbackAprendizadoPromptBlock;
 const firestore_1 = require("firebase-admin/firestore");
 const embeddingService_1 = require("./embeddingService");
+const rankByContext_1 = require("./contextSelection/rankByContext");
 const COLLECTION = process.env.FIRESTORE_FEEDBACKS_COLLECTION?.trim() || "feedbacksAprendizado";
 const DEFAULT_MAX_ITEMS = 12;
 const DEFAULT_MAX_CHARS_FIELD = 700;
@@ -45,6 +46,9 @@ function parseDoc(id, raw) {
         tipoAnaliseId,
         organizacaoId: typeof raw.organizacaoId === "string" && raw.organizacaoId.trim()
             ? raw.organizacaoId.trim()
+            : null,
+        concessionariaId: typeof raw.concessionariaId === "string" && raw.concessionariaId.trim()
+            ? raw.concessionariaId.trim()
             : null,
         regraOuItem,
         original,
@@ -94,6 +98,7 @@ async function listFeedbacksAprovadosParaAnalise(params) {
         return [];
     const maxItems = Math.max(1, Math.min(params.maxItems ?? DEFAULT_MAX_ITEMS, 20));
     const orgId = params.organizacaoId?.trim() || null;
+    const concessionariaId = params.concessionariaId?.trim() || null;
     try {
         const db = (0, firestore_1.getFirestore)();
         const snap = await db
@@ -117,8 +122,19 @@ async function listFeedbacksAprovadosParaAnalise(params) {
         if (!queryText) {
             return candidates.slice(0, maxItems);
         }
+        const contextRanked = (0, rankByContext_1.rankByContext)({
+            items: candidates.map((item) => ({
+                ...item,
+                text: (0, embeddingService_1.buildFeedbackEmbeddingText)(item),
+            })),
+            tipoAnaliseId: tipoId,
+            organizacaoId: orgId,
+            concessionariaId,
+            query: queryText,
+            maxItems: Math.min(candidates.length, Math.max(maxItems * 3, maxItems)),
+        });
         try {
-            const withEmb = await ensureEmbeddings(candidates);
+            const withEmb = await ensureEmbeddings(contextRanked);
             if (withEmb.length <= maxItems)
                 return withEmb;
             const queryEmbedding = await (0, embeddingService_1.createEmbedding)(queryText);
@@ -126,7 +142,7 @@ async function listFeedbacksAprovadosParaAnalise(params) {
         }
         catch (ragErr) {
             console.warn("RAG feedbacks falhou; fallback por recência:", ragErr);
-            return candidates.slice(0, maxItems);
+            return contextRanked.slice(0, maxItems);
         }
     }
     catch (err) {

@@ -4,6 +4,7 @@ exports.listGoldenCasesAprovadosParaAnalise = listGoldenCasesAprovadosParaAnalis
 exports.buildGoldenCasesPromptBlock = buildGoldenCasesPromptBlock;
 const firestore_1 = require("firebase-admin/firestore");
 const embeddingService_1 = require("./embeddingService");
+const rankByContext_1 = require("./contextSelection/rankByContext");
 const COLLECTION = process.env.FIRESTORE_GOLDEN_CASES_COLLECTION?.trim() || "goldenCases";
 const DEFAULT_MAX_ITEMS = 5;
 const DEFAULT_MAX_CHARS_FIELD = 700;
@@ -93,6 +94,9 @@ function parseDoc(id, raw) {
         organizacaoId: typeof raw.organizacaoId === "string" && raw.organizacaoId.trim()
             ? raw.organizacaoId.trim()
             : null,
+        concessionariaId: typeof raw.concessionariaId === "string" && raw.concessionariaId.trim()
+            ? raw.concessionariaId.trim()
+            : null,
         erroIa,
         analiseCorreta: analiseCorreta || pares.map((p) => p.correto).join("\n"),
         pares,
@@ -136,6 +140,7 @@ async function listGoldenCasesAprovadosParaAnalise(params) {
         return [];
     const maxItems = Math.max(1, Math.min(params.maxItems ?? DEFAULT_MAX_ITEMS, 10));
     const orgId = params.organizacaoId?.trim() || null;
+    const concessionariaId = params.concessionariaId?.trim() || null;
     try {
         const db = (0, firestore_1.getFirestore)();
         const snap = await db.collection(COLLECTION).limit(80).get();
@@ -155,8 +160,19 @@ async function listGoldenCasesAprovadosParaAnalise(params) {
         if (!queryText) {
             return candidates.slice(0, maxItems);
         }
+        const contextRanked = (0, rankByContext_1.rankByContext)({
+            items: candidates.map((item) => ({
+                ...item,
+                text: (0, embeddingService_1.buildGoldenEmbeddingText)(item),
+            })),
+            tipoAnaliseId: tipoId,
+            organizacaoId: orgId,
+            concessionariaId,
+            query: queryText,
+            maxItems: Math.min(candidates.length, Math.max(maxItems * 3, maxItems)),
+        });
         try {
-            const withEmb = await ensureEmbeddings(candidates);
+            const withEmb = await ensureEmbeddings(contextRanked);
             if (withEmb.length <= maxItems) {
                 return withEmb;
             }
@@ -167,7 +183,7 @@ async function listGoldenCasesAprovadosParaAnalise(params) {
         }
         catch (ragErr) {
             console.warn("RAG goldens falhou; fallback por recência:", ragErr);
-            return candidates.slice(0, maxItems);
+            return contextRanked.slice(0, maxItems);
         }
     }
     catch (err) {
