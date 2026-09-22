@@ -2,7 +2,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 
 import {
@@ -421,6 +421,41 @@ export const processAnaliseJob = onDocumentCreated(
       openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
     if (!apiKey) {
       console.error("OPENAI_API_KEY não configurada para processamento do job.");
+      return;
+    }
+
+    const solicitacaoId = String(event.params.solicitacaoId ?? "");
+    const jobId = String(event.params.jobId ?? "");
+    if (!solicitacaoId || !jobId) return;
+
+    await runAnaliseJob({
+      solicitacaoId,
+      jobId,
+      apiKey,
+      collection: COLLECTION,
+    });
+  },
+);
+
+export const continueAnaliseJob = onDocumentUpdated(
+  {
+    document: `${COLLECTION}/{solicitacaoId}/analiseJobs/{jobId}`,
+    region: "southamerica-east1",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [openaiApiKey],
+  },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+    if (before.state === "queued" || after.state !== "queued") return;
+    if (!after.continuation?.requested) return;
+
+    const apiKey =
+      openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
+    if (!apiKey) {
+      console.error("OPENAI_API_KEY nao configurada para continuar o job.");
       return;
     }
 

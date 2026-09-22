@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.formatarRelatorioComplementos = exports.processAnaliseJob = exports.analisarSolicitacao = void 0;
+exports.formatarRelatorioComplementos = exports.continueAnaliseJob = exports.processAnaliseJob = exports.analisarSolicitacao = void 0;
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const storage_1 = require("firebase-admin/storage");
@@ -289,6 +289,37 @@ exports.processAnaliseJob = (0, firestore_2.onDocumentCreated)({
     const apiKey = openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
     if (!apiKey) {
         console.error("OPENAI_API_KEY não configurada para processamento do job.");
+        return;
+    }
+    const solicitacaoId = String(event.params.solicitacaoId ?? "");
+    const jobId = String(event.params.jobId ?? "");
+    if (!solicitacaoId || !jobId)
+        return;
+    await (0, analiseJobProcessor_1.runAnaliseJob)({
+        solicitacaoId,
+        jobId,
+        apiKey,
+        collection: COLLECTION,
+    });
+});
+exports.continueAnaliseJob = (0, firestore_2.onDocumentUpdated)({
+    document: `${COLLECTION}/{solicitacaoId}/analiseJobs/{jobId}`,
+    region: "southamerica-east1",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [openaiApiKey],
+}, async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after)
+        return;
+    if (before.state === "queued" || after.state !== "queued")
+        return;
+    if (!after.continuation?.requested)
+        return;
+    const apiKey = openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
+    if (!apiKey) {
+        console.error("OPENAI_API_KEY nao configurada para continuar o job.");
         return;
     }
     const solicitacaoId = String(event.params.solicitacaoId ?? "");

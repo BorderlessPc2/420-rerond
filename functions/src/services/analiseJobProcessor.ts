@@ -109,6 +109,7 @@ const ANALYSIS_RETRY_MAX_ATTEMPTS = 6;
 const ANALYSIS_RETRY_BASE_DELAY_MS = 2500;
 const RATE_LIMIT_FALLBACK_MAX_DEPTH = 4;
 const RATE_LIMIT_COOLDOWN_MS = 15000;
+const CONTINUATION_RUNTIME_BUDGET_MS = 7.5 * 60 * 1000;
 const VALID_TIPOS: TipoRelatorio[] = ["pit", "obra_per", "obra_nao_per"];
 
 /** Lazy: evita getStorage() no import (quebra análise do deploy antes do initializeApp). */
@@ -1085,6 +1086,36 @@ export async function runAnaliseJob(params: {
       rawContent: string;
     };
 
+    const savedBatchResults = Array.isArray(jobData.batchResults)
+      ? (jobData.batchResults as Array<Record<string, unknown>>)
+      : [];
+    const batchResults: BatchParsed[] = savedBatchResults
+      .map((saved, index) => ({
+        batchIndex: typeof saved.batchIndex === "number" ? saved.batchIndex : index,
+        filenames: Array.isArray(saved.filenames)
+          ? saved.filenames.map((name) => String(name))
+          : [],
+        tokensUsed: typeof saved.tokensUsed === "number" ? saved.tokensUsed : undefined,
+        checklist: Array.isArray(saved.checklist) ? saved.checklist : [],
+        parecerTecnico:
+          typeof saved.parecerTecnico === "string" ? saved.parecerTecnico : "",
+        dadosExtraidos:
+          saved.dadosExtraidos && typeof saved.dadosExtraidos === "object"
+            ? (saved.dadosExtraidos as DadosExtraidosAnalise)
+            : null,
+        conferenciaInputs: Array.isArray(saved.conferenciaInputs)
+          ? (saved.conferenciaInputs as ConferenciaInput[])
+          : [],
+        rawContent: typeof saved.rawContent === "string" ? saved.rawContent : "",
+      }))
+      .filter((saved) => saved.checklist.length > 0 || saved.parecerTecnico || saved.rawContent);
+
+    const completedSourceBatches = new Set(
+      batchResults
+        .map((saved) => saved.batchIndex)
+        .filter((index) => Number.isInteger(index) && index >= 0),
+    );
+
     const maxOut = isProfile ? 20000 : 16000;
 
     const appendPdfParts = (
@@ -1272,10 +1303,14 @@ export async function runAnaliseJob(params: {
       }
     };
 
-    const batchResults: BatchParsed[] = [];
     lastStage = "analyze";
 
     for (let i = 0; i < plannedBatches.length; i++) {
+      if (completedSourceBatches.has(i)) {
+        console.log(`Job ${params.jobId}: lote ${i + 1}/${plannedBatches.length} ja processado; pulando.`);
+        continue;
+      }
+
       const batch = plannedBatches[i];
       const pdfsInBatch =
         batch.items.length > 0
@@ -1307,9 +1342,10 @@ export async function runAnaliseJob(params: {
       for (const parsed of parsedList) {
         batchResults.push({
           ...parsed,
-          batchIndex: batchResults.length,
+          batchIndex: i,
         });
       }
+      completedSourceBatches.add(i);
 
       await jobRef.update(sanitizeForFirestore({
         batchResults: batchResults.map((b) => ({
@@ -1321,8 +1357,31 @@ export async function runAnaliseJob(params: {
           dadosExtraidos: b.dadosExtraidos,
           conferenciaInputs: b.conferenciaInputs,
         })),
+        continuation: {
+          completedBatches: Array.from(completedSourceBatches).sort((a, b) => a - b),
+          plannedBatches: plannedBatches.length,
+          lastBatchIndex: i,
+        },
         updatedAt: FieldValue.serverTimestamp(),
       }));
+
+      const hasMoreBatches = i < plannedBatches.length - 1;
+      if (hasMoreBatches && Date.now() - startedMs > CONTINUATION_RUNTIME_BUDGET_MS) {
+        await updateJob(jobRef, solicitacaoRef, "queued", progress, "continuation", {
+          continuation: {
+            requested: true,
+            reason: "runtime_budget",
+            completedBatches: Array.from(completedSourceBatches).sort((a, b) => a - b),
+            plannedBatches: plannedBatches.length,
+            lastBatchIndex: i,
+            requestedAt: FieldValue.serverTimestamp(),
+          },
+        });
+        console.log(
+          `Job ${params.jobId}: execucao pausada para continuacao apos lote ${i + 1}/${plannedBatches.length}.`,
+        );
+        return;
+      }
     }
 
     await updateJob(jobRef, solicitacaoRef, "generating_report", 88, "parecer");
