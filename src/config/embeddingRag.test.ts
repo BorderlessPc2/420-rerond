@@ -22,8 +22,23 @@ describe('embeddingService (RAG)', () => {
       { id: 'mid', embedding: [0.5, 0.5, 0] as number[] },
     ]
     const query = [1, 0, 0]
-    const ranked = rankBySimilarity(items, query, (i) => i.embedding, 2)
+    const ranked = rankBySimilarity(items, query, (i) => i.embedding, 2, 0)
     expect(ranked.map((r) => r.id)).toEqual(['near', 'mid'])
+  })
+
+  it('excludes candidates below similarity threshold', () => {
+    const ranked = rankBySimilarity(
+      [
+        { id: 'near', embedding: [1, 0, 0] },
+        { id: 'far', embedding: [0, 1, 0] },
+      ],
+      [1, 0, 0],
+      (item) => item.embedding,
+      2,
+      0.9,
+    )
+
+    expect(ranked.map((item) => item.id)).toEqual(['near'])
   })
 
   it('build texts include teaching pairs without inventing content', () => {
