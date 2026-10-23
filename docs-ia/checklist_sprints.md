@@ -146,7 +146,7 @@
 
 - [x] Estrutura por tipo: `/tipo/caso-00N` (docs originais, análise IA, erros, análise correta, observações) — coleção + seed + hub **Ensinar a IA**
 - [x] Cadastro/associação: tipo, organização, regras, justificativas — wizard com pares errado×certo + status de validação
-- [x] Recuperação por tipo na análise (determinística; máx. 3) — `functions` `goldenCaseService` + processor *(RAG/embeddings = fase 2 com API)*
+- [x] Recuperação por tipo e escopo na análise — `functions` `goldenCaseService` + processor; relevância semântica depende de embeddings pré-computados
 - [x] Seeds mínimos ocupação/acesso/PAC (sintéticos; substituir pelos do cliente)
 - [x] Documentar o que entra no contexto da chamada vs o que fica só no acervo — [`guia_ensinar_ia.md`](./guia_ensinar_ia.md)
 - [x] Ingestão dos primeiros casos **reais** fornecidos pelo cliente — seeds multi-tipo + **aprovados em produção** (2026-09)

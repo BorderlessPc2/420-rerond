@@ -11,6 +11,8 @@ import {
   type Timestamp,
 } from 'firebase/firestore'
 import { auth, db } from '../../lib/firebase'
+import { isLocalFallbackEnabled, localFallbackError } from '../../config/localFallback'
+import { normalizeLearningScope } from '../learning/learningScope'
 import type {
   FeedbackAprendizado,
   FeedbackAprendizadoDraft,
@@ -54,6 +56,7 @@ const parse = (id: string, raw: Record<string, unknown>): FeedbackAprendizado =>
   solicitacaoId: raw.solicitacaoId != null ? String(raw.solicitacaoId) : null,
   tipoAnaliseId: raw.tipoAnaliseId != null ? String(raw.tipoAnaliseId) : null,
   organizacaoId: raw.organizacaoId != null ? String(raw.organizacaoId) : null,
+  concessionariaId: raw.concessionariaId != null ? String(raw.concessionariaId) : null,
   regraOuItem: String(raw.regraOuItem ?? ''),
   original: String(raw.original ?? ''),
   correcao: String(raw.correcao ?? ''),
@@ -63,6 +66,10 @@ const parse = (id: string, raw: Record<string, unknown>): FeedbackAprendizado =>
   autorNome: raw.autorNome != null ? String(raw.autorNome) : null,
   revisadoPorId: raw.revisadoPorId != null ? String(raw.revisadoPorId) : null,
   revisaoNota: raw.revisaoNota != null ? String(raw.revisaoNota) : null,
+  ativo: raw.ativo !== false,
+  versao: typeof raw.versao === 'number' ? raw.versao : 1,
+  origem: raw.origem != null ? String(raw.origem) : null,
+  revisadoAt: toDate(raw.revisadoAt),
   createdAt: toDate(raw.createdAt),
   updatedAt: toDate(raw.updatedAt),
 })
@@ -101,10 +108,11 @@ export async function listFeedbacks(options?: {
       snap.docs.map((item) => parse(item.id, item.data() as Record<string, unknown>)),
     )
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       return filterLocal(readMock())
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao carregar feedbacks.')
     throw err
   }
 }
@@ -123,10 +131,18 @@ export async function createFeedback(
   if (!draft.correcao.trim()) throw new Error('Informe a correção correta.')
   if (!draft.justificativa.trim()) throw new Error('Informe a justificativa técnica.')
 
+  const tipoAnaliseId = draft.tipoAnaliseId?.trim() ?? ''
+  if (!tipoAnaliseId) throw new Error('Vincule o feedback a um tipo de análise.')
+  const scope = normalizeLearningScope({
+    organizacaoId: draft.organizacaoId,
+    concessionariaId: draft.concessionariaId,
+    tipoAnaliseId,
+  })
   const base = {
     solicitacaoId: draft.solicitacaoId ?? null,
-    tipoAnaliseId: draft.tipoAnaliseId ?? null,
-    organizacaoId: draft.organizacaoId ?? null,
+    tipoAnaliseId: scope.tipoAnaliseId,
+    organizacaoId: scope.organizacaoId,
+    concessionariaId: scope.concessionariaId,
     regraOuItem: draft.regraOuItem.trim(),
     original: draft.original.trim(),
     correcao: draft.correcao.trim(),
@@ -136,6 +152,9 @@ export async function createFeedback(
     autorNome: draft.autorNome ?? auth.currentUser?.email ?? null,
     revisadoPorId: null,
     revisaoNota: null,
+    ativo: draft.ativo !== false,
+    versao: draft.versao ?? 1,
+    origem: draft.origem ?? 'ensinar-ia',
   }
 
   if (mockMode) {
@@ -158,10 +177,11 @@ export async function createFeedback(
     const snap = await getDoc(created)
     return parse(snap.id, snap.data() as Record<string, unknown>)
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       return createFeedback(draft)
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao salvar feedback.')
     throw err
   }
 }
@@ -197,10 +217,11 @@ export async function setFeedbackStatus(
     if (!snap.exists()) throw new Error('Feedback não encontrado.')
     return parse(snap.id, snap.data() as Record<string, unknown>)
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       return setFeedbackStatus(id, status, revisaoNota)
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao atualizar feedback.')
     throw err
   }
 }

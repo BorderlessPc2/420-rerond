@@ -115,11 +115,15 @@ function parseDoc(
   ) as GoldenCaseValidacaoStatus | null;
 
   if (!status || status !== "aprovado") return null;
-  if (raw.ativo === false) return null;
+  if (raw.ativo !== true) return null;
 
   const tipoAnaliseId =
     typeof raw.tipoAnaliseId === "string" ? raw.tipoAnaliseId.trim() : "";
-  if (!tipoAnaliseId) return null;
+  const organizacaoId =
+    typeof raw.organizacaoId === "string" ? raw.organizacaoId.trim() : "";
+  const concessionariaId =
+    typeof raw.concessionariaId === "string" ? raw.concessionariaId.trim() : "";
+  if (!tipoAnaliseId || !organizacaoId) return null;
 
   const codigo = String(raw.codigo ?? "").trim();
   const titulo = String(raw.titulo ?? "").trim();
@@ -149,7 +153,7 @@ function parseDoc(
     analiseCorreta: analiseCorreta || pares.map((p) => p.correto).join("\n"),
     pares,
     status,
-    ativo: raw.ativo !== false,
+    ativo: raw.ativo === true,
     updatedAtMs: toMs(raw.updatedAt) || toMs(raw.createdAt),
     createdAtMs: toMs(raw.createdAt),
     embedding: embedding && embedding.length > 0 ? embedding : null,
@@ -162,34 +166,35 @@ async function ensureEmbeddings(
   items: GoldenCaseFirestore[],
 ): Promise<GoldenCaseFirestore[]> {
   const db = getFirestore();
-  const out: GoldenCaseFirestore[] = [];
-
-  for (const item of items) {
-    if (
-      item.embedding?.length &&
-      (!item.embeddingModel || item.embeddingModel === EMBEDDING_MODEL)
-    ) {
-      out.push(item);
-      continue;
-    }
-    try {
-      const text = buildGoldenEmbeddingText(item);
-      const embedding = await createEmbedding(text);
-      await db.collection(COLLECTION).doc(item.id).set(
-        {
-          embedding,
-          embeddingModel: EMBEDDING_MODEL,
-          embeddingUpdatedAt: new Date(),
-        },
-        { merge: true },
-      );
-      out.push({ ...item, embedding, embeddingModel: EMBEDDING_MODEL });
-    } catch (err) {
-      console.warn(`Falha ao gerar embedding do golden ${item.id}:`, err);
-      out.push(item);
-    }
-  }
-  return out;
+  return Promise.all(
+    items.map(async (item) => {
+      if (
+        item.embedding?.length &&
+        (!item.embeddingModel || item.embeddingModel === EMBEDDING_MODEL)
+      ) {
+        return item;
+      }
+      try {
+        const text = buildGoldenEmbeddingText(item);
+        const embedding = await createEmbedding(text);
+        await db.collection(COLLECTION).doc(item.id).set(
+          {
+            embedding,
+            embeddingModel: EMBEDDING_MODEL,
+            embeddingUpdatedAt: new Date(),
+          },
+          { merge: true },
+        );
+        return { ...item, embedding, embeddingModel: EMBEDDING_MODEL };
+      } catch (err) {
+        console.warn(
+          `Falha ao gerar embedding do golden ${item.id}; usando ranking lexical explícito:`,
+          err,
+        );
+        return item;
+      }
+    }),
+  );
 }
 
 export async function listGoldenCasesAprovadosParaAnalise(params: {

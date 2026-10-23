@@ -27,6 +27,7 @@ export type FeedbackAprendizadoFirestore = {
   createdAtMs: number;
   embedding?: number[] | null;
   embeddingModel?: string | null;
+  ativo: boolean;
 };
 
 const COLLECTION =
@@ -56,11 +57,15 @@ function parseDoc(
   raw: Record<string, unknown>,
 ): FeedbackAprendizadoFirestore | null {
   const status = String(raw.status ?? "") as FeedbackValidacaoStatus;
-  if (status !== "aprovado") return null;
+  if (status !== "aprovado" || raw.ativo !== true) return null;
 
   const tipoAnaliseId =
     typeof raw.tipoAnaliseId === "string" ? raw.tipoAnaliseId.trim() : "";
-  if (!tipoAnaliseId) return null;
+  const organizacaoId =
+    typeof raw.organizacaoId === "string" ? raw.organizacaoId.trim() : "";
+  const concessionariaId =
+    typeof raw.concessionariaId === "string" ? raw.concessionariaId.trim() : "";
+  if (!tipoAnaliseId || !organizacaoId) return null;
 
   const regraOuItem = String(raw.regraOuItem ?? "").trim();
   const original = String(raw.original ?? "").trim();
@@ -93,6 +98,7 @@ function parseDoc(
     embedding: embedding && embedding.length > 0 ? embedding : null,
     embeddingModel:
       typeof raw.embeddingModel === "string" ? raw.embeddingModel : null,
+    ativo: raw.ativo === true,
   };
 }
 
@@ -100,33 +106,35 @@ async function ensureEmbeddings(
   items: FeedbackAprendizadoFirestore[],
 ): Promise<FeedbackAprendizadoFirestore[]> {
   const db = getFirestore();
-  const out: FeedbackAprendizadoFirestore[] = [];
-  for (const item of items) {
-    if (
-      item.embedding?.length &&
-      (!item.embeddingModel || item.embeddingModel === EMBEDDING_MODEL)
-    ) {
-      out.push(item);
-      continue;
-    }
-    try {
-      const text = buildFeedbackEmbeddingText(item);
-      const embedding = await createEmbedding(text);
-      await db.collection(COLLECTION).doc(item.id).set(
-        {
-          embedding,
-          embeddingModel: EMBEDDING_MODEL,
-          embeddingUpdatedAt: new Date(),
-        },
-        { merge: true },
-      );
-      out.push({ ...item, embedding, embeddingModel: EMBEDDING_MODEL });
-    } catch (err) {
-      console.warn(`Falha ao gerar embedding do feedback ${item.id}:`, err);
-      out.push(item);
-    }
-  }
-  return out;
+  return Promise.all(
+    items.map(async (item) => {
+      if (
+        item.embedding?.length &&
+        (!item.embeddingModel || item.embeddingModel === EMBEDDING_MODEL)
+      ) {
+        return item;
+      }
+      try {
+        const text = buildFeedbackEmbeddingText(item);
+        const embedding = await createEmbedding(text);
+        await db.collection(COLLECTION).doc(item.id).set(
+          {
+            embedding,
+            embeddingModel: EMBEDDING_MODEL,
+            embeddingUpdatedAt: new Date(),
+          },
+          { merge: true },
+        );
+        return { ...item, embedding, embeddingModel: EMBEDDING_MODEL };
+      } catch (err) {
+        console.warn(
+          `Falha ao gerar embedding do feedback ${item.id}; usando ranking lexical explícito:`,
+          err,
+        );
+        return item;
+      }
+    }),
+  );
 }
 
 /**

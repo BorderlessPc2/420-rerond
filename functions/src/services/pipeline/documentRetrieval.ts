@@ -9,6 +9,11 @@ export interface DocumentChunk {
 
 export interface RetrievedChunk extends DocumentChunk {
   score?: number;
+  lexicalScore?: number;
+  semanticScore?: number | null;
+  combinedScore?: number;
+  thresholdPassed?: boolean;
+  selectionReason?: "lexical-checklist" | "lexical-query" | "semantic";
 }
 
 export interface SelecionarChunksParams {
@@ -16,6 +21,7 @@ export interface SelecionarChunksParams {
   query: string;
   checklistTerms: string[];
   maxChunks: number;
+  maxChunksPerDocument?: number;
 }
 
 function normalize(value: string): string {
@@ -41,11 +47,41 @@ function documentTypeBoost(tipoDocumento: string): number {
   return 1;
 }
 
+function checklistTermsForChunk(chunk: DocumentChunk, checklistTerms: string[]): number {
+  const haystack = normalize(`${chunk.tipoDocumento} ${chunk.documentName} ${chunk.text}`);
+  return checklistTerms.filter((term) => haystack.includes(normalize(term))).length;
+}
+
 function scoreChunk(chunk: DocumentChunk, query: string, checklistTerms: string[]): number {
   const haystack = normalize(`${chunk.tipoDocumento} ${chunk.documentName} ${chunk.text}`);
-  const checklistScore = checklistTerms.filter((term) => haystack.includes(normalize(term))).length * 3;
+  const checklistScore = checklistTermsForChunk(chunk, checklistTerms) * 3;
   const queryScore = termsFrom(query).filter((term) => haystack.includes(term)).length;
   return checklistScore + queryScore + documentTypeBoost(chunk.tipoDocumento);
+}
+
+export interface RetrievalScoreInput {
+  lexicalScore: number;
+  semanticScore?: number | null;
+}
+
+export interface RetrievalScore {
+  lexicalScore: number;
+  semanticScore: number | null;
+  combinedScore: number;
+  thresholdPassed: boolean;
+}
+
+export function combineRetrievalScores(input: RetrievalScoreInput): RetrievalScore {
+  const lexical = Math.max(0, input.lexicalScore);
+  const semantic = input.semanticScore ?? 0;
+  const lexicalNormalized = Math.min(1, lexical / 12);
+  const combinedScore = lexicalNormalized * 0.4 + Math.max(-1, Math.min(1, semantic)) * 0.6;
+  return {
+    lexicalScore: lexical,
+    semanticScore: input.semanticScore ?? null,
+    combinedScore,
+    thresholdPassed: combinedScore >= 0.45,
+  };
 }
 
 function truncate(value: string, maxChars: number): string {
@@ -59,7 +95,10 @@ export function selecionarChunksRelevantesSync(
 ): RetrievedChunk[] {
   if (params.maxChunks <= 0) return [];
 
-  return [...params.chunks]
+  const maxPerDocument = params.maxChunksPerDocument ?? params.maxChunks;
+  const selected: RetrievedChunk[] = [];
+  const counts = new Map<string, number>();
+  const ranked = [...params.chunks]
     .map((chunk) => ({ chunk, score: scoreChunk(chunk, params.query, params.checklistTerms) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => {
@@ -68,9 +107,29 @@ export function selecionarChunksRelevantesSync(
         return a.chunk.documentName.localeCompare(b.chunk.documentName);
       }
       return (a.chunk.pageStart ?? 0) - (b.chunk.pageStart ?? 0);
-    })
-    .slice(0, params.maxChunks)
-    .map((item) => ({ ...item.chunk, score: item.score }));
+    });
+
+  for (const item of ranked) {
+    const count = counts.get(item.chunk.documentName) ?? 0;
+    if (count >= maxPerDocument) continue;
+    const retrievalScore = combineRetrievalScores({
+      lexicalScore: item.score,
+      semanticScore: null,
+    });
+    selected.push({
+      ...item.chunk,
+      score: item.score,
+      ...retrievalScore,
+      thresholdPassed: true,
+      selectionReason:
+        checklistTermsForChunk(item.chunk, params.checklistTerms) > 0
+          ? "lexical-checklist"
+          : "lexical-query",
+    });
+    counts.set(item.chunk.documentName, count + 1);
+    if (selected.length >= params.maxChunks) break;
+  }
+  return selected;
 }
 
 export async function selecionarChunksRelevantes(

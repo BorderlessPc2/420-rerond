@@ -97,9 +97,9 @@ async function createEmbedding(text) {
     }
     return vector;
 }
-function rankBySimilarity(items, queryEmbedding, getEmbedding, maxItems) {
+function rankBySimilarity(items, queryEmbedding, getEmbedding, maxItems, minSimilarity = 0.72) {
     if (!queryEmbedding.length || maxItems <= 0)
-        return items.slice(0, maxItems);
+        return [];
     const scored = items
         .map((item) => {
         const emb = getEmbedding(item);
@@ -109,9 +109,9 @@ function rankBySimilarity(items, queryEmbedding, getEmbedding, maxItems) {
         return { item, score };
     })
         .sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id));
-    const withEmb = scored.filter((s) => s.score >= 0);
-    if (withEmb.length === 0)
-        return items.slice(0, maxItems);
-    return withEmb.slice(0, maxItems).map((s) => s.item);
+    return scored
+        .filter((s) => s.score >= minSimilarity)
+        .slice(0, maxItems)
+        .map((s) => s.item);
 }
 //# sourceMappingURL=embeddingService.js.map

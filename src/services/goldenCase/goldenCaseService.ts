@@ -25,6 +25,8 @@ import {
   parseGoldenStatus,
 } from '../../utils/goldenCasePrompt'
 import { GOLDEN_CASES_SEED } from './goldenCaseSeed'
+import { isLocalFallbackEnabled, localFallbackError } from '../../config/localFallback'
+import { normalizeLearningScope } from '../learning/learningScope'
 
 const COLLECTION =
   import.meta.env.VITE_FIRESTORE_GOLDEN_CASES_COLLECTION?.trim() || 'goldenCases'
@@ -73,6 +75,7 @@ export const parseGoldenCase = (
     titulo: String(raw.titulo ?? ''),
     tipoAnaliseId: String(raw.tipoAnaliseId ?? ''),
     organizacaoId: raw.organizacaoId != null ? String(raw.organizacaoId) : null,
+    concessionariaId: raw.concessionariaId != null ? String(raw.concessionariaId) : null,
     descricao: raw.descricao ? String(raw.descricao) : undefined,
     erroIa,
     analiseCorreta,
@@ -81,8 +84,15 @@ export const parseGoldenCase = (
     documentosRef: normalizeDocumentosRef(raw.documentosRef),
     status: parseGoldenStatus(raw.status),
     ativo: raw.ativo !== false,
+    autorId: raw.autorId != null ? String(raw.autorId) : null,
+    autorNome: raw.autorNome != null ? String(raw.autorNome) : null,
+    revisadoPorId: raw.revisadoPorId != null ? String(raw.revisadoPorId) : null,
+    revisaoNota: raw.revisaoNota != null ? String(raw.revisaoNota) : null,
+    versao: typeof raw.versao === 'number' ? raw.versao : 1,
+    origem: raw.origem != null ? String(raw.origem) : null,
     createdAt: toDate(raw.createdAt),
     updatedAt: toDate(raw.updatedAt),
+    revisadoAt: toDate(raw.revisadoAt),
   }
 }
 
@@ -138,6 +148,7 @@ async function ensureClienteGoldenSeeds(): Promise<void> {
       titulo: seed.titulo,
       tipoAnaliseId: seed.tipoAnaliseId,
       organizacaoId: seed.organizacaoId ?? null,
+      concessionariaId: seed.concessionariaId ?? null,
       descricao: seed.descricao ?? null,
       erroIa: seed.erroIa ?? null,
       analiseCorreta: seed.analiseCorreta,
@@ -219,11 +230,12 @@ export async function listGoldenCases(
     const snap = await getDocs(query(collection(db, COLLECTION), orderBy('codigo')))
     return filter(snap.docs.map((item) => parseGoldenCase(item.id, item.data() as Record<string, unknown>)))
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       ensureMockSeed()
       return filter(readMock())
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao carregar casos modelo.')
     throw err
   }
 }
@@ -258,11 +270,21 @@ export async function createGoldenCase(draft: GoldenCaseDraft): Promise<GoldenCa
     pares.map((p) => p.correto).join('\n\n') ||
     ''
 
+  const scope = normalizeLearningScope({
+    organizacaoId: draft.organizacaoId,
+    concessionariaId: draft.concessionariaId,
+    tipoAnaliseId: draft.tipoAnaliseId,
+  })
   const base = {
     codigo: draft.codigo.trim(),
     titulo: draft.titulo.trim(),
-    tipoAnaliseId: draft.tipoAnaliseId.trim(),
-    organizacaoId: draft.organizacaoId ?? null,
+    tipoAnaliseId: scope.tipoAnaliseId,
+    organizacaoId: scope.organizacaoId,
+    concessionariaId: scope.concessionariaId,
+    autorId: draft.autorId ?? null,
+    autorNome: draft.autorNome ?? null,
+    versao: draft.versao ?? 1,
+    origem: draft.origem ?? 'ensinar-ia',
     descricao: draft.descricao?.trim() || null,
     erroIa: draft.erroIa?.trim() || pares[0]?.original || null,
     analiseCorreta,
@@ -301,10 +323,11 @@ export async function createGoldenCase(draft: GoldenCaseDraft): Promise<GoldenCa
     }
     return parseGoldenCase(snap.id, data as Record<string, unknown>)
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       return createGoldenCase(draft)
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao salvar caso modelo.')
     throw err
   }
 }
@@ -367,10 +390,11 @@ export async function updateGoldenCase(
     if (!snap.exists()) throw new Error('Golden case não encontrado.')
     return parseGoldenCase(snap.id, snap.data() as Record<string, unknown>)
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       return updateGoldenCase(id, patch)
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao atualizar caso modelo.')
     throw err
   }
 }
@@ -412,7 +436,7 @@ export async function setGoldenCaseAtivo(id: string, ativo: boolean): Promise<Go
 export async function deleteGoldenCase(id: string): Promise<void> {
   if (!id.trim()) throw new Error('ID do caso inválido.')
 
-  if (mockMode) {
+  if (mockMode && isLocalFallbackEnabled()) {
     writeMock(readMock().filter((item) => item.id !== id))
     return
   }
@@ -420,11 +444,12 @@ export async function deleteGoldenCase(id: string): Promise<void> {
   try {
     await deleteDoc(doc(db, COLLECTION, id))
   } catch (err) {
-    if (isPermissionError(err)) {
+    if (isPermissionError(err) && isLocalFallbackEnabled()) {
       mockMode = true
       writeMock(readMock().filter((item) => item.id !== id))
       return
     }
+    if (isPermissionError(err)) throw localFallbackError('Falha ao desativar caso modelo.')
     throw err
   }
 }

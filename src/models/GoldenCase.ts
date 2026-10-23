@@ -27,6 +27,7 @@ export type GoldenCase = {
   titulo: string
   tipoAnaliseId: string
   organizacaoId?: string | null
+  concessionariaId?: string | null
   descricao?: string
   /** Resumo legado do erro da IA (quando houver). */
   erroIa?: string
@@ -38,8 +39,15 @@ export type GoldenCase = {
   documentosRef: GoldenCaseDocumentoRef[]
   status: GoldenCaseValidacaoStatus
   ativo: boolean
+  autorId?: string | null
+  autorNome?: string | null
+  revisadoPorId?: string | null
+  revisaoNota?: string | null
+  versao?: number
+  origem?: string | null
   createdAt?: Date
   updatedAt?: Date
+  revisadoAt?: Date
 }
 
 export type GoldenCaseDraft = Omit<

@@ -82,6 +82,7 @@ import {
 } from "./goldenCaseService";
 import { verificarEvidencias } from "./pipeline/evidenceVerifier";
 import { sanitizeForFirestore } from "./firestoreSanitizer";
+import { allocateContextBudget } from "./contextSelection/contextBudget";
 
 export type AnaliseJobState =
   | "uploaded"
@@ -938,6 +939,7 @@ export async function runAnaliseJob(params: {
           query: ragQueryText || requisitosFormatados,
           checklistTerms: extractRetrievalTerms(requisitosFormatados),
           maxChunks: DOCUMENT_RAG_MAX_CHUNKS,
+          maxChunksPerDocument: 2,
         });
         documentRagBlock = buildDocumentRetrievalPromptBlock(selectedChunks);
         documentRagChunkIds = selectedChunks.map((chunk) => chunk.id);
@@ -992,6 +994,30 @@ export async function runAnaliseJob(params: {
       }
     }
 
+    const contextBudget = allocateContextBudget({
+      maxTokens: BATCH_MAX_TOKENS,
+      blocks: {
+        system: systemPrompt.length / 4,
+        requisitos: requisitosFormatados.length / 4,
+        normas: normasPDFs.length * 500,
+        memoria: (contextoMemoriaAnterior ?? "").length / 4,
+        golden: goldenBlock.length / 4,
+        feedback: feedbackBlock.length / 4,
+        rag: documentRagBlock.length / 4,
+        pdf: BATCH_MAX_TOKENS,
+      },
+      outputReserve: isProfile ? 20000 : 16000,
+    });
+    const limitContextBlock = (value: string, tokens: number) =>
+      value.length <= tokens * 4 ? value : `${value.slice(0, Math.max(0, tokens * 4 - 1))}…`;
+    const budgetedMemory = limitContextBlock(
+      contextoMemoriaAnterior ?? "",
+      contextBudget.blocks.memoria,
+    );
+    const budgetedGolden = limitContextBlock(goldenBlock, contextBudget.blocks.golden);
+    const budgetedFeedback = limitContextBlock(feedbackBlock, contextBudget.blocks.feedback);
+    const budgetedRag = limitContextBlock(documentRagBlock, contextBudget.blocks.rag);
+
     const analysisPrompt = buildProfileAnalysisPrompt({
       profile: promptProfile,
       dados: dadosForm,
@@ -1000,11 +1026,11 @@ export async function runAnaliseJob(params: {
       tiposProjetoNome,
       escopo: escopoAnalise,
       promptCustomizado:
-        [promptCustomizadoComPerfilBase, documentRagBlock].filter(Boolean).join("\n\n") ||
+        [promptCustomizadoComPerfilBase, budgetedRag].filter(Boolean).join("\n\n") ||
         undefined,
-      contextoRevisaoAnterior: contextoMemoriaAnterior || undefined,
-      feedbackAprendizado: feedbackBlock || undefined,
-      goldenCases: goldenBlock || undefined,
+      contextoRevisaoAnterior: budgetedMemory || undefined,
+      feedbackAprendizado: budgetedFeedback || undefined,
+      goldenCases: budgetedGolden || undefined,
       exemploSaidaEsperada:
         promptProfile === "eco101" ? buildEco101ExemploAnaliseBlock() : undefined,
     });

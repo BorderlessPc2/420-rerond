@@ -22,6 +22,7 @@ const feedbackAprendizadoService_1 = require("./feedbackAprendizadoService");
 const goldenCaseService_1 = require("./goldenCaseService");
 const evidenceVerifier_1 = require("./pipeline/evidenceVerifier");
 const firestoreSanitizer_1 = require("./firestoreSanitizer");
+const contextBudget_1 = require("./contextSelection/contextBudget");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 /** Orcamento por lote de PDFs do projeto (folga para normas/perfil e limite de tokens). */
@@ -721,6 +722,7 @@ async function runAnaliseJob(params) {
                     query: ragQueryText || requisitosFormatados,
                     checklistTerms: extractRetrievalTerms(requisitosFormatados),
                     maxChunks: DOCUMENT_RAG_MAX_CHUNKS,
+                    maxChunksPerDocument: 2,
                 });
                 documentRagBlock = (0, pipeline_1.buildDocumentRetrievalPromptBlock)(selectedChunks);
                 documentRagChunkIds = selectedChunks.map((chunk) => chunk.id);
@@ -769,6 +771,25 @@ async function runAnaliseJob(params) {
                 console.warn("Falha ao carregar golden cases:", gcErr);
             }
         }
+        const contextBudget = (0, contextBudget_1.allocateContextBudget)({
+            maxTokens: BATCH_MAX_TOKENS,
+            blocks: {
+                system: systemPrompt.length / 4,
+                requisitos: requisitosFormatados.length / 4,
+                normas: normasPDFs.length * 500,
+                memoria: (contextoMemoriaAnterior ?? "").length / 4,
+                golden: goldenBlock.length / 4,
+                feedback: feedbackBlock.length / 4,
+                rag: documentRagBlock.length / 4,
+                pdf: BATCH_MAX_TOKENS,
+            },
+            outputReserve: isProfile ? 20000 : 16000,
+        });
+        const limitContextBlock = (value, tokens) => value.length <= tokens * 4 ? value : `${value.slice(0, Math.max(0, tokens * 4 - 1))}…`;
+        const budgetedMemory = limitContextBlock(contextoMemoriaAnterior ?? "", contextBudget.blocks.memoria);
+        const budgetedGolden = limitContextBlock(goldenBlock, contextBudget.blocks.golden);
+        const budgetedFeedback = limitContextBlock(feedbackBlock, contextBudget.blocks.feedback);
+        const budgetedRag = limitContextBlock(documentRagBlock, contextBudget.blocks.rag);
         const analysisPrompt = (0, concessionariaProfiles_1.buildProfileAnalysisPrompt)({
             profile: promptProfile,
             dados: dadosForm,
@@ -776,11 +797,11 @@ async function runAnaliseJob(params) {
             tiposAnalise,
             tiposProjetoNome,
             escopo: escopoAnalise,
-            promptCustomizado: [promptCustomizadoComPerfilBase, documentRagBlock].filter(Boolean).join("\n\n") ||
+            promptCustomizado: [promptCustomizadoComPerfilBase, budgetedRag].filter(Boolean).join("\n\n") ||
                 undefined,
-            contextoRevisaoAnterior: contextoMemoriaAnterior || undefined,
-            feedbackAprendizado: feedbackBlock || undefined,
-            goldenCases: goldenBlock || undefined,
+            contextoRevisaoAnterior: budgetedMemory || undefined,
+            feedbackAprendizado: budgetedFeedback || undefined,
+            goldenCases: budgetedGolden || undefined,
             exemploSaidaEsperada: promptProfile === "eco101" ? (0, exemplosAnalise_1.buildEco101ExemploAnaliseBlock)() : undefined,
         });
         await updateJob(jobRef, solicitacaoRef, "analyzing", 68, "checklist");

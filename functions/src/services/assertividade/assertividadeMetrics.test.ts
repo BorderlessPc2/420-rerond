@@ -49,4 +49,29 @@ describe("calcularMetricasAssertividade", () => {
     expect(result.percentualComCorrecaoHumana).toBe(0);
     expect(result.porTipo).toEqual({});
   });
+
+  it("calcula precisão, recall e cobertura de evidência por finding", () => {
+    const result = calcularMetricasAssertividade([
+      {
+        id: "caso-1",
+        tipoAnaliseId: "poc",
+        score: 0.8,
+        criticosOk: true,
+        teveCorrecaoHumana: false,
+        findingsEsperados: ["f-1", "f-2"],
+        findingsEncontrados: ["f-1", "f-3"],
+        evidenciasCorretas: 1,
+        evidenciasEsperadas: 2,
+        paginasCorretas: 1,
+        paginasEsperadas: 2,
+        alucinacoes: 1,
+      },
+    ]);
+
+    expect(result.precisaoFinding).toBeCloseTo(0.5);
+    expect(result.recallFinding).toBeCloseTo(0.5);
+    expect(result.precisaoEvidencia).toBeCloseTo(0.5);
+    expect(result.precisaoPagina).toBeCloseTo(0.5);
+    expect(result.taxaAlucinacao).toBe(1);
+  });
 });

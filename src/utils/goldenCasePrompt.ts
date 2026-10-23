@@ -82,15 +82,18 @@ export function filterGoldenCasesAprovadosParaPreview(
   all: GoldenCase[],
   tipoAnaliseId: string,
   maxItems = 3,
+  organizacaoId?: string | null,
 ): GoldenCase[] {
   const tipo = tipoAnaliseId.trim()
+  const organizacao = organizacaoId?.trim() || null
   if (!tipo) return []
   return all
     .filter(
       (item) =>
         item.ativo !== false &&
         item.status === 'aprovado' &&
-        item.tipoAnaliseId === tipo,
+        item.tipoAnaliseId === tipo &&
+        (!organizacao || item.organizacaoId === organizacao),
     )
     .sort((a, b) => {
       const am = a.updatedAt?.getTime?.() ?? a.createdAt?.getTime?.() ?? 0

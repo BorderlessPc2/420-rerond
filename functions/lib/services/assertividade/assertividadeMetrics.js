@@ -7,11 +7,29 @@ function media(values) {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 function calcularGrupo(casos) {
+    const expected = casos.flatMap((caso) => caso.findingsEsperados ?? []);
+    const found = casos.flatMap((caso) => caso.findingsEncontrados ?? []);
+    const expectedSet = new Set(expected);
+    const foundSet = new Set(found);
+    const truePositives = [...foundSet].filter((finding) => expectedSet.has(finding)).length;
+    const expectedEvidence = casos.reduce((sum, caso) => sum + (caso.evidenciasEsperadas ?? 0), 0);
+    const expectedPages = casos.reduce((sum, caso) => sum + (caso.paginasEsperadas ?? 0), 0);
     return {
         totalCasos: casos.length,
         scoreMedio: media(casos.map((caso) => caso.score)),
         percentualCriticosOk: media(casos.map((caso) => (caso.criticosOk ? 1 : 0))),
         percentualComCorrecaoHumana: media(casos.map((caso) => (caso.teveCorrecaoHumana ? 1 : 0))),
+        precisaoFinding: foundSet.size === 0 ? 0 : truePositives / foundSet.size,
+        recallFinding: expectedSet.size === 0 ? 0 : truePositives / expectedSet.size,
+        precisaoEvidencia: expectedEvidence === 0
+            ? 0
+            : casos.reduce((sum, caso) => sum + (caso.evidenciasCorretas ?? 0), 0) /
+                expectedEvidence,
+        precisaoPagina: expectedPages === 0
+            ? 0
+            : casos.reduce((sum, caso) => sum + (caso.paginasCorretas ?? 0), 0) /
+                expectedPages,
+        taxaAlucinacao: casos.reduce((sum, caso) => sum + (caso.alucinacoes ?? 0), 0),
     };
 }
 function calcularMetricasAssertividade(casos) {

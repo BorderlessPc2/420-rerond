@@ -48,6 +48,7 @@ import {
   filterGoldenCasesAprovadosParaPreview,
   newParId,
 } from '../utils/goldenCasePrompt'
+import { safeLearningUrl } from '../utils/safeLearningUrl'
 import './EnsinarIA.css'
 
 type HubTab = 'casos' | 'novo' | 'feedback' | 'preview'
@@ -1157,15 +1158,18 @@ export default function EnsinarIA() {
                   {selecionado.documentosRef.map((d, i) => (
                     <li key={`${d.nome}-${i}`}>
                       {d.nome}
-                      {d.url ? (
-                        <>
-                          {' '}
-                          —{' '}
-                          <a href={d.url} target="_blank" rel="noreferrer">
-                            link
-                          </a>
-                        </>
-                      ) : null}
+                      {(() => {
+                        const safeUrl = safeLearningUrl(d.url)
+                        return safeUrl ? (
+                          <>
+                            {' '}
+                            —{' '}
+                            <a href={safeUrl} target="_blank" rel="noreferrer">
+                              link
+                            </a>
+                          </>
+                        ) : null
+                      })()}
                     </li>
                   ))}
                 </ul>

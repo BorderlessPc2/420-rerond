@@ -70,7 +70,7 @@ O principal problema atual é a **qualidade do resultado produzido pela IA**: el
 
 - Validação **empírica** contínua com OpenAI (isolamento, memória, feedback, plantas) — wiring pronto
 - Análise visual de plantas / projetos geométricos (falsos negativos) — prompts endurecidos; qualidade a medir
-- Pipeline Sprint 9: multi-lote + omissão seletiva por prioridade **feitos**; RAG documental (chunk/embed) ainda backlog
+- Pipeline Sprint 9: multi-lote + omissão seletiva por prioridade **feitos**; RAG documental lexical com score/threshold; embeddings por chunk ainda backlog
 - Extração assistida de requisitos a partir de PDF de norma (confirmação humana)
 
 ### Planejado (sprints abertas / backlog fino)

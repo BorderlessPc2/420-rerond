@@ -71,10 +71,12 @@ function parseDoc(id, raw) {
         : null);
     if (!status || status !== "aprovado")
         return null;
-    if (raw.ativo === false)
+    if (raw.ativo !== true)
         return null;
     const tipoAnaliseId = typeof raw.tipoAnaliseId === "string" ? raw.tipoAnaliseId.trim() : "";
-    if (!tipoAnaliseId)
+    const organizacaoId = typeof raw.organizacaoId === "string" ? raw.organizacaoId.trim() : "";
+    const concessionariaId = typeof raw.concessionariaId === "string" ? raw.concessionariaId.trim() : "";
+    if (!tipoAnaliseId || !organizacaoId)
         return null;
     const codigo = String(raw.codigo ?? "").trim();
     const titulo = String(raw.titulo ?? "").trim();
@@ -101,7 +103,7 @@ function parseDoc(id, raw) {
         analiseCorreta: analiseCorreta || pares.map((p) => p.correto).join("\n"),
         pares,
         status,
-        ativo: raw.ativo !== false,
+        ativo: raw.ativo === true,
         updatedAtMs: toMs(raw.updatedAt) || toMs(raw.createdAt),
         createdAtMs: toMs(raw.createdAt),
         embedding: embedding && embedding.length > 0 ? embedding : null,
@@ -110,12 +112,10 @@ function parseDoc(id, raw) {
 }
 async function ensureEmbeddings(items) {
     const db = (0, firestore_1.getFirestore)();
-    const out = [];
-    for (const item of items) {
+    return Promise.all(items.map(async (item) => {
         if (item.embedding?.length &&
             (!item.embeddingModel || item.embeddingModel === embeddingService_1.EMBEDDING_MODEL)) {
-            out.push(item);
-            continue;
+            return item;
         }
         try {
             const text = (0, embeddingService_1.buildGoldenEmbeddingText)(item);
@@ -125,14 +125,13 @@ async function ensureEmbeddings(items) {
                 embeddingModel: embeddingService_1.EMBEDDING_MODEL,
                 embeddingUpdatedAt: new Date(),
             }, { merge: true });
-            out.push({ ...item, embedding, embeddingModel: embeddingService_1.EMBEDDING_MODEL });
+            return { ...item, embedding, embeddingModel: embeddingService_1.EMBEDDING_MODEL };
         }
         catch (err) {
-            console.warn(`Falha ao gerar embedding do golden ${item.id}:`, err);
-            out.push(item);
+            console.warn(`Falha ao gerar embedding do golden ${item.id}; usando ranking lexical explícito:`, err);
+            return item;
         }
-    }
-    return out;
+    }));
 }
 async function listGoldenCasesAprovadosParaAnalise(params) {
     const tipoId = params.tipoAnaliseId.trim();

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.combineRetrievalScores = combineRetrievalScores;
 exports.selecionarChunksRelevantesSync = selecionarChunksRelevantesSync;
 exports.selecionarChunksRelevantes = selecionarChunksRelevantes;
 exports.buildDocumentRetrievalPromptBlock = buildDocumentRetrievalPromptBlock;
@@ -28,11 +29,27 @@ function documentTypeBoost(tipoDocumento) {
         return 0;
     return 1;
 }
+function checklistTermsForChunk(chunk, checklistTerms) {
+    const haystack = normalize(`${chunk.tipoDocumento} ${chunk.documentName} ${chunk.text}`);
+    return checklistTerms.filter((term) => haystack.includes(normalize(term))).length;
+}
 function scoreChunk(chunk, query, checklistTerms) {
     const haystack = normalize(`${chunk.tipoDocumento} ${chunk.documentName} ${chunk.text}`);
-    const checklistScore = checklistTerms.filter((term) => haystack.includes(normalize(term))).length * 3;
+    const checklistScore = checklistTermsForChunk(chunk, checklistTerms) * 3;
     const queryScore = termsFrom(query).filter((term) => haystack.includes(term)).length;
     return checklistScore + queryScore + documentTypeBoost(chunk.tipoDocumento);
+}
+function combineRetrievalScores(input) {
+    const lexical = Math.max(0, input.lexicalScore);
+    const semantic = input.semanticScore ?? 0;
+    const lexicalNormalized = Math.min(1, lexical / 12);
+    const combinedScore = lexicalNormalized * 0.4 + Math.max(-1, Math.min(1, semantic)) * 0.6;
+    return {
+        lexicalScore: lexical,
+        semanticScore: input.semanticScore ?? null,
+        combinedScore,
+        thresholdPassed: combinedScore >= 0.45,
+    };
 }
 function truncate(value, maxChars) {
     const normalized = value.replace(/\s+/g, " ").trim();
@@ -43,7 +60,10 @@ function truncate(value, maxChars) {
 function selecionarChunksRelevantesSync(params) {
     if (params.maxChunks <= 0)
         return [];
-    return [...params.chunks]
+    const maxPerDocument = params.maxChunksPerDocument ?? params.maxChunks;
+    const selected = [];
+    const counts = new Map();
+    const ranked = [...params.chunks]
         .map((chunk) => ({ chunk, score: scoreChunk(chunk, params.query, params.checklistTerms) }))
         .filter((item) => item.score > 0)
         .sort((a, b) => {
@@ -53,9 +73,29 @@ function selecionarChunksRelevantesSync(params) {
             return a.chunk.documentName.localeCompare(b.chunk.documentName);
         }
         return (a.chunk.pageStart ?? 0) - (b.chunk.pageStart ?? 0);
-    })
-        .slice(0, params.maxChunks)
-        .map((item) => ({ ...item.chunk, score: item.score }));
+    });
+    for (const item of ranked) {
+        const count = counts.get(item.chunk.documentName) ?? 0;
+        if (count >= maxPerDocument)
+            continue;
+        const retrievalScore = combineRetrievalScores({
+            lexicalScore: item.score,
+            semanticScore: null,
+        });
+        selected.push({
+            ...item.chunk,
+            score: item.score,
+            ...retrievalScore,
+            thresholdPassed: true,
+            selectionReason: checklistTermsForChunk(item.chunk, params.checklistTerms) > 0
+                ? "lexical-checklist"
+                : "lexical-query",
+        });
+        counts.set(item.chunk.documentName, count + 1);
+        if (selected.length >= params.maxChunks)
+            break;
+    }
+    return selected;
 }
 async function selecionarChunksRelevantes(params) {
     return selecionarChunksRelevantesSync(params);

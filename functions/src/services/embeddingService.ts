@@ -120,8 +120,9 @@ export function rankBySimilarity<T extends { id: string }>(
   queryEmbedding: number[],
   getEmbedding: (item: T) => number[] | null | undefined,
   maxItems: number,
+  minSimilarity = 0.72,
 ): T[] {
-  if (!queryEmbedding.length || maxItems <= 0) return items.slice(0, maxItems);
+  if (!queryEmbedding.length || maxItems <= 0) return [];
 
   const scored = items
     .map((item) => {
@@ -134,7 +135,8 @@ export function rankBySimilarity<T extends { id: string }>(
     })
     .sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id));
 
-  const withEmb = scored.filter((s) => s.score >= 0);
-  if (withEmb.length === 0) return items.slice(0, maxItems);
-  return withEmb.slice(0, maxItems).map((s) => s.item);
+  return scored
+    .filter((s) => s.score >= minSimilarity)
+    .slice(0, maxItems)
+    .map((s) => s.item);
 }
