@@ -12,6 +12,12 @@ import NovaConcessionaria from './views/NovaConcessionaria'
 import Clientes from './views/Clientes'
 import Processos from './views/Processos'
 import ProcessoDetalhe from './views/ProcessoDetalhe'
+import GestaoContratos from './views/GestaoContratos'
+import GestaoContratoDetalhe, { GestaoVisaoGeral } from './views/GestaoContratoDetalhe'
+import { GestaoProtocolos, GestaoProtocoloDetalhe } from './views/GestaoProtocolos'
+import GestaoPontos from './views/GestaoPontos'
+import GestaoPlanejamento from './views/GestaoPlanejamento'
+import GestaoMapa from './views/GestaoMapa'
 import ConfiguracoesModulares from './views/ConfiguracoesModulares'
 import EnsinarIA from './views/EnsinarIA'
 import MetricasIA from './views/MetricasIA'
@@ -38,6 +44,15 @@ function App() {
             <Route path="solicitacoes" element={<Solicitacoes />} />
             <Route path="nova-solicitacao" element={<NovaSolicitacao />} />
             <Route path="solicitacoes/:id/editar" element={<EditarSolicitacao />} />
+            <Route path="gestao-contratos" element={<GestaoContratos />} />
+            <Route path="gestao-contratos/:contratoId" element={<GestaoContratoDetalhe />}>
+              <Route index element={<GestaoVisaoGeral />} />
+              <Route path="protocolos" element={<GestaoProtocolos />} />
+              <Route path="protocolos/:protocoloId" element={<GestaoProtocoloDetalhe />} />
+              <Route path="pontos" element={<GestaoPontos />} />
+              <Route path="planejamento" element={<GestaoPlanejamento />} />
+              <Route path="mapa" element={<GestaoMapa />} />
+            </Route>
             <Route path="configuracoes" element={<ConfiguracoesModulares />} />
             <Route path="ensinar-ia" element={<EnsinarIA />} />
             <Route path="metricas-ia" element={<MetricasIA />} />

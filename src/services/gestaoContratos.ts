@@ -1,0 +1,115 @@
+import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { auth, db, storage } from '../lib/firebase'
+
+export type Contrato = { id: string; nome: string; clienteId?: string; createdAt?: unknown }
+export type Etapa = 'planejamento' | 'elaboracao' | 'fase_1' | 'fase_2' | 'homologacao' | 'concluido'
+export type Situacao = 'nao_iniciado' | 'em_andamento' | 'em_analise' | 'em_correcao' | 'aguardando_terceiros' | 'paralisado' | 'aprovado_concessionaria' | 'concluido'
+export type Protocolo = {
+  id: string; contratoId: string; titulo: string; concessionaria: string; rodovia: string
+  numero?: string; etapa: Etapa; status: Situacao; previsao?: string; realizadoEm?: string
+  processoAnaliseId?: string; createdAt?: unknown
+}
+export type Ponto = {
+  id: string; contratoId: string; protocoloId: string; codigo: string; estado: string
+  concessionaria: string; rodovia: string; km: string; tipo: 'regularizacao' | 'nova_implantacao'
+  resultado?: 'regularizado' | 'aprovado_implantacao'; latitude?: number; longitude?: number
+  precisao?: 'confirmada' | 'aproximada'; previsao?: string; realizadoEm?: string
+}
+export type Movimento = {
+  id: string; tipo: string; em: string; autor: string; observacao: string
+  etapa: Etapa; status: Situacao; anexos: { nome: string; url: string }[]
+}
+const rows = async <T>(name: string): Promise<T[]> =>
+  (await getDocs(collection(db, name))).docs.map((item) => ({ id: item.id, ...item.data() }) as T)
+const scoped = async <T extends { id: string; contratoId: string }>(name: string, contratoId: string): Promise<T[]> =>
+  (await getDocs(query(collection(db, name), where('contratoId', '==', contratoId)))).docs.map((item) => ({ ...item.data(), id: item.id }) as T)
+
+export const listContratos = () => rows<Contrato>('gestaoContratos')
+export const getContrato = async (id: string) => {
+  const snap = await getDoc(doc(db, 'gestaoContratos', id))
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Contrato) : null
+}
+export const criarContrato = async (nome: string, clienteId?: string) => {
+  if (!nome.trim()) throw new Error('Informe nome do contrato.')
+  return (await addDoc(collection(db, 'gestaoContratos'), { nome: nome.trim(), clienteId: clienteId || null, createdAt: serverTimestamp() })).id
+}
+export const listProtocolos = (contratoId: string) => scoped<Protocolo>('gestaoProtocolos', contratoId)
+export const listPontos = (contratoId: string) => scoped<Ponto>('gestaoPontos', contratoId)
+export const getProtocolo = async (contratoId: string, id: string) => {
+  const snap = await getDoc(doc(db, 'gestaoProtocolos', id))
+  return snap.exists() && snap.data().contratoId === contratoId ? ({ id: snap.id, ...snap.data() } as Protocolo) : null
+}
+export const criarProtocolo = async (contratoId: string, input: Pick<Protocolo, 'titulo' | 'concessionaria' | 'rodovia'> & Partial<Pick<Protocolo, 'numero' | 'previsao' | 'processoAnaliseId'>>) => {
+  if (!input.titulo.trim() || !input.concessionaria.trim() || !input.rodovia.trim()) throw new Error('Informe título, concessionária e rodovia.')
+  if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
+  return (await addDoc(collection(db, 'gestaoProtocolos'), { ...input, contratoId, etapa: 'planejamento', status: 'nao_iniciado', createdAt: serverTimestamp() })).id
+}
+export const criarPonto = async (contratoId: string, protocoloId: string, input: Omit<Ponto, 'id' | 'contratoId' | 'protocoloId'>) => {
+  const protocolo = await getProtocolo(contratoId, protocoloId)
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  if (!input.codigo.trim() || !input.estado.trim() || !input.km.trim()) throw new Error('Informe código, estado e quilômetro.')
+  if (input.concessionaria.trim() !== protocolo.concessionaria.trim() || input.rodovia.trim() !== protocolo.rodovia.trim()) throw new Error('Ponto deve pertencer à mesma concessionária e rodovia do protocolo.')
+  if ((input.latitude === undefined) !== (input.longitude === undefined) || (input.latitude !== undefined && (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) || input.latitude < -90 || input.latitude > 90 || input.longitude! < -180 || input.longitude! > 180))) throw new Error('Coordenadas inválidas.')
+  if (input.resultado && ((input.tipo === 'regularizacao') !== (input.resultado === 'regularizado'))) throw new Error('Resultado incompatível com classificação do ponto.')
+  return (await addDoc(collection(db, 'gestaoPontos'), { ...input, contratoId, protocoloId })).id
+}
+export const atualizarPonto = async (contratoId: string, id: string, patch: Partial<Pick<Ponto, 'latitude' | 'longitude' | 'precisao' | 'previsao' | 'realizadoEm' | 'resultado'>>) => {
+  const snap = await getDoc(doc(db, 'gestaoPontos', id))
+  if (!snap.exists() || snap.data().contratoId !== contratoId) throw new Error('Ponto não encontrado neste contrato.')
+  const point = snap.data() as Ponto
+  const latitude = patch.latitude ?? point.latitude
+  const longitude = patch.longitude ?? point.longitude
+  if ((latitude === undefined) !== (longitude === undefined) || (latitude !== undefined && (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude! < -180 || longitude! > 180))) throw new Error('Coordenadas inválidas.')
+  if (patch.resultado && ((point.tipo === 'regularizacao') !== (patch.resultado === 'regularizado'))) throw new Error('Resultado incompatível com classificação do ponto.')
+  await updateDoc(doc(db, 'gestaoPontos', id), { ...patch, ...(patch.resultado ? { realizadoEm: patch.realizadoEm || point.realizadoEm || new Date().toISOString().slice(0, 10) } : {}) })
+}
+export const listMovimentos = async (contratoId: string, protocoloId: string) => {
+  if (!(await getProtocolo(contratoId, protocoloId))) throw new Error('Protocolo não encontrado neste contrato.')
+  return (await scoped<Movimento & { contratoId: string; protocoloId: string }>('gestaoMovimentos', contratoId))
+    .filter((item) => item.protocoloId === protocoloId).sort((a, b) => a.em.localeCompare(b.em))
+}
+export const registrarMovimento = async (contratoId: string, protocoloId: string, input: Pick<Movimento, 'tipo' | 'observacao' | 'etapa' | 'status'> & { em: string; files?: File[]; numero?: string; previsao?: string; realizadoEm?: string }) => {
+  if (!input.tipo.trim() || !input.em || !Number.isFinite(Date.parse(input.em))) throw new Error('Informe tipo e data válida.')
+  const protocolo = await getProtocolo(contratoId, protocoloId)
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const files = input.files ?? []
+  if (files.some((file) => file.size > 20 * 1024 * 1024)) throw new Error('Cada anexo deve ter até 20 MB.')
+  const movementRef = doc(collection(db, 'gestaoMovimentos'))
+  const anexos: Movimento['anexos'] = []
+  for (const file of files) {
+    const path = `gestaoContratos/${contratoId}/${protocoloId}/${movementRef.id}/${crypto.randomUUID()}/${file.name}`
+    const uploaded = await uploadBytes(ref(storage, path), file)
+    anexos.push({ nome: file.name, url: await getDownloadURL(uploaded.ref) })
+  }
+  await runTransaction(db, async (transaction) => {
+    const current = await transaction.get(doc(db, 'gestaoProtocolos', protocoloId))
+    if (!current.exists() || current.data().contratoId !== contratoId) throw new Error('Protocolo não encontrado neste contrato.')
+    transaction.set(movementRef, { contratoId, protocoloId, tipo: input.tipo.trim(), observacao: input.observacao.trim(), em: input.em, etapa: input.etapa, status: input.status, autor: auth.currentUser?.email ?? auth.currentUser?.uid ?? '', anexos })
+    transaction.update(current.ref, { etapa: input.etapa, status: input.status, ...(input.numero !== undefined ? { numero: input.numero.trim() } : {}), ...(input.previsao !== undefined ? { previsao: input.previsao } : {}), ...(input.realizadoEm !== undefined ? { realizadoEm: input.realizadoEm } : {}) })
+  })
+}
+export const atualizarPlanejamento = async (contratoId: string, protocoloId: string, previsao: string, realizadoEm: string) => {
+  if (!(await getProtocolo(contratoId, protocoloId))) throw new Error('Protocolo não encontrado neste contrato.')
+  await updateDoc(doc(db, 'gestaoProtocolos', protocoloId), { previsao, realizadoEm })
+}
+export const atualizarPlanejamentoPonto = async (contratoId: string, id: string, previsao: string, realizadoEm: string) =>
+  atualizarPonto(contratoId, id, { previsao, realizadoEm })
+export const filtrarGestao = (protocolos: Protocolo[], pontos: Ponto[], filtro: { estado?: string; concessionaria?: string; rodovia?: string; status?: string; tipo?: string; etapa?: string; inicio?: string; fim?: string }) => {
+  const selecionados = pontos.filter((p) => {
+    const protocolo = protocolos.find((item) => item.id === p.protocoloId)
+    const periodo = p.previsao || protocolo?.previsao || ''
+    return (!filtro.estado || p.estado === filtro.estado) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.tipo || p.tipo === filtro.tipo) && (!filtro.status || (p.resultado ?? protocolo?.status) === filtro.status) && (!filtro.etapa || protocolo?.etapa === filtro.etapa) && (!filtro.inicio || periodo >= filtro.inicio) && (!filtro.fim || periodo <= filtro.fim)
+  })
+  const ids = new Set(selecionados.map((p) => p.protocoloId))
+  const visibleProtocols = protocolos.filter((p) => ids.has(p.id) || (!pontos.some((item) => item.protocoloId === p.id) && !filtro.estado && !filtro.tipo && (!filtro.status || filtro.status === p.status) && (!filtro.inicio || (p.previsao || '') >= filtro.inicio) && (!filtro.fim || (p.previsao || '') <= filtro.fim) && (!filtro.concessionaria || filtro.concessionaria === p.concessionaria) && (!filtro.rodovia || filtro.rodovia === p.rodovia) && (!filtro.etapa || filtro.etapa === p.etapa)))
+  return { protocolos: visibleProtocols, pontos: selecionados }
+}
+export const indicadoresGestao = (protocolos: Protocolo[], pontos: Ponto[]) => ({
+  protocolos: protocolos.length, pontos: pontos.length,
+  regularizados: pontos.filter((p) => p.resultado === 'regularizado').length,
+  aprovadosImplantacao: pontos.filter((p) => p.resultado === 'aprovado_implantacao').length,
+  previstos: pontos.filter((p) => !!p.previsao).length,
+  realizados: pontos.filter((p) => !!p.realizadoEm).length,
+})
+export const pontoStatus = (ponto: Ponto, protocolo?: Protocolo) => ponto.resultado ? { valor: ponto.resultado, herdado: false } : { valor: protocolo?.status ?? 'nao_iniciado', herdado: true }

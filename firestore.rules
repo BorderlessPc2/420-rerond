@@ -2,6 +2,82 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function shortText(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function optionalText(data, key, max) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= max);
+    }
+
+    function optionalDate(data, key) {
+      return !(key in data) || (data[key] is string && (data[key] == '' || data[key].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')));
+    }
+
+    function validStage(value) {
+      return value in ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido'];
+    }
+
+    function validStatus(value) {
+      return value in ['nao_iniciado', 'em_andamento', 'em_analise', 'em_correcao', 'aguardando_terceiros', 'paralisado', 'aprovado_concessionaria', 'concluido'];
+    }
+
+    function validContrato(data) {
+      return data.keys().hasAll(['nome', 'createdAt'])
+        && data.keys().hasOnly(['nome', 'clienteId', 'createdAt'])
+        && shortText(data.nome, 160)
+        && optionalText(data, 'clienteId', 128)
+        && data.createdAt is timestamp;
+    }
+
+    function validProtocolo(data) {
+      return data.keys().hasAll(['contratoId', 'titulo', 'concessionaria', 'rodovia', 'etapa', 'status', 'createdAt'])
+        && data.keys().hasOnly(['contratoId', 'titulo', 'concessionaria', 'rodovia', 'numero', 'processoAnaliseId', 'previsao', 'realizadoEm', 'etapa', 'status', 'createdAt'])
+        && shortText(data.contratoId, 128) && shortText(data.titulo, 200)
+        && shortText(data.concessionaria, 160) && shortText(data.rodovia, 80)
+        && optionalText(data, 'numero', 100) && optionalText(data, 'processoAnaliseId', 128)
+        && optionalDate(data, 'previsao') && optionalDate(data, 'realizadoEm')
+        && validStage(data.etapa) && validStatus(data.status)
+        && data.createdAt is timestamp;
+    }
+
+    function validPonto(data) {
+      return data.keys().hasAll(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo'])
+        && data.keys().hasOnly(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
+        && shortText(data.contratoId, 128) && shortText(data.protocoloId, 128)
+        && shortText(data.codigo, 100) && shortText(data.estado, 40)
+        && shortText(data.concessionaria, 160) && shortText(data.rodovia, 80)
+        && shortText(data.km, 60) && data.tipo in ['regularizacao', 'nova_implantacao']
+        && (!('resultado' in data) || data.resultado == null ||
+          (data.tipo == 'regularizacao' && data.resultado == 'regularizado') ||
+          (data.tipo == 'nova_implantacao' && data.resultado == 'aprovado_implantacao'))
+        && (('latitude' in data) == ('longitude' in data))
+        && (!('latitude' in data) || (data.latitude is number && data.longitude is number
+          && data.latitude >= -90 && data.latitude <= 90 && data.longitude >= -180 && data.longitude <= 180))
+        && (!('precisao' in data) || data.precisao in ['confirmada', 'aproximada'])
+        && optionalDate(data, 'previsao') && optionalDate(data, 'realizadoEm');
+    }
+
+    function validAnexo(anexo, contratoId, protocoloId, movimentoId) {
+      return anexo is map && anexo.keys().hasAll(['nome', 'url'])
+        && anexo.keys().hasOnly(['nome', 'url'])
+        && shortText(anexo.nome, 255)
+        && anexo.url is string && anexo.url.size() <= 2048
+        && anexo.url.matches('^https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/gestaoContratos%2F' + contratoId + '%2F' + protocoloId + '%2F' + movimentoId + '%2F.*');
+    }
+
+    function validMovimento(data, movimentoId) {
+      return data.keys().hasAll(['contratoId', 'protocoloId', 'tipo', 'observacao', 'em', 'etapa', 'status', 'autor', 'anexos'])
+        && data.keys().hasOnly(['contratoId', 'protocoloId', 'tipo', 'observacao', 'em', 'etapa', 'status', 'autor', 'anexos'])
+        && shortText(data.contratoId, 128) && shortText(data.protocoloId, 128)
+        && shortText(data.tipo, 120) && data.observacao is string && data.observacao.size() <= 5000
+        && optionalDate(data, 'em') && data.em != ''
+        && validStage(data.etapa) && validStatus(data.status)
+        && data.autor is string && data.autor.size() <= 320
+        && data.autor == request.auth.token.email
+        && data.anexos is list && data.anexos.size() <= 10;
+    }
+
     match /solicitacoes/{solicitacaoId} {
       allow read, write: if request.auth != null;
 
@@ -31,6 +107,46 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null;
       allow delete: if false;
+    }
+
+    match /gestaoContratos/{contratoId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validContrato(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /gestaoProtocolos/{protocoloId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validProtocolo(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/gestaoContratos/$(request.resource.data.contratoId));
+      allow update: if request.auth != null && validProtocolo(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['etapa', 'status', 'numero', 'previsao', 'realizadoEm'])
+        && request.resource.data.contratoId == resource.data.contratoId;
+      allow delete: if false;
+    }
+
+    match /gestaoPontos/{pontoId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validPonto(request.resource.data)
+        && exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia;
+      allow update: if request.auth != null && validPonto(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm', 'resultado']);
+      allow delete: if false;
+    }
+
+    match /gestaoMovimentos/{movimentoId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validMovimento(request.resource.data)
+        && exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
+        && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.etapa == request.resource.data.etapa
+        && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.status == request.resource.data.status;
+      allow update, delete: if false;
     }
 
     match /tiposAnalise/{tipoId} {

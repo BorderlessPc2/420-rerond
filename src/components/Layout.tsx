@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Plus, Building2, Users, FolderKanban, Menu, X, LogOut, Layers3, Brain, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, FileText, Plus, Building2, Users, FolderKanban, Menu, X, LogOut, Layers3, Brain, BarChart3, BriefcaseBusiness } from 'lucide-react'
 import { logout } from '../services/auth/authService'
 import './Layout.css'
 
@@ -49,6 +49,14 @@ export default function Layout() {
           >
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
+          </Link>
+          <Link
+            to="/gestao-contratos"
+            className={`nav-item ${location.pathname.startsWith('/gestao-contratos') ? 'active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <BriefcaseBusiness size={20} />
+            <span>Gestão de Contratos</span>
           </Link>
           <Link
             to="/solicitacoes"
