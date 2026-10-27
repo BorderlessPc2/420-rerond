@@ -75,7 +75,8 @@ service cloud.firestore {
         && validStage(data.etapa) && validStatus(data.status)
         && data.autor is string && data.autor.size() <= 320
         && data.autor == request.auth.token.email
-        && data.anexos is list && data.anexos.size() <= 10;
+        && data.anexos is list && data.anexos.size() <= 10
+        && data.anexos.hasOnly(data.anexos);
     }
 
     match /solicitacoes/{solicitacaoId} {
@@ -141,7 +142,7 @@ service cloud.firestore {
 
     match /gestaoMovimentos/{movimentoId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && validMovimento(request.resource.data)
+      allow create: if request.auth != null && validMovimento(request.resource.data, movimentoId)
         && exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
         && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
         && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.etapa == request.resource.data.etapa

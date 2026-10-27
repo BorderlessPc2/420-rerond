@@ -63,6 +63,31 @@
 .gestao-contract-card { min-block-size: 152px; }
 .gestao-quicklinks .gestao-card { min-block-size: 165px; }
 .gestao-status { display: inline-flex; align-items: center; inline-size: fit-content; padding: 5px 9px; border-radius: 999px; background: var(--color-primary-50); color: var(--color-primary-800); font-size: .77rem; font-weight: 700; white-space: nowrap; }
+.gestao-status-em_correcao, .gestao-status-paralisado { background: var(--color-danger-bg); color: var(--color-danger); }
+.gestao-status-aguardando_terceiros, .gestao-status-em_analise { background: var(--color-warning-bg); color: var(--color-warning); }
+.gestao-status-concluido, .gestao-status-aprovado_concessionaria { background: var(--color-success-bg, #e8f5ed); color: var(--color-success, #176b3a); }
+.gestao-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gestao-stage-progress { display: grid; gap: 8px; margin-block: 18px 24px; }
+.gestao-stage-track { block-size: 7px; overflow: hidden; border-radius: 999px; background: var(--color-border); }
+.gestao-stage-track span { display: block; block-size: 100%; border-radius: inherit; background: var(--color-primary-600); transition: inline-size .2s ease; }
+.gestao-stage-progress > div:last-child { display: flex; justify-content: space-between; gap: 6px; color: var(--color-text-soft); font-size: .7rem; }
+.gestao-stage-progress > div:last-child .is-done { color: var(--color-primary-800); font-weight: 700; }
+.gestao-pontos-draft { grid-column: 1 / -1; display: grid; gap: 12px; padding: 18px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--color-primary-50), var(--color-surface)); }
+.gestao-draft-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding-block-end: 4px; }
+.gestao-draft-heading div { display: grid; gap: 4px; }
+.gestao-draft-heading small { color: var(--color-text-soft); font-size: .82rem; font-weight: 400; }
+.gestao-draft-heading > span { color: var(--color-primary-800); font-size: .8rem; font-weight: 700; }
+.gestao-point-draft { display: grid; grid-template-columns: 28px repeat(6, minmax(100px, 1fr)) auto; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.gestao-point-index { color: var(--color-primary-700); font-size: .75rem; font-weight: 800; }
+.gestao-success { padding: 12px 15px; border-radius: var(--radius-md); color: var(--color-success, #176b3a) !important; background: var(--color-success-bg, #e8f5ed); }
+.gestao-protocol-points li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.gestao-protocol-points small { color: var(--color-text-soft); }
+.gestao-import-group { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--color-border); }
+.gestao-import-group span { color: var(--color-text-soft); font-size: .85rem; }
+@media (prefers-reduced-motion: reduce) {
+  .gestao-page * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
 .gestao-list, .gestao-point-list, .gestao-planning-list, .gestao-simple-list { padding: 0; margin: 0; list-style: none; }
 .gestao-list, .gestao-point-list, .gestao-planning-list { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; }
 .gestao-list li + li, .gestao-point-list li + li, .gestao-planning-list li + li { border-top: 1px solid var(--color-border); }
@@ -126,6 +151,9 @@
   .gestao-list-link { grid-template-columns: minmax(0, 1fr) auto; }
   .gestao-list-meta { grid-column: 1; }
   .gestao-point-row, .gestao-planning-list li { flex-direction: column; align-items: stretch; }
+  .gestao-point-draft { grid-template-columns: 28px 1fr 1fr; }
+  .gestao-point-draft select, .gestao-point-draft button { grid-column: 2 / -1; }
+  .gestao-protocol-points li { grid-template-columns: 1fr; align-items: stretch; }
   .gestao-point-actions { justify-content: start; }
   .gestao-next-action { align-items: start; flex-direction: column; }
   .gestao-map { aspect-ratio: 1; }

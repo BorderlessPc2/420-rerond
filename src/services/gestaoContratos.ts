@@ -1,6 +1,7 @@
-import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../lib/firebase'
+import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
 export type Contrato = { id: string; nome: string; clienteId?: string; createdAt?: unknown }
 export type Etapa = 'planejamento' | 'elaboracao' | 'fase_1' | 'fase_2' | 'homologacao' | 'concluido'
@@ -19,6 +20,17 @@ export type Ponto = {
 export type Movimento = {
   id: string; tipo: string; em: string; autor: string; observacao: string
   etapa: Etapa; status: Situacao; anexos: { nome: string; url: string }[]
+}
+export type { PontoInput, ProtocoloInput } from './gestaoValidacao'
+
+export const validarProtocoloInput = (input: ProtocoloInput): string | null => validarInputProtocolo(input)[0] ?? null
+export const validarCoordenadas = (latitude?: number, longitude?: number): string | null => validarInputPonto({ codigo: 'x', estado: 'x', km: 'x', tipo: 'nova_implantacao', concessionaria: '', rodovia: '', latitude, longitude }, { concessionaria: '', rodovia: '' }).find((error) => error === 'Coordenadas inválidas.') ?? null
+export const validarPontoInput = (input: PontoInput, protocolo: Pick<Protocolo, 'concessionaria' | 'rodovia'>): string | null => validarInputPonto(input, protocolo)[0] ?? null
+
+const ETAPAS_ORDEM: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
+export const progressoEtapa = (etapa: Etapa) => {
+  const indice = Math.max(0, ETAPAS_ORDEM.indexOf(etapa))
+  return { indice, total: ETAPAS_ORDEM.length, percentual: Math.round((indice / (ETAPAS_ORDEM.length - 1)) * 100) }
 }
 const rows = async <T>(name: string): Promise<T[]> =>
   (await getDocs(collection(db, name))).docs.map((item) => ({ id: item.id, ...item.data() }) as T)
@@ -40,19 +52,34 @@ export const getProtocolo = async (contratoId: string, id: string) => {
   const snap = await getDoc(doc(db, 'gestaoProtocolos', id))
   return snap.exists() && snap.data().contratoId === contratoId ? ({ id: snap.id, ...snap.data() } as Protocolo) : null
 }
-export const criarProtocolo = async (contratoId: string, input: Pick<Protocolo, 'titulo' | 'concessionaria' | 'rodovia'> & Partial<Pick<Protocolo, 'numero' | 'previsao' | 'processoAnaliseId'>>) => {
-  if (!input.titulo.trim() || !input.concessionaria.trim() || !input.rodovia.trim()) throw new Error('Informe título, concessionária e rodovia.')
+export const criarProtocolo = async (contratoId: string, input: ProtocoloInput) => {
+  const error = validarInputProtocolo(input)[0]
+  if (error) throw new Error(error)
   if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
   return (await addDoc(collection(db, 'gestaoProtocolos'), { ...input, contratoId, etapa: 'planejamento', status: 'nao_iniciado', createdAt: serverTimestamp() })).id
 }
-export const criarPonto = async (contratoId: string, protocoloId: string, input: Omit<Ponto, 'id' | 'contratoId' | 'protocoloId'>) => {
+export const criarPonto = async (contratoId: string, protocoloId: string, input: PontoInput) => {
   const protocolo = await getProtocolo(contratoId, protocoloId)
   if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
-  if (!input.codigo.trim() || !input.estado.trim() || !input.km.trim()) throw new Error('Informe código, estado e quilômetro.')
-  if (input.concessionaria.trim() !== protocolo.concessionaria.trim() || input.rodovia.trim() !== protocolo.rodovia.trim()) throw new Error('Ponto deve pertencer à mesma concessionária e rodovia do protocolo.')
-  if ((input.latitude === undefined) !== (input.longitude === undefined) || (input.latitude !== undefined && (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) || input.latitude < -90 || input.latitude > 90 || input.longitude! < -180 || input.longitude! > 180))) throw new Error('Coordenadas inválidas.')
-  if (input.resultado && ((input.tipo === 'regularizacao') !== (input.resultado === 'regularizado'))) throw new Error('Resultado incompatível com classificação do ponto.')
+  const error = validarInputPonto(input, protocolo)[0]
+  if (error) throw new Error(error)
   return (await addDoc(collection(db, 'gestaoPontos'), { ...input, contratoId, protocoloId })).id
+}
+
+export const criarProtocoloComPontos = async (contratoId: string, input: ProtocoloInput, pontos: PontoInput[]) => {
+  const protocoloError = validarInputProtocolo(input)[0]
+  if (protocoloError) throw new Error(protocoloError)
+  if (pontos.length > 499) throw new Error('Limite de 499 pontos por protocolo para gravação atômica.')
+  if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
+  const pontoError = pontos.flatMap((ponto) => validarInputPonto(ponto, input))[0]
+  if (pontoError) throw new Error(pontoError)
+  const protocoloRef = doc(collection(db, 'gestaoProtocolos'))
+  const pontoRefs = pontos.map(() => doc(collection(db, 'gestaoPontos')))
+  const writes = [{ ref: protocoloRef, data: { ...input, contratoId, etapa: 'planejamento' as const, status: 'nao_iniciado' as const, createdAt: serverTimestamp() } }, ...pontos.map((ponto, index) => ({ ref: pontoRefs[index], data: { ...ponto, contratoId, protocoloId: protocoloRef.id } }))]
+  const batch = writeBatch(db)
+  writes.forEach(({ ref: target, data }) => batch.set(target, data))
+  await batch.commit()
+  return protocoloRef.id
 }
 export const atualizarPonto = async (contratoId: string, id: string, patch: Partial<Pick<Ponto, 'latitude' | 'longitude' | 'precisao' | 'previsao' | 'realizadoEm' | 'resultado'>>) => {
   const snap = await getDoc(doc(db, 'gestaoPontos', id))
