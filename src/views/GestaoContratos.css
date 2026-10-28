@@ -145,6 +145,18 @@
 .gestao-legend-dot { display: inline-block; inline-size: 12px; block-size: 12px; margin-inline-end: 5px; border-radius: 50%; background: var(--color-primary-700); vertical-align: -1px; }
 .gestao-legend-dot.approx { background: white; border: 2px solid var(--color-primary-700); }
 .gestao-map-detail { margin-block-start: 24px; }
+.gestao-dashboard-map { padding: 22px; margin-block: 24px 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.gestao-dashboard-map .gestao-section-head { margin-block-start: 0; }
+.gestao-point-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-block: 18px; }
+.gestao-point-detail-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 12px; border-radius: var(--radius-md); background: var(--color-primary-50); }
+.gestao-point-detail-grid span { color: var(--color-text-soft); font-size: .76rem; }
+.gestao-point-detail-grid strong { color: var(--color-text); font-size: .9rem; }
+.gestao-map-empty, .gestao-map-pending { display: flex; justify-content: space-between; gap: 12px; padding: 14px 0; color: var(--color-text-soft); font-size: .85rem; }
+.gestao-map-pending { margin-block-start: 16px; border-block-start: 1px solid var(--color-border); }
+.gestao-map-legend .gestao-legend-success { background: #1f8f5f; }
+.gestao-map-legend .gestao-legend-attention { background: #c43d4b; }
+.gestao-map-legend .gestao-legend-progress { background: #236da8; }
+.gestao-map-legend .gestao-legend-neutral { background: #6b7280; }
 
 @media (max-width: 800px) {
   .gestao-page { padding: 22px 16px 48px; }

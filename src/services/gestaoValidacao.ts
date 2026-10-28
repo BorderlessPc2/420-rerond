@@ -1,6 +1,6 @@
 import type { Ponto, Protocolo } from './gestaoContratos'
 
-export type ProtocoloInput = Pick<Protocolo, 'titulo' | 'concessionaria' | 'rodovia'> & Partial<Pick<Protocolo, 'numero' | 'previsao' | 'processoAnaliseId'>>
+export type ProtocoloInput = Pick<Protocolo, 'titulo' | 'concessionaria' | 'rodovia'> & Partial<Pick<Protocolo, 'numero' | 'previsao' | 'realizadoEm' | 'processoAnaliseId'>>
 export type PontoInput = Omit<Ponto, 'id' | 'contratoId' | 'protocoloId'>
 
 export const validarInputProtocolo = (input: ProtocoloInput) =>

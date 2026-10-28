@@ -47,10 +47,16 @@ export const agruparLinhasImportacao = (rows: RawImportRow[]): ImportPreview => 
 }
 
 export const parsePlanilha = async (file: File): Promise<ImportPreview> => {
+  if (!file.size) throw new Error('Arquivo de planilha vazio.')
   const data = await file.arrayBuffer()
   const workbook = XLSX.read(data, { type: 'array', cellDates: false })
-  const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) throw new Error('Planilha sem abas.')
+  const sheet = workbook.Sheets[sheetName]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+  if (!rows.length) throw new Error('Planilha sem linhas de dados.')
+  const headers = Object.keys(rows[0]).map(normalizarCabecalho)
+  if (!['titulo_protocolo', 'concessionaria', 'rodovia'].every((header) => headers.includes(header))) throw new Error('Planilha deve conter título, concessionária e rodovia.')
   return agruparLinhasImportacao(rows.map((row, index) => ({ ...row, linha: index + 2 })))
 }
 

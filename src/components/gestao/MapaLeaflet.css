@@ -1,0 +1,4 @@
+.gestao-leaflet-map { min-height: 320px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: #e8eef1; z-index: 0; }
+.gestao-leaflet-map .leaflet-control-attribution { font-size: 10px; }
+.gestao-leaflet-map .leaflet-tooltip { border: 0; border-radius: 8px; box-shadow: 0 5px 18px rgb(15 23 42 / 16%); font: inherit; }
+@media (max-width: 800px) { .gestao-leaflet-map { min-height: 360px; } }

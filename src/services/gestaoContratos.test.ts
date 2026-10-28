@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { criarProtocoloComPontos, filtrarGestao, indicadoresGestao, pontoStatus, progressoEtapa, type Ponto, type Protocolo } from './gestaoContratos'
+import { criarProtocoloComPontos, filtrarGestao, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarTransicao, type Ponto, type Protocolo } from './gestaoContratos'
+import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
 import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
 const protocolos: Protocolo[] = [
@@ -21,6 +22,23 @@ describe('recorte operacional', () => {
     expect(recorte.pontos.map((p) => p.id)).toEqual(['p2'])
     expect(recorte.protocolos.map((p) => p.id)).toEqual(['a'])
     expect(filtrarGestao(protocolos, pontos, { status: 'nao_iniciado' }).protocolos.map((p) => p.id)).toEqual(['b'])
+  })
+  it('combina concessionária, protocolo e código sem trazer pontos fora do recorte', () => {
+    const recorte = filtrarGestao(protocolos, pontos, { concessionaria: 'Eco', protocoloId: 'a', pontoCodigo: '2' })
+    expect(recorte.pontos.map((p) => p.id)).toEqual(['p2'])
+    expect(recorte.protocolos.map((p) => p.id)).toEqual(['a'])
+    expect(filtrarGestao(protocolos, pontos, { protocoloId: 'b' }).protocolos.map((p) => p.id)).toEqual(['b'])
+    expect(filtrarGestao(protocolos, pontos, { protocoloId: 'a', concessionaria: 'Outra' }).protocolos).toEqual([])
+  })
+  it('prepara pontos geolocalizados e cores operacionais para o mapa', () => {
+    expect(getMapPoints([{ ...pontos[0], latitude: 10, longitude: -40 }, { ...pontos[1], latitude: undefined, longitude: undefined }])).toHaveLength(1)
+    expect(getMapBounds([{ ...pontos[0], latitude: 10, longitude: -40 }])).toEqual([[10, -40], [10, -40]])
+    expect(getPontoColor(pontos[0], protocolos[0])).toBe('#1f8f5f')
+  })
+  it('conta protocolos paralisados e prazos vencidos', () => {
+    const data = new Date().toISOString().slice(0, 10)
+    expect(indicadoresGestao([{ ...protocolos[0], status: 'paralisado', previsao: '2020-01-01' }], [])).toMatchObject({ paralisados: 1, atrasados: 1 })
+    expect(indicadoresGestao([{ ...protocolos[0], previsao: data }], [])).toMatchObject({ atrasados: 0 })
   })
 })
 
@@ -49,5 +67,11 @@ describe('validação de gestão', () => {
   it('recusa protocolo com pontos acima do limite atômico do Firestore', async () => {
     const pontos = Array.from({ length: 500 }, (_, index) => ({ ...ponto, codigo: String(index) }))
     await expect(criarProtocoloComPontos('contrato', protocolo, pontos)).rejects.toThrow('Limite de 499 pontos por protocolo')
+  })
+  it('rejeita edição de ponto que quebra vínculo com protocolo', () => {
+    expect(validarEdicaoPonto({ ...ponto, rodovia: 'BR-116' }, protocolo)).toContain('Ponto deve pertencer à mesma concessionária e rodovia do protocolo.')
+  })
+  it('rejeita transição para correção sem observação', () => {
+    expect(validarTransicao('fase_1', 'em_andamento', 'fase_1', 'em_correcao', '')).toBe('Informe observação para correção ou paralisação.')
   })
 })

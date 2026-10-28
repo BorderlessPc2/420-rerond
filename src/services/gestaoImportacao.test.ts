@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agruparLinhasImportacao, normalizarCabecalho, type RawImportRow } from './gestaoImportacao'
+import { agruparLinhasImportacao, normalizarCabecalho, parsePlanilha, type RawImportRow } from './gestaoImportacao'
 
 describe('importação de planilhas', () => {
   it('normaliza cabeçalhos e agrupa pontos pelo protocolo', () => {
@@ -26,5 +26,8 @@ describe('importação de planilhas', () => {
     ])
     expect(preview.linhasInvalidas[0].erros).toContain('Código de ponto duplicado neste protocolo.')
     expect(preview.protocolos.find((item) => item.input.titulo === 'Q')?.pontos).toHaveLength(0)
+  })
+  it('rejeita arquivo vazio antes de interpretar a planilha', async () => {
+    await expect(parsePlanilha(new File([], 'vazio.csv'))).rejects.toThrow('Arquivo de planilha vazio.')
   })
 })

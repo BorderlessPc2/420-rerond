@@ -114,7 +114,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null && validContrato(request.resource.data)
         && request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
+      allow update: if request.auth != null && validContrato(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'clienteId'])
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
     }
 
     match /gestaoProtocolos/{protocoloId} {
@@ -123,7 +126,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && exists(/databases/$(database)/documents/gestaoContratos/$(request.resource.data.contratoId));
       allow update: if request.auth != null && validProtocolo(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['etapa', 'status', 'numero', 'previsao', 'realizadoEm'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['titulo', 'concessionaria', 'rodovia', 'numero', 'etapa', 'status', 'previsao', 'realizadoEm'])
         && request.resource.data.contratoId == resource.data.contratoId;
       allow delete: if false;
     }
@@ -136,7 +139,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
         && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia;
       allow update: if request.auth != null && validPonto(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm', 'resultado']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['codigo', 'estado', 'km', 'tipo', 'concessionaria', 'rodovia', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
+        && request.resource.data.contratoId == resource.data.contratoId
+        && request.resource.data.protocoloId == resource.data.protocoloId
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
+        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia;
       allow delete: if false;
     }
 
