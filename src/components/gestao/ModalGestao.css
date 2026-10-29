@@ -1,6 +1,7 @@
 .gestao-modal {
   inline-size: min(760px, calc(100% - 32px));
   max-block-size: min(760px, calc(100dvh - 32px));
+  margin: auto;
   padding: 0;
   border: 0;
   border-radius: 20px;
