@@ -167,6 +167,9 @@
 .gestao-map-detail { margin-block-start: 24px; }
 .gestao-dashboard-map { padding: 22px; margin-block: 24px 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
 .gestao-dashboard-map .gestao-section-head { margin-block-start: 0; }
+.gestao-map-preview { position: relative; overflow: hidden; border-radius: var(--radius-md); }
+.gestao-map-preview .gestao-leaflet-map { pointer-events: none; }
+.gestao-map-preview-link { display: inline-flex; margin-block-start: 12px; }
 .gestao-point-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-block: 18px; }
 .gestao-point-detail-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 12px; border-radius: var(--radius-md); background: var(--color-primary-50); }
 .gestao-point-detail-grid span { color: var(--color-text-soft); font-size: .76rem; }
