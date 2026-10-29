@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { criarProtocoloComPontos, filtrarGestao, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarTransicao, type Ponto, type Protocolo } from './gestaoContratos'
+import { criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarTransicao, type Ponto, type Protocolo } from './gestaoContratos'
 import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
 import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
@@ -11,6 +11,12 @@ const pontos: Ponto[] = [
   { id: 'p1', contratoId: 'c', protocoloId: 'a', codigo: '1', estado: 'ES', concessionaria: 'Eco', rodovia: 'BR-101', km: '10', tipo: 'regularizacao', resultado: 'regularizado' },
   { id: 'p2', contratoId: 'c', protocoloId: 'a', codigo: '2', estado: 'RJ', concessionaria: 'Eco', rodovia: 'BR-101', km: '20', tipo: 'nova_implantacao' },
 ]
+describe('exclusão de contrato', () => {
+  it('remove contrato e dados operacionais vinculados', () => {
+    expect(getContratoCascadeCollections()).toEqual(['gestaoContratos', 'gestaoProtocolos', 'gestaoPontos', 'gestaoMovimentos'])
+  })
+})
+
 describe('recorte operacional', () => {
   it('distingue pontos de protocolos e conclusão por classificação', () => {
     expect(indicadoresGestao(protocolos, pontos)).toMatchObject({ protocolos: 2, pontos: 2, regularizados: 1, aprovadosImplantacao: 0 })

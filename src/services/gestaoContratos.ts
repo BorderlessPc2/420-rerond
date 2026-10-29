@@ -45,6 +45,8 @@ const rows = async <T>(name: string): Promise<T[]> =>
 const scoped = async <T extends { id: string; contratoId: string }>(name: string, contratoId: string): Promise<T[]> =>
   (await getDocs(query(collection(db, name), where('contratoId', '==', contratoId)))).docs.map((item) => ({ ...item.data(), id: item.id }) as T)
 
+export const getContratoCascadeCollections = () => ['gestaoContratos', 'gestaoProtocolos', 'gestaoPontos', 'gestaoMovimentos'] as const
+
 export const listContratos = () => rows<Contrato>('gestaoContratos')
 export const getContrato = async (id: string) => {
   const snap = await getDoc(doc(db, 'gestaoContratos', id))
@@ -58,6 +60,21 @@ export const atualizarContrato = async (id: string, patch: Pick<Contrato, 'nome'
   if (!patch.nome.trim()) throw new Error('Informe nome do contrato.')
   if (!(await getContrato(id))) throw new Error('Contrato não encontrado.')
   await updateDoc(doc(db, 'gestaoContratos', id), { nome: patch.nome.trim(), clienteId: patch.clienteId || null })
+}
+
+export const excluirContrato = async (id: string) => {
+  if (!(await getContrato(id))) throw new Error('Contrato não encontrado.')
+  const [protocolos, pontos, movimentos] = await Promise.all([
+    getDocs(query(collection(db, 'gestaoProtocolos'), where('contratoId', '==', id))),
+    getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', id))),
+    getDocs(query(collection(db, 'gestaoMovimentos'), where('contratoId', '==', id))),
+  ])
+  const refs = [...protocolos.docs.map((item) => item.ref), ...pontos.docs.map((item) => item.ref), ...movimentos.docs.map((item) => item.ref), doc(db, 'gestaoContratos', id)]
+  for (let index = 0; index < refs.length; index += 450) {
+    const batch = writeBatch(db)
+    refs.slice(index, index + 450).forEach((ref) => batch.delete(ref))
+    await batch.commit()
+  }
 }
 export const listProtocolos = (contratoId: string) => scoped<Protocolo>('gestaoProtocolos', contratoId)
 export const listPontos = (contratoId: string) => scoped<Ponto>('gestaoPontos', contratoId)
