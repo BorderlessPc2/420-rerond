@@ -182,3 +182,38 @@
   .gestao-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gestao-list-link { padding: 15px; }
 }
+
+.gestao-dashboard-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 28px; margin-block: 8px 22px; border: 1px solid var(--color-border); border-radius: 22px; background: linear-gradient(120deg, var(--color-primary-50), var(--color-surface) 70%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%), var(--shadow-sm); }
+.gestao-dashboard-intro h2 { margin-block: 4px 8px; }
+.gestao-dashboard-intro p { margin: 0; }
+.gestao-dashboard-intro .gestao-status { justify-self: end; }
+.gestao-dashboard-map { animation: gestao-section-in .28s cubic-bezier(.32,.72,0,1) both; }
+.gestao-attention { animation: gestao-section-in .3s .04s cubic-bezier(.32,.72,0,1) both; }
+.gestao-quicklinks .gestao-card { animation: gestao-section-in .3s ease both; }
+.gestao-quicklinks .gestao-card:nth-child(2) { animation-delay: .04s; }
+.gestao-quicklinks .gestao-card:nth-child(3) { animation-delay: .08s; }
+.gestao-quicklinks .gestao-card:nth-child(4) { animation-delay: .12s; }
+@keyframes gestao-section-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.gestao-health { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 10px; margin-block: 12px 24px; padding: 10px; border-radius: 24px; background: var(--color-primary-50); box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%), var(--shadow-sm); animation: gestao-section-in .32s cubic-bezier(.32,.72,0,1) both; }
+.gestao-health-main { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-block-size: 190px; padding: 28px 30px; border-radius: 18px; background: var(--color-primary-800); color: white; box-shadow: inset 0 1px 0 rgb(255 255 255 / 16%); }
+.gestao-health-main h2 { margin-block: 7px 8px; color: white; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.04em; }
+.gestao-health-main p { max-inline-size: 34ch; margin: 0; color: rgb(255 255 255 / 72%); font-size: .9rem; }
+.gestao-health-main .gestao-eyebrow { color: var(--color-accent500, #f1b726); }
+.gestao-health-ring { position: relative; display: grid; flex: 0 0 112px; place-items: center; inline-size: 112px; block-size: 112px; border-radius: 50%; background: conic-gradient(var(--color-accent500, #f1b726) var(--gestao-progress), rgb(255 255 255 / 16%) 0); isolation: isolate; }
+.gestao-health-ring::after { position: absolute; inset: 8px; z-index: -1; content: ''; border-radius: inherit; background: var(--color-primary-800); }
+.gestao-health-ring strong, .gestao-health-ring span { grid-area: 1 / 1; z-index: 1; }
+.gestao-health-ring strong { margin-block-start: -16px; font-size: 1.55rem; }
+.gestao-health-ring span { margin-block-start: 28px; color: rgb(255 255 255 / 64%); font-size: .67rem; text-transform: uppercase; letter-spacing: .08em; }
+.gestao-health-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.gestao-health-stat { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-block-size: 90px; padding: 16px 18px; border-radius: 16px; background: var(--color-surface); box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%); transition: transform .24s cubic-bezier(.32,.72,0,1), box-shadow .24s cubic-bezier(.32,.72,0,1); }
+.gestao-health-stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-sm); }
+.gestao-health-stat span { color: var(--color-text-soft); font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; }
+.gestao-health-stat strong { color: var(--color-text); font-size: 1.7rem; letter-spacing: -.04em; line-height: 1; }
+.gestao-health-stat small { color: var(--color-text-soft); font-size: .75rem; }
+.gestao-health-stat-success strong { color: var(--color-success, #176b3a); }
+.gestao-health-stat-danger strong { color: var(--color-danger); }
+@media (max-width: 800px) { .gestao-health { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .gestao-dashboard-intro { grid-template-columns: 1fr; } .gestao-dashboard-intro .gestao-status { justify-self: start; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
+@media (max-width: 460px) { .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } }
+@media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-metrics > div:hover { transform: none; } }
