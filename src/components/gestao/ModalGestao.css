@@ -27,7 +27,7 @@
 .gestao-modal-close:hover { background: var(--color-primary-50) !important; }
 .gestao-modal-body { overflow: auto; padding: 28px 32px 32px; }
 .gestao-modal-body .gestao-form { gap: 24px; }
-.gestao-contract-edit-form { display: grid; gap: 30px !important; }
+.gestao-modal .gestao-contract-edit-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px !important; }
 .gestao-contract-edit-field { display: grid; gap: 8px; }
 .gestao-contract-edit-field label { color: var(--color-text); font-size: .88rem; font-weight: 700; }
 .gestao-contract-edit-field > span { color: var(--color-text-soft); font-size: .78rem; }
