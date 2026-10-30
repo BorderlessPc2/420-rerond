@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarTransicao, type Ponto, type Protocolo } from './gestaoContratos'
+import { calcularDashboardGestao, criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
 import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
 import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
@@ -46,6 +46,9 @@ describe('recorte operacional', () => {
     expect(indicadoresGestao([{ ...protocolos[0], status: 'paralisado', previsao: '2020-01-01' }], [])).toMatchObject({ paralisados: 1, atrasados: 1 })
     expect(indicadoresGestao([{ ...protocolos[0], previsao: data }], [])).toMatchObject({ atrasados: 0 })
   })
+  it('gera séries do dashboard por status e estado', () => {
+    expect(calcularDashboardGestao(protocolos, pontos, 'ES')).toMatchObject({ estados: ['ES', 'RJ'], status: [{ status: 'em_correcao', total: 1 }], totalPontos: 1 })
+  })
 })
 
 describe('validação de gestão', () => {
@@ -54,6 +57,9 @@ describe('validação de gestão', () => {
   it('aceita protocolo e ponto válidos', () => {
     expect(validarInputProtocolo(protocolo)).toEqual([])
     expect(validarInputPonto(ponto, protocolo)).toEqual([])
+  })
+  it('aceita ponto sem protocolo quando concessionária e rodovia são informadas', () => {
+    expect(validarPontoInput(ponto, undefined)).toBeNull()
   })
   it('rejeita campos obrigatórios, coordenadas incompletas e limites inválidos', () => {
     expect(validarInputProtocolo({ ...protocolo, titulo: ' ' })).toContain('Informe título, concessionária e rodovia.')
@@ -69,6 +75,9 @@ describe('validação de gestão', () => {
   })
   it('expõe criação conjunta como operação assíncrona', () => {
     expect(criarProtocoloComPontos).toBeTypeOf('function')
+  })
+  it('expõe vínculo posterior de ponto a protocolo', () => {
+    expect(vincularPontoProtocolo).toBeTypeOf('function')
   })
   it('recusa protocolo com pontos acima do limite atômico do Firestore', async () => {
     const pontos = Array.from({ length: 500 }, (_, index) => ({ ...ponto, codigo: String(index) }))

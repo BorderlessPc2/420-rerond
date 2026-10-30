@@ -12,7 +12,7 @@ export type Protocolo = {
   processoAnaliseId?: string; createdAt?: unknown
 }
 export type Ponto = {
-  id: string; contratoId: string; protocoloId: string; codigo: string; estado: string
+  id: string; contratoId: string; protocoloId: string | null; codigo: string; estado: string
   concessionaria: string; rodovia: string; km: string; tipo: 'regularizacao' | 'nova_implantacao'
   resultado?: 'regularizado' | 'aprovado_implantacao'; latitude?: number; longitude?: number
   precisao?: 'confirmada' | 'aproximada'; previsao?: string; realizadoEm?: string
@@ -25,7 +25,7 @@ export type { PontoInput, ProtocoloInput } from './gestaoValidacao'
 
 export const validarProtocoloInput = (input: ProtocoloInput): string | null => validarInputProtocolo(input)[0] ?? null
 export const validarCoordenadas = (latitude?: number, longitude?: number): string | null => validarInputPonto({ codigo: 'x', estado: 'x', km: 'x', tipo: 'nova_implantacao', concessionaria: '', rodovia: '', latitude, longitude }, { concessionaria: '', rodovia: '' }).find((error) => error === 'Coordenadas inválidas.') ?? null
-export const validarPontoInput = (input: PontoInput, protocolo: Pick<Protocolo, 'concessionaria' | 'rodovia'>): string | null => validarInputPonto(input, protocolo)[0] ?? null
+export const validarPontoInput = (input: PontoInput, protocolo?: Pick<Protocolo, 'concessionaria' | 'rodovia'>): string | null => validarInputPonto(input, protocolo)[0] ?? null
 export const validarEdicaoPonto = (input: PontoInput, protocolo: Pick<Protocolo, 'concessionaria' | 'rodovia'>) => validarInputPonto(input, protocolo)
 
 const ETAPAS_ORDEM: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
@@ -88,10 +88,10 @@ export const criarProtocolo = async (contratoId: string, input: ProtocoloInput) 
   if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
   return (await addDoc(collection(db, 'gestaoProtocolos'), { ...input, contratoId, etapa: 'planejamento', status: 'nao_iniciado', createdAt: serverTimestamp() })).id
 }
-export const criarPonto = async (contratoId: string, protocoloId: string, input: PontoInput) => {
-  const protocolo = await getProtocolo(contratoId, protocoloId)
-  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
-  const error = validarInputPonto(input, protocolo)[0]
+export const criarPonto = async (contratoId: string, protocoloId: string | null, input: PontoInput) => {
+  const protocolo = protocoloId ? await getProtocolo(contratoId, protocoloId) : undefined
+  if (protocoloId && !protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const error = validarInputPonto(input, protocolo ?? undefined)[0]
   if (error) throw new Error(error)
   return (await addDoc(collection(db, 'gestaoPontos'), { ...input, contratoId, protocoloId })).id
 }
@@ -111,11 +111,20 @@ export const atualizarPontoCompleto = async (contratoId: string, id: string, inp
   const snap = await getDoc(doc(db, 'gestaoPontos', id))
   if (!snap.exists() || snap.data().contratoId !== contratoId) throw new Error('Ponto não encontrado neste contrato.')
   const point = snap.data() as Ponto
-  const protocolo = await getProtocolo(contratoId, point.protocoloId)
-  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
-  const errors = validarEdicaoPonto(input, protocolo)
+  const protocolo = point.protocoloId ? await getProtocolo(contratoId, point.protocoloId) : undefined
+  if (point.protocoloId && !protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const errors = validarInputPonto(input, protocolo ?? undefined)
   if (errors.length) throw new Error(errors[0])
   await updateDoc(doc(db, 'gestaoPontos', id), { ...input, contratoId, protocoloId: point.protocoloId, ...(input.resultado ? { realizadoEm: input.realizadoEm || point.realizadoEm || new Date().toISOString().slice(0, 10) } : {}) })
+}
+export const vincularPontoProtocolo = async (contratoId: string, pontoId: string, protocoloId: string) => {
+  const [pointSnap, protocolo] = await Promise.all([getDoc(doc(db, 'gestaoPontos', pontoId)), getProtocolo(contratoId, protocoloId)])
+  if (!pointSnap.exists() || pointSnap.data().contratoId !== contratoId) throw new Error('Ponto não encontrado neste contrato.')
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const point = pointSnap.data() as Ponto
+  const errors = validarInputPonto({ ...point, protocoloId: undefined } as PontoInput, protocolo)
+  if (errors.length) throw new Error(errors[0])
+  await updateDoc(doc(db, 'gestaoPontos', pontoId), { protocoloId })
 }
 
 export const criarProtocoloComPontos = async (contratoId: string, input: ProtocoloInput, pontos: PontoInput[]) => {
@@ -178,7 +187,7 @@ export const atualizarPlanejamentoPonto = async (contratoId: string, id: string,
   atualizarPonto(contratoId, id, { previsao, realizadoEm })
 export const filtrarGestao = (protocolos: Protocolo[], pontos: Ponto[], filtro: { estado?: string; concessionaria?: string; rodovia?: string; protocoloId?: string; pontoCodigo?: string; status?: string; tipo?: string; etapa?: string; inicio?: string; fim?: string }) => {
   const selecionados = pontos.filter((p) => {
-    const protocolo = protocolos.find((item) => item.id === p.protocoloId)
+    const protocolo = p.protocoloId ? protocolos.find((item) => item.id === p.protocoloId) : undefined
     const periodo = p.previsao || protocolo?.previsao || ''
     return (!filtro.estado || p.estado === filtro.estado) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.protocoloId || p.protocoloId === filtro.protocoloId) && (!filtro.pontoCodigo || p.codigo.toLocaleLowerCase().includes(filtro.pontoCodigo.toLocaleLowerCase())) && (!filtro.tipo || p.tipo === filtro.tipo) && (!filtro.status || (p.resultado ?? protocolo?.status) === filtro.status) && (!filtro.etapa || protocolo?.etapa === filtro.etapa) && (!filtro.inicio || periodo >= filtro.inicio) && (!filtro.fim || periodo <= filtro.fim)
   })
@@ -199,5 +208,13 @@ export const indicadoresGestao = (protocolos: Protocolo[], pontos: Ponto[]) => {
     paralisados: protocolos.filter((p) => p.status === 'paralisado').length,
     atrasados: protocolos.filter((p) => !!p.previsao && p.previsao < hoje && !p.realizadoEm && p.status !== 'concluido').length,
   }
+}
+export const calcularDashboardGestao = (protocolos: Protocolo[], pontos: Ponto[], estado = '') => {
+  const estados = [...new Set(pontos.map((ponto) => ponto.estado).filter(Boolean))].sort()
+  const selecionados = estado ? pontos.filter((ponto) => ponto.estado === estado) : pontos
+  const ids = new Set(selecionados.map((ponto) => ponto.protocoloId).filter((id): id is string => Boolean(id)))
+  const protocolosSelecionados = estado ? protocolos.filter((protocolo) => ids.has(protocolo.id)) : protocolos
+  const status = [...new Set(protocolos.map((protocolo) => protocolo.status))].map((status) => ({ status, total: protocolosSelecionados.filter((protocolo) => protocolo.status === status).length })).filter((item) => item.total)
+  return { estados, status, totalPontos: selecionados.length, totalProtocolos: protocolosSelecionados.length, indicadores: indicadoresGestao(protocolosSelecionados, selecionados) }
 }
 export const pontoStatus = (ponto: Ponto, protocolo?: Protocolo) => ponto.resultado ? { valor: ponto.resultado, herdado: false } : { valor: protocolo?.status ?? 'nao_iniciado', herdado: true }

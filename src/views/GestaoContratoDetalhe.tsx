@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
-import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGestao, type Contrato, type Ponto, type Protocolo } from '../services/gestaoContratos'
+import { calcularDashboardGestao, getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGestao, type Contrato, type Ponto, type Protocolo } from '../services/gestaoContratos'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
 import { classificarPrazo, resumirPrioridades } from '../utils/gestaoPrioridades'
 import './GestaoContratos.css'
@@ -13,7 +13,8 @@ export default function GestaoContratoDetalhe() {
   const [protocolos, setProtocolos] = useState<Protocolo[]>([])
   const [pontos, setPontos] = useState<Ponto[]>([])
   const [error, setError] = useState('')
-  const filtro = { estado: '', concessionaria: '', rodovia: '', protocoloId: '', pontoCodigo: '', status: '', tipo: '', etapa: '', inicio: '', fim: '' }
+  const [estado, setEstado] = useState('')
+  const filtro = { estado, concessionaria: '', rodovia: '', protocoloId: '', pontoCodigo: '', status: '', tipo: '', etapa: '', inicio: '', fim: '' }
   const refresh = async () => {
     try {
       const found = await getContrato(contratoId)
@@ -23,8 +24,9 @@ export default function GestaoContratoDetalhe() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao carregar contrato.') }
   }
   useEffect(() => { void refresh() }, [contratoId])
-  const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
+  const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, estado])
   const totals = indicadoresGestao(filtrado.protocolos, filtrado.pontos)
+  const dashboard = calcularDashboardGestao(protocolos, pontos, estado)
   const prioridades = resumirPrioridades(filtrado.protocolos)
   if (!contrato) return <div className="gestao-page"><Link to="/gestao-contratos">Voltar aos contratos</Link><p role="alert">{error || 'Carregando contrato...'}</p></div>
   const base = `/gestao-contratos/${contratoId}`
@@ -38,7 +40,14 @@ export default function GestaoContratoDetalhe() {
     {isOverview && <>
     <section className="gestao-dashboard-intro" aria-label="Resumo do contrato">
       <div><span className="gestao-eyebrow">Painel operacional</span><h2>Decida o próximo movimento</h2><p>Use este recorte para localizar gargalos, revisar prazos e abrir o contexto certo sem perder o contrato atual.</p></div>
-      <span className="gestao-status">{protocolos.length} protocolos · {pontos.length} pontos</span>
+      <label className="gestao-dashboard-filter">Estado<select value={estado} onChange={(event) => setEstado(event.target.value)}><option value="">Todos os estados</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+    </section>
+    <section className="gestao-dashboard-charts" aria-label="Indicadores visuais">
+      <div className="gestao-chart-card"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Distribuição</span><h3>Status dos protocolos</h3></div><strong>{dashboard.totalProtocolos}</strong></div><div className="gestao-bars">{dashboard.status.map((item) => <div className="gestao-bar-row" key={item.status}><span>{item.status.replaceAll('_', ' ')}</span><div className="gestao-bar-track"><i style={{ inlineSize: `${dashboard.totalProtocolos ? Math.max(8, (item.total / dashboard.totalProtocolos) * 100) : 0}%` }} /></div><strong>{item.total}</strong></div>)}</div></div>
+      <div className="gestao-chart-card gestao-chart-donut"><div><span className="gestao-eyebrow">Pontos</span><h3>Conclusão operacional</h3></div><div className="gestao-donut" style={{ '--gestao-donut': `${dashboard.totalPontos ? Math.round(((dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao) / dashboard.totalPontos) * 100) : 0}%` } as React.CSSProperties}><strong>{dashboard.totalPontos ? Math.round(((dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao) / dashboard.totalPontos) * 100) : 0}%</strong></div><p>{dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao} de {dashboard.totalPontos} pontos concluídos</p></div>
+    </section>
+    <section className="gestao-dashboard-intro" aria-label="Resumo filtrado">
+      <span className="gestao-status">{totals.protocolos} protocolos · {totals.pontos} pontos</span>
     </section>
     <section className="gestao-health" aria-label="Saúde operacional do contrato">
       <div className="gestao-health-main">

@@ -166,6 +166,22 @@
 .gestao-legend-dot.approx { background: white; border: 2px solid var(--color-primary-700); }
 .gestao-map-detail { margin-block-start: 24px; }
 .gestao-dashboard-map { padding: 22px; margin-block: 24px 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.gestao-dashboard-filter { min-inline-size: 190px; color: var(--color-text-soft); font-size: .78rem; font-weight: 700; }
+.gestao-dashboard-filter select { display: block; margin-block-start: 6px; }
+.gestao-dashboard-charts { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(230px, .8fr); gap: 16px; margin-block: 20px 24px; }
+.gestao-chart-card { min-block-size: 220px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.gestao-chart-card .gestao-section-head { margin-block: 0 20px; }
+.gestao-bars { display: grid; gap: 13px; }
+.gestao-bar-row { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr auto; align-items: center; gap: 10px; font-size: .8rem; }
+.gestao-bar-row > span { color: var(--color-text-soft); text-transform: capitalize; }
+.gestao-bar-track { block-size: 9px; overflow: hidden; border-radius: 99px; background: var(--color-primary-50); }
+.gestao-bar-track i { display: block; block-size: 100%; border-radius: inherit; background: var(--color-primary-600); transition: inline-size .35s ease; }
+.gestao-chart-donut { display: grid; grid-template-columns: 1fr auto; align-content: start; gap: 12px; }
+.gestao-chart-donut > p { grid-column: 1 / -1; margin: 0; font-size: .86rem; }
+.gestao-donut { display: grid; place-items: center; inline-size: 112px; aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--color-primary-600) var(--gestao-donut), var(--color-primary-50) 0); }
+.gestao-donut::after { content: ''; position: absolute; inline-size: 82px; aspect-ratio: 1; border-radius: 50%; background: var(--color-surface); }
+.gestao-donut strong { position: relative; z-index: 1; font-size: 1.2rem; }
+@media (max-width: 760px) { .gestao-dashboard-charts { grid-template-columns: 1fr; } }
 .gestao-dashboard-map .gestao-section-head { margin-block-start: 0; }
 .gestao-map-preview { position: relative; overflow: hidden; border-radius: var(--radius-md); }
 .gestao-map-preview .gestao-leaflet-map { pointer-events: none; }

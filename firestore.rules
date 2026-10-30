@@ -44,7 +44,7 @@ service cloud.firestore {
     function validPonto(data) {
       return data.keys().hasAll(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo'])
         && data.keys().hasOnly(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
-        && shortText(data.contratoId, 128) && shortText(data.protocoloId, 128)
+        && shortText(data.contratoId, 128) && (data.protocoloId == null || shortText(data.protocoloId, 128))
         && shortText(data.codigo, 100) && shortText(data.estado, 40)
         && shortText(data.concessionaria, 160) && shortText(data.rodovia, 80)
         && shortText(data.km, 60) && data.tipo in ['regularizacao', 'nova_implantacao']
@@ -117,7 +117,7 @@ service cloud.firestore {
       allow update: if request.auth != null && validContrato(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'clienteId'])
         && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if false;
+      allow delete: if request.auth != null;
     }
 
     match /gestaoProtocolos/{protocoloId} {
@@ -128,23 +128,28 @@ service cloud.firestore {
       allow update: if request.auth != null && validProtocolo(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['titulo', 'concessionaria', 'rodovia', 'numero', 'etapa', 'status', 'previsao', 'realizadoEm'])
         && request.resource.data.contratoId == resource.data.contratoId;
-      allow delete: if false;
+      allow delete: if request.auth != null;
     }
 
     match /gestaoPontos/{pontoId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && validPonto(request.resource.data)
-        && exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
-        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
-        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
-        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia;
+        && (request.resource.data.protocoloId == null || (
+          exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia
+        ));
       allow update: if request.auth != null && validPonto(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['codigo', 'estado', 'km', 'tipo', 'concessionaria', 'rodovia', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['protocoloId', 'codigo', 'estado', 'km', 'tipo', 'concessionaria', 'rodovia', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
         && request.resource.data.contratoId == resource.data.contratoId
-        && request.resource.data.protocoloId == resource.data.protocoloId
-        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
-        && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia;
-      allow delete: if false;
+        && (request.resource.data.protocoloId == null || (
+          exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
+          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia
+        ));
+      allow delete: if request.auth != null && resource.data.contratoId is string;
     }
 
     match /gestaoMovimentos/{movimentoId} {
@@ -154,7 +159,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
         && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.etapa == request.resource.data.etapa
         && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.status == request.resource.data.status;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if request.auth != null;
     }
 
     match /tiposAnalise/{tipoId} {
