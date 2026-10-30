@@ -12,8 +12,8 @@
 .gestao-page h2,
 .gestao-page h3,
 .gestao-page p { margin-block-start: 0; }
-.gestao-page h1 { font-size: clamp(2rem, 3vw, 2.6rem); letter-spacing: -.035em; line-height: 1.12; margin-block: 8px 10px; }
-.gestao-page h2 { font-size: 1.45rem; letter-spacing: -.025em; margin-block: 0 6px; }
+.gestao-page h1 { min-inline-size: 0; font-size: clamp(2rem, 3vw, 2.6rem); letter-spacing: -.035em; line-height: 1.12; margin-block: 8px 10px; text-wrap: balance; }
+.gestao-page h2 { min-inline-size: 0; font-size: 1.45rem; letter-spacing: -.025em; margin-block: 0 6px; text-wrap: balance; }
 .gestao-page h3 { font-size: 1.12rem; margin-block: 0 6px; }
 .gestao-page p { color: var(--color-text-soft); line-height: 1.5; max-width: 65ch; }
 .gestao-page a { color: var(--color-primary-800); }
@@ -114,7 +114,7 @@
 .gestao-list-link { display: grid; grid-template-columns: minmax(190px, 1fr) auto minmax(110px, auto) auto; align-items: center; gap: 16px; padding: 18px 20px; text-decoration: none; transition: background-color .18s ease; }
 .gestao-list-link:hover { background: var(--color-primary-50); }
 .gestao-list-main { display: flex; flex-direction: column; gap: 5px; min-inline-size: 0; }
-.gestao-list-main strong { color: var(--color-text); }
+.gestao-list-main strong { display: -webkit-box; overflow: hidden; color: var(--color-text); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .gestao-list-main small, .gestao-list-meta, .gestao-point-row small, .gestao-planning-list small { color: var(--color-text-soft); font-size: .83rem; }
 .gestao-attention { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; padding: 17px 20px; margin-block: -16px 32px; border-inline-start: 3px solid var(--color-warning); border-radius: var(--radius-md); background: var(--color-warning-bg); }
 .gestao-attention p { margin: 5px 0 0; font-size: .82rem; }
@@ -166,8 +166,11 @@
 .gestao-legend-dot.approx { background: white; border: 2px solid var(--color-primary-700); }
 .gestao-map-detail { margin-block-start: 24px; }
 .gestao-dashboard-map { padding: 22px; margin-block: 24px 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
-.gestao-dashboard-filter { min-inline-size: 190px; color: var(--color-text-soft); font-size: .78rem; font-weight: 700; }
-.gestao-dashboard-filter select { display: block; margin-block-start: 6px; }
+.gestao-dashboard-filter { display: grid; min-inline-size: 190px; gap: 6px; color: var(--color-text-soft); font-size: .78rem; font-weight: 700; }
+.gestao-dashboard-filter select { display: block; }
+.gestao-dashboard-filter .gestao-button-link { min-block-size: auto; padding: 0; font-size: .78rem; }
+.gestao-dashboard-live { margin-block: -10px 14px; font-size: .82rem; }
+.gestao-chart-empty { margin: 30px 0 0; font-size: .86rem; }
 .gestao-dashboard-charts { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(230px, .8fr); gap: 16px; margin-block: 20px 24px; }
 .gestao-chart-card { min-block-size: 220px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
 .gestao-chart-card .gestao-section-head { margin-block: 0 20px; }
@@ -178,8 +181,8 @@
 .gestao-bar-track i { display: block; block-size: 100%; border-radius: inherit; background: var(--color-primary-600); transition: inline-size .35s ease; }
 .gestao-chart-donut { display: grid; grid-template-columns: 1fr auto; align-content: start; gap: 12px; }
 .gestao-chart-donut > p { grid-column: 1 / -1; margin: 0; font-size: .86rem; }
-.gestao-donut { display: grid; place-items: center; inline-size: 112px; aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--color-primary-600) var(--gestao-donut), var(--color-primary-50) 0); }
-.gestao-donut::after { content: ''; position: absolute; inline-size: 82px; aspect-ratio: 1; border-radius: 50%; background: var(--color-surface); }
+.gestao-donut { position: relative; display: grid; place-items: center; inline-size: 112px; aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--color-primary-600) var(--gestao-donut), var(--color-primary-50) 0); isolation: isolate; }
+.gestao-donut::after { position: absolute; inset: 15px; z-index: -1; content: ''; border-radius: 50%; background: var(--color-surface); }
 .gestao-donut strong { position: relative; z-index: 1; font-size: 1.2rem; }
 @media (max-width: 760px) { .gestao-dashboard-charts { grid-template-columns: 1fr; } }
 .gestao-dashboard-map .gestao-section-head { margin-block-start: 0; }
@@ -248,5 +251,4 @@
 @media (max-width: 800px) { .gestao-health { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .gestao-dashboard-intro { grid-template-columns: 1fr; } .gestao-dashboard-intro .gestao-status { justify-self: start; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
 @media (max-width: 460px) { .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } }
-@media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-metrics > div:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover, .gestao-metrics > div:hover { transform: none; } }

@@ -8,11 +8,14 @@ type ModalGestaoProps = {
   onClose: () => void
   children: React.ReactNode
   labelledBy?: string
+  describedBy?: string
+  initialFocus?: 'close' | 'content'
 }
 
-export default function ModalGestao({ open, title, description, onClose, children, labelledBy }: ModalGestaoProps) {
+export default function ModalGestao({ open, title, description, onClose, children, labelledBy, describedBy, initialFocus = 'content' }: ModalGestaoProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -23,7 +26,8 @@ export default function ModalGestao({ open, title, description, onClose, childre
 
   useEffect(() => {
     if (!open) return
-    closeButtonRef.current?.focus()
+    if (initialFocus === 'close') closeButtonRef.current?.focus()
+    else (contentRef.current?.querySelector<HTMLElement>('input, select, textarea, button, a') ?? closeButtonRef.current)?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
@@ -31,10 +35,10 @@ export default function ModalGestao({ open, title, description, onClose, childre
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  return <dialog ref={dialogRef} className="gestao-modal" aria-labelledby={labelledBy} onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+  return <dialog ref={dialogRef} className="gestao-modal" aria-labelledby={labelledBy} aria-describedby={describedBy} onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <div className="gestao-modal-shell">
       <header className="gestao-modal-header">
-        <div><span className="gestao-eyebrow">Gestão de contratos</span><h2 id={labelledBy}>{title}</h2>{description && <p>{description}</p>}</div>
+        <div><span className="gestao-eyebrow">Gestão de contratos</span><h2 id={labelledBy}>{title}</h2>{description && <p id={describedBy}>{description}</p>}</div>
         <button ref={closeButtonRef} type="button" className="gestao-modal-close" onClick={onClose} aria-label="Fechar janela">×</button>
       </header>
       <div className="gestao-modal-body">{children}</div>
