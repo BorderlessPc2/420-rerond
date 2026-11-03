@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { calcularDashboardGestao, getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGestao, type Contrato, type Ponto, type Protocolo } from '../services/gestaoContratos'
+import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGestao, type Contrato, type Etapa, type Ponto, type Protocolo } from '../services/gestaoContratos'
+import { calcularDashboardGestao } from '../services/gestaoDashboard'
+import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
+import GestaoDashboardCharts from '../components/gestao/GestaoDashboardCharts'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
 import { classificarPrazo, resumirPrioridades } from '../utils/gestaoPrioridades'
 import { nomeGestao } from './gestaoUi'
+import { resumoContratoGestao, tituloContratoGestao } from './gestaoContratoHelpers'
 import './GestaoContratos.css'
+
+const etapasFiltro: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
+type DashboardQueryKey = 'estado' | 'concessionaria' | 'rodovia' | 'status' | 'tipo' | 'etapa' | 'inicio' | 'fim' | 'q'
 
 export type GestaoContext = { contrato: Contrato; protocolos: Protocolo[]; pontos: Ponto[]; refresh: () => Promise<void> }
 export default function GestaoContratoDetalhe() {
@@ -15,8 +22,18 @@ export default function GestaoContratoDetalhe() {
   const [protocolos, setProtocolos] = useState<Protocolo[]>([])
   const [pontos, setPontos] = useState<Ponto[]>([])
   const [error, setError] = useState('')
-  const estado = searchParams.get('estado') ?? ''
-  const filtro = { estado, concessionaria: '', rodovia: '', protocoloId: '', pontoCodigo: '', status: '', tipo: '', etapa: '', inicio: '', fim: '' }
+  const [exportando, setExportando] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
+  const filtro = useMemo(() => gestaoFiltroFromSearchParams(searchParams), [searchParams])
+  const { estado, concessionaria, rodovia, status, tipo, etapa, inicio, fim, busca } = filtro
+  const setDashboardParam = (key: DashboardQueryKey, value: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    setSearchParams(next)
+  }
+  const clearDashboardFilters = () => setSearchParams({})
+  const hasDashboardFilter = Boolean(estado || concessionaria || rodovia || status || tipo || etapa || inicio || fim || busca)
   const refresh = async () => {
     try {
       const found = await getContrato(contratoId)
@@ -26,29 +43,52 @@ export default function GestaoContratoDetalhe() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao carregar contrato.') }
   }
   useEffect(() => { void refresh() }, [contratoId])
-  const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, estado])
+  const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
   const totals = indicadoresGestao(filtrado.protocolos, filtrado.pontos)
-  const dashboard = calcularDashboardGestao(protocolos, pontos, estado)
+  const dashboard = useMemo(() => calcularDashboardGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
+  const exportarRecorte = async () => {
+    if (!contrato) return
+    setExportando(true)
+    try {
+      const result = exportarRecorteGestao(contrato.nome, protocolos, pontos, filtro)
+      setError('')
+      setExportMessage(`Exportado: ${result.protocolos} protocolos e ${result.pontos} pontos.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao exportar recorte.')
+    } finally {
+      setExportando(false)
+    }
+  }
+  const statusOpcoes = useMemo(() => [...new Set(protocolos.map((item) => item.status))].sort(), [protocolos])
   const prioridades = resumirPrioridades(filtrado.protocolos)
   if (!contrato) return <div className="gestao-page"><Link to="/gestao-contratos">Voltar aos contratos</Link><p role="alert">{error || 'Carregando contrato...'}</p></div>
   const base = `/gestao-contratos/${contratoId}`
   const isOverview = location.pathname === base
   return <div className="gestao-page">
-    <header className="gestao-header"><div><Link className="gestao-back" to="/gestao-contratos">← Todos os contratos</Link><span className="gestao-eyebrow">Contrato selecionado</span><h1>{contrato.nome}</h1><p>Protocolos, pontos e entregas no mesmo contexto.</p></div></header>
+    <header className="gestao-header"><div><Link className="gestao-back" to="/gestao-contratos">← Todos os contratos</Link><span className="gestao-eyebrow">Contrato selecionado{contrato.numero?.trim() ? ` · ${contrato.numero}` : ''}</span><h1>{tituloContratoGestao(contrato.nome, contrato.numero)}</h1><p>{resumoContratoGestao(contrato) || 'Protocolos, pontos e entregas no mesmo contexto.'}</p>{contrato.objeto?.trim() && <p className="gestao-contract-object">{contrato.objeto}</p>}{contrato.observacoes?.trim() && <p className="gestao-contract-notes"><strong>Observações:</strong> {contrato.observacoes}</p>}</div>{contrato.situacao && contrato.situacao !== 'ativo' && <span className="gestao-status">{nomeGestao(contrato.situacao)}</span>}</header>
     <nav aria-label="Áreas do contrato" className="gestao-nav">
       <NavLink end to={base}>Visão geral</NavLink><NavLink to={`${base}/protocolos`}>Protocolos</NavLink><NavLink to={`${base}/pontos`}>Pontos</NavLink><NavLink to={`${base}/planejamento`}>Planejamento</NavLink><NavLink to={`${base}/mapa`}>Mapa</NavLink>
     </nav>
     {error && <p className="gestao-error" role="alert">{error}</p>}
+    {exportMessage && <p className="gestao-success" role="status">{exportMessage}</p>}
     {isOverview && <>
     <section className="gestao-dashboard-intro" aria-label="Resumo do contrato">
       <div><span className="gestao-eyebrow">Painel operacional</span><h2>Decida o próximo movimento</h2><p>Use este recorte para localizar gargalos, revisar prazos e abrir o contexto certo sem perder o contrato atual.</p></div>
-      <div className="gestao-dashboard-filter"><label htmlFor="gestao-dashboard-estado">Estado</label><select id="gestao-dashboard-estado" value={estado} onChange={(event) => { const next = new URLSearchParams(searchParams); if (event.target.value) next.set('estado', event.target.value); else next.delete('estado'); setSearchParams(next) }}><option value="">Todos os estados</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select>{estado && <button type="button" className="gestao-button-link" onClick={() => { const next = new URLSearchParams(searchParams); next.delete('estado'); setSearchParams(next) }}>Limpar filtro</button>}</div>
+      <div className="gestao-dashboard-filters">
+        <label htmlFor="gestao-dashboard-estado">Estado<select id="gestao-dashboard-estado" value={estado} onChange={(event) => setDashboardParam('estado', event.target.value)}><option value="">Todos</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+        <label htmlFor="gestao-dashboard-concessionaria">Concessionária<select id="gestao-dashboard-concessionaria" value={concessionaria} onChange={(event) => setDashboardParam('concessionaria', event.target.value)}><option value="">Todas</option>{dashboard.concessionarias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+        <label htmlFor="gestao-dashboard-rodovia">Rodovia<select id="gestao-dashboard-rodovia" value={rodovia} onChange={(event) => setDashboardParam('rodovia', event.target.value)}><option value="">Todas</option>{dashboard.rodovias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+        <label htmlFor="gestao-dashboard-status">Status<select id="gestao-dashboard-status" value={status ?? ''} onChange={(event) => setDashboardParam('status', event.target.value)}><option value="">Todos</option>{statusOpcoes.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
+        <label htmlFor="gestao-dashboard-tipo">Tipo de ponto<select id="gestao-dashboard-tipo" value={tipo ?? ''} onChange={(event) => setDashboardParam('tipo', event.target.value)}><option value="">Todos</option><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select></label>
+        <label htmlFor="gestao-dashboard-etapa">Etapa<select id="gestao-dashboard-etapa" value={etapa ?? ''} onChange={(event) => setDashboardParam('etapa', event.target.value)}><option value="">Todas</option>{etapasFiltro.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
+        <label htmlFor="gestao-dashboard-inicio">Previsão de<input id="gestao-dashboard-inicio" type="date" value={inicio ?? ''} onChange={(event) => setDashboardParam('inicio', event.target.value)} /></label>
+        <label htmlFor="gestao-dashboard-fim">Previsão até<input id="gestao-dashboard-fim" type="date" value={fim ?? ''} onChange={(event) => setDashboardParam('fim', event.target.value)} /></label>
+        <label htmlFor="gestao-dashboard-busca">Busca<input id="gestao-dashboard-busca" type="search" placeholder="Protocolo ou ponto" value={busca ?? ''} onChange={(event) => setDashboardParam('q', event.target.value)} /></label>
+        <div className="gestao-dashboard-filters-actions">{hasDashboardFilter && <button type="button" className="gestao-button-link" onClick={clearDashboardFilters}>Limpar filtros</button>}<button type="button" className="gestao-button-secondary" disabled={exportando} onClick={() => void exportarRecorte()}>{exportando ? 'Exportando…' : 'Exportar recorte (XLSX)'}</button></div>
+      </div>
     </section>
-    <p className="gestao-dashboard-live" aria-live="polite">{totals.protocolos} protocolos e {totals.pontos} pontos no recorte atual.</p>
-    <section className="gestao-dashboard-charts" aria-label="Indicadores visuais">
-      <div className="gestao-chart-card" role="img" aria-label={`Distribuição de ${dashboard.totalProtocolos} protocolos por status` }><div className="gestao-section-head"><div><span className="gestao-eyebrow">Distribuição</span><h3>Status dos protocolos</h3></div><strong>{dashboard.totalProtocolos}</strong></div>{dashboard.status.length ? <div className="gestao-bars">{dashboard.status.map((item) => <div className="gestao-bar-row" key={item.status}><span>{nomeGestao(item.status)}</span><div className="gestao-bar-track"><i style={{ inlineSize: `${dashboard.totalProtocolos ? Math.max(8, (item.total / dashboard.totalProtocolos) * 100) : 0}%` }} /></div><strong>{item.total}</strong></div>)}</div> : <p className="gestao-chart-empty">Nenhum protocolo neste recorte.</p>}</div>
-      <div className="gestao-chart-card gestao-chart-donut" role="img" aria-label="Percentual de pontos concluídos"><div><span className="gestao-eyebrow">Pontos</span><h3>Conclusão operacional</h3></div>{dashboard.totalPontos ? <><div className="gestao-donut" style={{ '--gestao-donut': `${Math.round(((dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao) / dashboard.totalPontos) * 100)}%` } as React.CSSProperties}><strong>{Math.round(((dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao) / dashboard.totalPontos) * 100)}%</strong></div><p>{dashboard.indicadores.regularizados + dashboard.indicadores.aprovadosImplantacao} de {dashboard.totalPontos} pontos concluídos</p></> : <p className="gestao-chart-empty">Nenhum ponto neste recorte.</p>}</div>
-    </section>
+    <p className="gestao-dashboard-live" aria-live="polite">{totals.protocolos} protocolos, {totals.pontos} pontos{dashboard.pontosSemProtocolo ? ` (${dashboard.pontosSemProtocolo} sem protocolo)` : ''} no recorte atual.</p>
+    <GestaoDashboardCharts data={dashboard} />
     <section className="gestao-health" aria-label="Saúde operacional do contrato">
       <div className="gestao-health-main">
         <div><span className="gestao-eyebrow">Saúde operacional</span><h2>{totals.atrasados ? 'Atenção necessária' : totals.protocolos ? 'Operação sob controle' : 'Pronto para começar'}</h2><p>{totals.atrasados ? `${totals.atrasados} protocolo${totals.atrasados === 1 ? '' : 's'} com prazo vencido pede${totals.atrasados === 1 ? '' : 'm'} ação.` : 'Acompanhe prazos, aprovações e localização dos pontos em um só lugar.'}</p></div>

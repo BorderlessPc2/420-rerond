@@ -1,0 +1,27 @@
+.gestao-status-chart { display: grid; grid-template-columns: minmax(120px, 150px) minmax(0, 1fr); gap: 18px; align-items: center; }
+.gestao-pie { inline-size: 100%; max-inline-size: 150px; aspect-ratio: 1; transform: rotate(-90deg); }
+.gestao-pie-track,
+.gestao-pie-segment { fill: none; stroke-width: 14; }
+.gestao-pie-track { stroke: var(--color-primary-50); }
+.gestao-pie-segment { transition: stroke-dasharray .35s ease, stroke-dashoffset .35s ease; }
+.gestao-pie-legend { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: .8rem; }
+.gestao-pie-legend li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.gestao-pie-legend i { inline-size: 12px; block-size: 12px; border-radius: 50%; }
+.gestao-pie-legend small { color: var(--color-text-soft); font-size: .74rem; }
+.gestao-chart-side { display: grid; gap: 18px; align-content: start; }
+.gestao-chart-side-block { display: grid; gap: 10px; }
+.gestao-chart-side-block .gestao-chart-donut { grid-template-columns: 1fr auto; }
+.gestao-chart-meta { margin: 0; color: var(--color-text-soft); font-size: .8rem; }
+.gestao-bars-compact { margin-block-start: 6px; }
+.gestao-dashboard-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
+.gestao-dashboard-filters label { display: grid; gap: 6px; color: var(--color-text-soft); font-size: .78rem; font-weight: 700; }
+.gestao-dashboard-filters-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+@media (max-width: 760px) {
+  .gestao-status-chart { grid-template-columns: 1fr; justify-items: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gestao-pie-segment,
+  .gestao-bar-track i { transition: none; }
+}

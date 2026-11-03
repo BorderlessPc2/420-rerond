@@ -431,29 +431,34 @@ Regras de consistência:
 
 ### Implementado
 
-- cadastro básico de contratos;
-- criação de protocolos;
-- criação conjunta de protocolo e pontos;
-- criação avulsa de pontos;
-- validações compartilhadas;
-- planejamento básico;
-- movimentações com anexos;
-- atualização de etapa e status;
-- importação XLSX/CSV com prévia;
-- agrupamento por protocolo;
-- prevenção de duplicidades;
-- filtros e indicadores básicos;
-- testes unitários e build.
+- cadastro de contratos com número, objeto, vigência, situação e observações;
+- criação e edição de protocolos e pontos **sem recriar IDs**;
+- validações compartilhadas (`gestaoValidacao`, transições em `gestaoTransicoes`);
+- planejamento básico e movimentações com anexos (transação: validação antes de upload; anexos em update separado);
+- matriz de transições de etapa/status com **composer guiado** (intenções, De→Para, selects filtrados), stepper premium no detalhe e diff no histórico;
+- tokens de motion `--gestao-*` e cores semânticas unificadas no CSS do módulo;
+- importação XLSX/CSV com prévia enriquecida, plano por grupo, idempotência na reimportação e export de erros;
+- filtros combinados (incl. busca), ordenação, indicadores/dashboard alinhados ao recorte filtrado;
+- exportação XLSX (protocolos + pontos) a partir da visão geral;
+- mapa e UI/UX do módulo (modais, acessibilidade, responsividade);
+- testes Vitest dos riscos críticos (vínculo, transição, importação, exportação, dashboard);
+- regras Firestore atualizadas para contrato estendido, movimentos e protocolo concluído.
 
-### Próxima ordem de implementação
+### Pendente ou v2
 
-1. Editar protocolo e ponto sem criar novo registro.
-2. Completar cadastro e edição de contrato.
-3. Definir e aplicar transições válidas de etapa/status.
-4. Completar auditoria e histórico de alterações.
-5. Fortalecer importação: arquivo vazio, cabeçalhos, prévia de mudanças e lotes.
-6. Adicionar indicadores operacionais: atrasos, pendências e paralisados.
-7. Adicionar exportação e, depois, mapa.
+- anexos contratuais no cadastro do contrato (Storage `gestaoContratos/{id}/anexos/`);
+- bloqueio operacional de novos protocolos quando contrato suspenso/encerrado (hoje `situacao` é informativa);
+- indicadores avançados dedicados (atrasos, pendências, paralisados) além dos gráficos atuais;
+- presets de transição por tipo de movimentação (campo livre “tipo”);
+- auditoria detalhada campo a campo além do histórico de movimentações;
+- migração em massa ao alterar rodovia/concessionária de protocolo com pontos vinculados.
+
+### Próxima ordem sugerida (pós ciclo 03/11/2026)
+
+1. Validar roteiro autenticado (§11) e publicar rules/hosting se ainda não publicados.
+2. Anexos contratuais e regras de Storage associadas.
+3. Regras de negócio para `situacao` do contrato impedir novos protocolos.
+4. Indicadores operacionais adicionais e exportações complementares.
 
 ## 9. Critérios de aceite do próximo ciclo
 

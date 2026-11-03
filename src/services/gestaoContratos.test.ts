@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDashboardGestao, criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
+import { calcularDashboardGestao, criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarPatchProtocoloComPontos, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
 import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
-import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
+import { validarInputContrato, validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
 const protocolos: Protocolo[] = [
   { id: 'a', contratoId: 'c', titulo: 'A', concessionaria: 'Eco', rodovia: 'BR-101', etapa: 'fase_1', status: 'em_correcao' },
@@ -47,7 +47,8 @@ describe('recorte operacional', () => {
     expect(indicadoresGestao([{ ...protocolos[0], previsao: data }], [])).toMatchObject({ atrasados: 0 })
   })
   it('gera séries do dashboard por status e estado', () => {
-    expect(calcularDashboardGestao(protocolos, pontos, 'ES')).toMatchObject({ estados: ['ES', 'RJ'], status: [{ status: 'em_correcao', total: 1 }], totalPontos: 1 })
+    expect(calcularDashboardGestao(protocolos, pontos, 'ES')).toMatchObject({ estados: ['ES', 'RJ'], totalPontos: 1, totalProtocolos: 1 })
+    expect(calcularDashboardGestao(protocolos, pontos, 'ES').status).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'em_correcao', total: 1 })]))
   })
 })
 
@@ -88,5 +89,15 @@ describe('validação de gestão', () => {
   })
   it('rejeita transição para correção sem observação', () => {
     expect(validarTransicao('fase_1', 'em_andamento', 'fase_1', 'em_correcao', '')).toBe('Informe observação para correção ou paralisação.')
+  })
+  it('bloqueia alteração de rodovia do protocolo quando há pontos vinculados', () => {
+    const atual = { concessionaria: 'Eco', rodovia: 'BR-101' }
+    expect(validarPatchProtocoloComPontos(atual, { ...atual, rodovia: 'BR-116' }, 2)).toBe('Não é possível alterar concessionária ou rodovia com pontos vinculados.')
+    expect(validarPatchProtocoloComPontos(atual, atual, 2)).toBeNull()
+    expect(validarPatchProtocoloComPontos(atual, { ...atual, rodovia: 'BR-116' }, 0)).toBeNull()
+  })
+  it('valida cadastro contratual estendido', () => {
+    expect(validarInputContrato({ nome: 'Contrato A', vigenciaInicio: '2026-12-01', vigenciaFim: '2026-01-01' })).toContain('Vigência inicial não pode ser posterior à final.')
+    expect(validarInputContrato({ nome: 'Contrato A', situacao: 'ativo' })).toEqual([])
   })
 })

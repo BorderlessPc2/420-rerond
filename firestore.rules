@@ -22,11 +22,21 @@ service cloud.firestore {
       return value in ['nao_iniciado', 'em_andamento', 'em_analise', 'em_correcao', 'aguardando_terceiros', 'paralisado', 'aprovado_concessionaria', 'concluido'];
     }
 
+    function validSituacaoContrato(value) {
+      return value in ['ativo', 'suspenso', 'encerrado'];
+    }
+
     function validContrato(data) {
-      return data.keys().hasAll(['nome', 'createdAt'])
-        && data.keys().hasOnly(['nome', 'clienteId', 'createdAt'])
+      return data.keys().hasAll(['nome', 'createdAt', 'situacao'])
+        && data.keys().hasOnly(['nome', 'clienteId', 'numero', 'objeto', 'vigenciaInicio', 'vigenciaFim', 'situacao', 'observacoes', 'createdAt'])
         && shortText(data.nome, 160)
         && optionalText(data, 'clienteId', 128)
+        && optionalText(data, 'numero', 80)
+        && optionalText(data, 'objeto', 2000)
+        && optionalText(data, 'observacoes', 5000)
+        && optionalDate(data, 'vigenciaInicio')
+        && optionalDate(data, 'vigenciaFim')
+        && validSituacaoContrato(data.situacao)
         && data.createdAt is timestamp;
     }
 
@@ -38,6 +48,8 @@ service cloud.firestore {
         && optionalText(data, 'numero', 100) && optionalText(data, 'processoAnaliseId', 128)
         && optionalDate(data, 'previsao') && optionalDate(data, 'realizadoEm')
         && validStage(data.etapa) && validStatus(data.status)
+        && (data.status != 'concluido' || data.etapa == 'concluido')
+        && (data.etapa != 'concluido' || data.status == 'concluido')
         && data.createdAt is timestamp;
     }
 
@@ -74,7 +86,8 @@ service cloud.firestore {
         && optionalDate(data, 'em') && data.em != ''
         && validStage(data.etapa) && validStatus(data.status)
         && data.autor is string && data.autor.size() <= 320
-        && data.autor == request.auth.token.email
+        && (data.autor == request.auth.uid
+          || (request.auth.token.email != null && data.autor == request.auth.token.email))
         && data.anexos is list && data.anexos.size() <= 10
         && data.anexos.hasOnly(data.anexos);
     }
@@ -115,7 +128,7 @@ service cloud.firestore {
       allow create: if request.auth != null && validContrato(request.resource.data)
         && request.resource.data.createdAt == request.time;
       allow update: if request.auth != null && validContrato(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'clienteId'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'clienteId', 'numero', 'objeto', 'vigenciaInicio', 'vigenciaFim', 'situacao', 'observacoes'])
         && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if request.auth != null;
     }
@@ -159,7 +172,16 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
         && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.etapa == request.resource.data.etapa
         && getAfter(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.status == request.resource.data.status;
-      allow update: if false;
+      allow update: if request.auth != null && validMovimento(request.resource.data, movimentoId)
+        && resource.data.contratoId == request.resource.data.contratoId
+        && resource.data.protocoloId == request.resource.data.protocoloId
+        && resource.data.tipo == request.resource.data.tipo
+        && resource.data.em == request.resource.data.em
+        && resource.data.etapa == request.resource.data.etapa
+        && resource.data.status == request.resource.data.status
+        && resource.data.autor == request.resource.data.autor
+        && resource.data.observacao == request.resource.data.observacao
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['anexos']);
       allow delete: if request.auth != null;
     }
 
