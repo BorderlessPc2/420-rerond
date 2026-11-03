@@ -182,8 +182,20 @@
 .gestao-sheet-fields small { color: var(--color-text-muted); }
 .gestao-import-limit-hint { margin: 0 0 12px; font-size: 0.9rem; color: var(--color-text-muted); }
 .gestao-import-group small { display: block; margin-top: 4px; color: var(--color-text-muted); }
-.gestao-dashboard-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: end; }
-.gestao-dashboard-filters-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; grid-column: 1 / -1; }
+.gestao-overview-panel { display: grid; gap: 18px; padding: 22px 24px 16px; margin-block: 4px 22px; border: 1px solid var(--color-border); border-radius: 18px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.gestao-overview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-block-end: 16px; border-bottom: 1px solid var(--color-border); }
+.gestao-overview-head h2 { margin: 4px 0 6px; font-size: 1.28rem; letter-spacing: -.03em; }
+.gestao-overview-head p { margin: 0; max-inline-size: 52ch; font-size: .9rem; }
+.gestao-overview-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 14px; }
+.gestao-overview-filters { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(220px, .9fr); gap: 18px 28px; }
+.gestao-overview-filters fieldset { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+.gestao-overview-filters legend { margin-block-end: 10px; padding: 0; color: var(--color-text-soft); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.gestao-overview-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gestao-overview-period .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gestao-overview-search { grid-column: 1 / -1; }
+.gestao-overview-panel label { display: grid; gap: 5px; min-inline-size: 0; color: var(--color-text-soft); font-size: .74rem; font-weight: 600; }
+.gestao-overview-panel :is(input, select) { min-block-size: 38px; padding: 7px 10px; font-size: .9rem; background: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-surface)); }
+.gestao-overview-live { margin: 0; padding-block-start: 2px; color: var(--color-text-soft); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .gestao-list-controls { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-block: 0 16px; align-items: end; }
 .gestao-list-controls label { display: grid; gap: 4px; font-size: .88rem; min-inline-size: min(220px, 100%); }
 .gestao-contract-object, .gestao-contract-notes { margin: 8px 0 0; max-inline-size: 60ch; color: var(--color-text-muted); }
@@ -257,7 +269,6 @@
 .gestao-legend-dot.approx { background: white; border: 2px solid var(--color-primary-700); }
 .gestao-map-detail { margin-block-start: 24px; }
 .gestao-dashboard-map { padding: 22px; margin-block: 24px 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
-.gestao-dashboard-live { margin-block: -10px 14px; font-size: .82rem; }
 .gestao-chart-empty { margin: 30px 0 0; font-size: .86rem; }
 .gestao-dashboard-charts { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(230px, .8fr); gap: 16px; margin-block: 20px 24px; }
 .gestao-chart-card { min-block-size: 220px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
@@ -309,10 +320,6 @@
   .gestao-list-link { padding: 15px; }
 }
 
-.gestao-dashboard-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 1fr); gap: 24px; padding: 28px; margin-block: 8px 22px; border: 1px solid var(--color-border); border-radius: 22px; background: linear-gradient(120deg, var(--color-primary-50), var(--color-surface) 70%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%), var(--shadow-sm); }
-.gestao-dashboard-intro h2 { margin-block: 4px 8px; }
-.gestao-dashboard-intro p { margin: 0; }
-.gestao-dashboard-intro .gestao-status { justify-self: end; }
 .gestao-dashboard-map { animation: gestao-section-in .28s cubic-bezier(.32,.72,0,1) both; }
 .gestao-attention { animation: gestao-section-in .3s .04s cubic-bezier(.32,.72,0,1) both; }
 .gestao-quicklinks .gestao-card { animation: gestao-section-in .3s ease both; }
@@ -339,6 +346,7 @@
 .gestao-health-stat-success strong { color: var(--color-success); }
 .gestao-health-stat-danger strong { color: var(--color-danger); }
 @media (max-width: 800px) { .gestao-health { grid-template-columns: 1fr; } }
-@media (max-width: 700px) { .gestao-dashboard-intro { grid-template-columns: 1fr; } .gestao-dashboard-intro .gestao-status { justify-self: start; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
+@media (max-width: 1080px) { .gestao-overview-filters { grid-template-columns: 1fr 1fr; } .gestao-overview-period { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
 @media (max-width: 460px) { .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } }
 @media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover, .gestao-metrics > div:hover { transform: none; } }

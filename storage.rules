@@ -10,7 +10,10 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/gestaoProtocolos/$(protocoloId))
         && firestore.get(/databases/(default)/documents/gestaoProtocolos/$(protocoloId)).data.contratoId == contratoId
         && request.resource.size < 20 * 1024 * 1024
-        && request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+        && (
+          request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
+          || (request.resource.contentType == 'application/octet-stream' && fileName.matches('(?i).*\\.(pdf|png|jpe?g|docx?|txt)$'))
+        );
       allow update, delete: if false;
     }
 

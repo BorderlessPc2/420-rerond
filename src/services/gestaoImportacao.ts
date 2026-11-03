@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 import type { Protocolo } from './gestaoContratos'
@@ -393,15 +393,32 @@ export const importarProtocolosEPontos = async (contratoId: string, preview: Imp
       }
       if (protocol && !planejamento.pontosNovos.length && group.pontos.length) continue
       const protocolRef = protocol ? doc(db, 'gestaoProtocolos', protocol.id) : doc(collection(db, 'gestaoProtocolos'))
-      const writes: { ref: ReturnType<typeof doc>; data: Record<string, unknown> }[] = protocol
-        ? []
-        : [{ ref: protocolRef, data: { ...group.input, contratoId, etapa: 'planejamento', status: 'nao_iniciado', createdAt: serverTimestamp() } }]
-      planejamento.pontosNovos.forEach((point) => {
-        writes.push({ ref: doc(collection(db, 'gestaoPontos')), data: { ...point, contratoId, protocoloId: protocolRef.id } })
-      })
-      if (!writes.length) continue
+      if (!protocol) {
+        await setDoc(protocolRef, {
+          titulo: group.input.titulo.trim(),
+          concessionaria: group.input.concessionaria.trim(),
+          rodovia: group.input.rodovia.trim(),
+          numero: group.input.numero?.trim() || '',
+          ...(group.input.processoAnaliseId?.trim() ? { processoAnaliseId: group.input.processoAnaliseId.trim() } : {}),
+          ...(group.input.previsao ? { previsao: group.input.previsao } : {}),
+          ...(group.input.realizadoEm ? { realizadoEm: group.input.realizadoEm } : {}),
+          contratoId,
+          etapa: 'planejamento',
+          status: 'nao_iniciado',
+          createdAt: serverTimestamp(),
+        })
+      }
+      if (!planejamento.pontosNovos.length) {
+        if (!protocol) {
+          existing.push({ id: protocolRef.id, contratoId, titulo: group.input.titulo, concessionaria: group.input.concessionaria, rodovia: group.input.rodovia, etapa: 'planejamento', status: 'nao_iniciado' })
+          result.importados += 1
+        }
+        continue
+      }
       const batch = writeBatch(db)
-      writes.forEach(({ ref, data }) => batch.set(ref, data))
+      planejamento.pontosNovos.forEach((point) => {
+        batch.set(doc(collection(db, 'gestaoPontos')), { ...point, contratoId, protocoloId: protocolRef.id })
+      })
       await batch.commit()
       if (!protocol) existing.push({ id: protocolRef.id, contratoId, titulo: group.input.titulo, concessionaria: group.input.concessionaria, rodovia: group.input.rodovia, etapa: 'planejamento', status: 'nao_iniciado' })
       result.importados += 1

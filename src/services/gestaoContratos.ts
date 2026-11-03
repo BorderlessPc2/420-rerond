@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, validarInputContrato, type ContratoInput, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
@@ -200,10 +200,10 @@ export const criarProtocoloComPontos = async (contratoId: string, input: Protoco
     createdAt: serverTimestamp(),
   }
   const protocoloRef = doc(collection(db, 'gestaoProtocolos'))
-  const pontoRefs = pontos.map(() => doc(collection(db, 'gestaoPontos')))
-  const writes = [
-    { ref: protocoloRef, data: protocoloData },
-    ...pontos.map((ponto, index) => {
+  await setDoc(protocoloRef, protocoloData)
+  if (pontos.length) {
+    const batch = writeBatch(db)
+    pontos.forEach((ponto) => {
       const data: Record<string, unknown> = {
         codigo: ponto.codigo.trim(),
         estado: ponto.estado.trim(),
@@ -222,12 +222,10 @@ export const criarProtocoloComPontos = async (contratoId: string, input: Protoco
       }
       if (ponto.previsao) data.previsao = ponto.previsao
       if (ponto.realizadoEm) data.realizadoEm = ponto.realizadoEm
-      return { ref: pontoRefs[index], data }
-    }),
-  ]
-  const batch = writeBatch(db)
-  writes.forEach(({ ref: target, data }) => batch.set(target, data))
-  await batch.commit()
+      batch.set(doc(collection(db, 'gestaoPontos')), data)
+    })
+    await batch.commit()
+  }
   return protocoloRef.id
 }
 export const atualizarPonto = async (contratoId: string, id: string, patch: Partial<Pick<Ponto, 'latitude' | 'longitude' | 'precisao' | 'previsao' | 'realizadoEm' | 'resultado'>>) => {
@@ -254,6 +252,11 @@ export const registrarMovimento = async (contratoId: string, protocoloId: string
   if (transitionError) throw new Error(transitionError)
   const files = input.files ?? []
   if (files.some((file) => file.size > 20 * 1024 * 1024)) throw new Error('Cada anexo deve ter até 20 MB.')
+  const anexoPermitido = (file: File) => {
+    const tipos = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
+    return tipos.includes(file.type) || ((!file.type || file.type === 'application/octet-stream') && /\.(pdf|png|jpe?g|docx?|txt)$/i.test(file.name))
+  }
+  if (files.some((file) => !anexoPermitido(file))) throw new Error('Anexe apenas PDF, Word, TXT, PNG ou JPEG.')
   const movementRef = doc(collection(db, 'gestaoMovimentos'))
   await runTransaction(db, async (transaction) => {
     const current = await transaction.get(doc(db, 'gestaoProtocolos', protocoloId))

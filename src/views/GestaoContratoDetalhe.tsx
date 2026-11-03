@@ -72,22 +72,46 @@ export default function GestaoContratoDetalhe() {
     {error && <p className="gestao-error" role="alert">{error}</p>}
     {exportMessage && <p className="gestao-success" role="status">{exportMessage}</p>}
     {isOverview && <>
-    <section className="gestao-dashboard-intro" aria-label="Resumo do contrato">
-      <div><span className="gestao-eyebrow">Painel operacional</span><h2>Decida o próximo movimento</h2><p>Use este recorte para localizar gargalos, revisar prazos e abrir o contexto certo sem perder o contrato atual.</p></div>
-      <div className="gestao-dashboard-filters">
-        <label htmlFor="gestao-dashboard-estado">Estado<select id="gestao-dashboard-estado" value={estado} onChange={(event) => setDashboardParam('estado', event.target.value)}><option value="">Todos</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-        <label htmlFor="gestao-dashboard-concessionaria">Concessionária<select id="gestao-dashboard-concessionaria" value={concessionaria} onChange={(event) => setDashboardParam('concessionaria', event.target.value)}><option value="">Todas</option>{dashboard.concessionarias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-        <label htmlFor="gestao-dashboard-rodovia">Rodovia<select id="gestao-dashboard-rodovia" value={rodovia} onChange={(event) => setDashboardParam('rodovia', event.target.value)}><option value="">Todas</option>{dashboard.rodovias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-        <label htmlFor="gestao-dashboard-status">Status<select id="gestao-dashboard-status" value={status ?? ''} onChange={(event) => setDashboardParam('status', event.target.value)}><option value="">Todos</option>{statusOpcoes.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
-        <label htmlFor="gestao-dashboard-tipo">Tipo de ponto<select id="gestao-dashboard-tipo" value={tipo ?? ''} onChange={(event) => setDashboardParam('tipo', event.target.value)}><option value="">Todos</option><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select></label>
-        <label htmlFor="gestao-dashboard-etapa">Etapa<select id="gestao-dashboard-etapa" value={etapa ?? ''} onChange={(event) => setDashboardParam('etapa', event.target.value)}><option value="">Todas</option>{etapasFiltro.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
-        <label htmlFor="gestao-dashboard-inicio">Previsão de<input id="gestao-dashboard-inicio" type="date" value={inicio ?? ''} onChange={(event) => setDashboardParam('inicio', event.target.value)} /></label>
-        <label htmlFor="gestao-dashboard-fim">Previsão até<input id="gestao-dashboard-fim" type="date" value={fim ?? ''} onChange={(event) => setDashboardParam('fim', event.target.value)} /></label>
-        <label htmlFor="gestao-dashboard-busca">Busca<input id="gestao-dashboard-busca" type="search" placeholder="Protocolo ou ponto" value={busca ?? ''} onChange={(event) => setDashboardParam('q', event.target.value)} /></label>
-        <div className="gestao-dashboard-filters-actions">{hasDashboardFilter && <button type="button" className="gestao-button-link" onClick={clearDashboardFilters}>Limpar filtros</button>}<button type="button" className="gestao-button-secondary" disabled={exportando} onClick={() => void exportarRecorte()}>{exportando ? 'Exportando…' : 'Exportar recorte (XLSX)'}</button></div>
+    <section className="gestao-overview-panel" aria-label="Recorte da visão geral">
+      <header className="gestao-overview-head">
+        <div>
+          <span className="gestao-eyebrow">Visão geral</span>
+          <h2>Recorte operacional</h2>
+          <p>Filtre protocolos e pontos deste contrato. Indicadores, mapa e listas usam o mesmo recorte.</p>
+        </div>
+        <div className="gestao-overview-actions">
+          {hasDashboardFilter && <button type="button" className="gestao-button-link" onClick={clearDashboardFilters}>Limpar filtros</button>}
+          <button type="button" className="gestao-button-secondary" disabled={exportando} onClick={() => void exportarRecorte()}>{exportando ? 'Exportando…' : 'Exportar XLSX'}</button>
+        </div>
+      </header>
+      <div className="gestao-overview-filters">
+        <fieldset>
+          <legend>Local</legend>
+          <div className="gestao-overview-fields">
+            <label htmlFor="gestao-dashboard-estado">Estado<select id="gestao-dashboard-estado" value={estado} onChange={(event) => setDashboardParam('estado', event.target.value)}><option value="">Todos</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+            <label htmlFor="gestao-dashboard-concessionaria">Concessionária<select id="gestao-dashboard-concessionaria" value={concessionaria} onChange={(event) => setDashboardParam('concessionaria', event.target.value)}><option value="">Todas</option>{dashboard.concessionarias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+            <label htmlFor="gestao-dashboard-rodovia">Rodovia<select id="gestao-dashboard-rodovia" value={rodovia} onChange={(event) => setDashboardParam('rodovia', event.target.value)}><option value="">Todas</option>{dashboard.rodovias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Operação</legend>
+          <div className="gestao-overview-fields">
+            <label htmlFor="gestao-dashboard-status">Status<select id="gestao-dashboard-status" value={status ?? ''} onChange={(event) => setDashboardParam('status', event.target.value)}><option value="">Todos</option>{statusOpcoes.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
+            <label htmlFor="gestao-dashboard-tipo">Tipo de ponto<select id="gestao-dashboard-tipo" value={tipo ?? ''} onChange={(event) => setDashboardParam('tipo', event.target.value)}><option value="">Todos</option><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select></label>
+            <label htmlFor="gestao-dashboard-etapa">Etapa<select id="gestao-dashboard-etapa" value={etapa ?? ''} onChange={(event) => setDashboardParam('etapa', event.target.value)}><option value="">Todas</option>{etapasFiltro.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
+          </div>
+        </fieldset>
+        <fieldset className="gestao-overview-period">
+          <legend>Prazo e busca</legend>
+          <div className="gestao-overview-fields">
+            <label htmlFor="gestao-dashboard-inicio">Previsão de<input id="gestao-dashboard-inicio" lang="pt-BR" type="date" value={inicio ?? ''} onChange={(event) => setDashboardParam('inicio', event.target.value)} /></label>
+            <label htmlFor="gestao-dashboard-fim">Previsão até<input id="gestao-dashboard-fim" lang="pt-BR" type="date" value={fim ?? ''} onChange={(event) => setDashboardParam('fim', event.target.value)} /></label>
+            <label className="gestao-overview-search" htmlFor="gestao-dashboard-busca">Busca<input id="gestao-dashboard-busca" type="search" placeholder="Título, código ou rodovia" value={busca ?? ''} onChange={(event) => setDashboardParam('q', event.target.value)} /></label>
+          </div>
+        </fieldset>
       </div>
+      <p className="gestao-overview-live" aria-live="polite">{totals.protocolos} protocolos · {totals.pontos} pontos{dashboard.pontosSemProtocolo ? ` · ${dashboard.pontosSemProtocolo} sem protocolo` : ''}</p>
     </section>
-    <p className="gestao-dashboard-live" aria-live="polite">{totals.protocolos} protocolos, {totals.pontos} pontos{dashboard.pontosSemProtocolo ? ` (${dashboard.pontosSemProtocolo} sem protocolo)` : ''} no recorte atual.</p>
     <GestaoDashboardCharts data={dashboard} />
     <section className="gestao-health" aria-label="Saúde operacional do contrato">
       <div className="gestao-health-main">

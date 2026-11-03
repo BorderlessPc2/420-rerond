@@ -61,8 +61,8 @@ export default function GestaoPontos() {
       tipo: editTipo,
       concessionaria: proc?.concessionaria ?? editing.concessionaria,
       rodovia: proc?.rodovia ?? editing.rodovia,
-      previsao: editPrevisao || undefined,
-      realizadoEm: editRealizado || undefined,
+      previsao: editPrevisao,
+      realizadoEm: editRealizado,
       ...(editResultado ? { resultado: editResultado } : {}),
       ...(editLatitude && editLongitude ? { latitude: Number(editLatitude), longitude: Number(editLongitude), precisao: editPrecisao } : {}),
     }

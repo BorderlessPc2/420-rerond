@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "gestaoPontos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "contratoId", "order": "ASCENDING" },
+        { "fieldPath": "protocoloId", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

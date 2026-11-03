@@ -53,6 +53,14 @@ service cloud.firestore {
         && data.createdAt is timestamp;
     }
 
+    function protocoloReferenciaPontoOk(protocoloId, contratoId, concessionaria, rodovia) {
+      let path = /databases/$(database)/documents/gestaoProtocolos/$(protocoloId);
+      return exists(path)
+        && getAfter(path).data.contratoId == contratoId
+        && getAfter(path).data.concessionaria == concessionaria
+        && getAfter(path).data.rodovia == rodovia;
+    }
+
     function validPonto(data) {
       return data.keys().hasAll(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo'])
         && data.keys().hasOnly(['contratoId', 'protocoloId', 'codigo', 'estado', 'concessionaria', 'rodovia', 'km', 'tipo', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
@@ -147,21 +155,23 @@ service cloud.firestore {
     match /gestaoPontos/{pontoId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && validPonto(request.resource.data)
-        && (request.resource.data.protocoloId == null || (
-          exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia
-        ));
+        && (request.resource.data.protocoloId == null
+          || protocoloReferenciaPontoOk(
+            request.resource.data.protocoloId,
+            request.resource.data.contratoId,
+            request.resource.data.concessionaria,
+            request.resource.data.rodovia
+          ));
       allow update: if request.auth != null && validPonto(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['protocoloId', 'codigo', 'estado', 'km', 'tipo', 'concessionaria', 'rodovia', 'resultado', 'latitude', 'longitude', 'precisao', 'previsao', 'realizadoEm'])
         && request.resource.data.contratoId == resource.data.contratoId
-        && (request.resource.data.protocoloId == null || (
-          exists(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId))
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.contratoId == request.resource.data.contratoId
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.concessionaria == request.resource.data.concessionaria
-          && get(/databases/$(database)/documents/gestaoProtocolos/$(request.resource.data.protocoloId)).data.rodovia == request.resource.data.rodovia
-        ));
+        && (request.resource.data.protocoloId == null
+          || protocoloReferenciaPontoOk(
+            request.resource.data.protocoloId,
+            request.resource.data.contratoId,
+            request.resource.data.concessionaria,
+            request.resource.data.rodovia
+          ));
       allow delete: if request.auth != null && resource.data.contratoId is string;
     }
 
