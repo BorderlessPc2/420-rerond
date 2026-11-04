@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ponto, Protocolo } from '../../services/gestaoContratos'
-import { getMapBounds, getMapPoints, getPontoColor } from './mapaUtils'
+import { getMapBounds, getMapPoints, getPontoColor, getPontoMapLabel, getPontoMapMeta } from './mapaUtils'
+import { nomeGestao } from '../../views/gestaoUi'
 import './MapaLeaflet.css'
 
 export type MapaLeafletProps = {
@@ -19,8 +20,6 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
   const elementRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.LayerGroup | null>(null)
-  const selectedPointIdRef = useRef(selectedPointId)
-  selectedPointIdRef.current = selectedPointId
 
   useEffect(() => {
     if (!elementRef.current || mapRef.current || mapError) return
@@ -33,8 +32,10 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
       mapRef.current = map
       layersRef.current = L.layerGroup().addTo(map)
       return () => { map.remove(); mapRef.current = null; layersRef.current = null }
-    } catch { setMapError(true) }
-  }, [])
+    } catch {
+      window.setTimeout(() => setMapError(true), 0)
+    }
+  }, [mapError])
 
   useEffect(() => {
     const map = mapRef.current
@@ -51,9 +52,19 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
         fillColor: getPontoColor(ponto, protocolo),
         fillOpacity: 0.95,
       })
-      const label = `${ponto.codigo}, ${ponto.rodovia} km ${ponto.km}`
-      marker.bindTooltip(label)
-      marker.on('click', () => onSelectPoint(ponto))
+      const label = getPontoMapLabel(ponto)
+      const meta = getPontoMapMeta(ponto, protocolo)
+      marker.bindTooltip(label, { direction: 'top', offset: [0, -8], opacity: 0.98 })
+      const popup = document.createElement('div')
+      const code = document.createElement('strong')
+      code.textContent = ponto.codigo
+      const location = document.createElement('span')
+      location.textContent = meta.location
+      const status = document.createElement('small')
+      status.textContent = nomeGestao(meta.status)
+      popup.append(code, location, status)
+      marker.bindPopup(popup, { closeButton: false, offset: [0, -8], className: 'gestao-map-popup' })
+      marker.on('click', () => { marker.openPopup(); onSelectPoint(ponto) })
       marker.on('add', () => {
         const element = marker.getElement()
         if (!(element instanceof HTMLElement)) return
@@ -67,11 +78,11 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
       marker.addTo(layers)
     })
     const bounds = getMapBounds(located)
-    if (bounds && fitBoundsOnChange && !selectedPointIdRef.current) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 })
+    if (bounds && fitBoundsOnChange && !selectedPointId) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 })
     const selected = located.find((ponto) => ponto.id === selectedPointId)
     if (selected) map.setView([selected.latitude as number, selected.longitude as number], Math.max(map.getZoom(), 14))
   }, [pontos, protocolos, selectedPointId, onSelectPoint, fitBoundsOnChange])
 
   if (mapError) return <div className="gestao-map-fallback" style={{ minHeight: height }} role="status"><strong>Mapa temporariamente indisponível.</strong><span>Os dados e pontos continuam disponíveis nas listas. Abra a aba de pontos para registrar ou revisar coordenadas.</span></div>
-  return <div ref={elementRef} className="gestao-leaflet-map" style={{ height }} aria-label="Mapa dos pontos do contrato" />
+  return <div ref={elementRef} className="gestao-leaflet-map" style={{ height }} role="application" aria-label="Mapa interativo dos pontos do contrato" />
 }

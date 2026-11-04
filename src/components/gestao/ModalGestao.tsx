@@ -2,6 +2,26 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import './ModalGestao.css'
 
+const getFocusable = (content: HTMLDivElement | null, closeButton: HTMLButtonElement | null) => [
+  ...(content?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]') ?? []),
+  ...(closeButton ? [closeButton] : []),
+]
+
+const trapFocus = (event: KeyboardEvent, content: HTMLDivElement | null, closeButton: HTMLButtonElement | null) => {
+  if (event.key !== 'Tab') return
+  const focusable = getFocusable(content, closeButton)
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 type ModalGestaoProps = {
   open: boolean
   title: string
@@ -27,6 +47,7 @@ export default function ModalGestao({ open, title, description, onClose, childre
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
   const focusSessionRef = useRef(false)
 
   useEffect(() => {
@@ -36,8 +57,11 @@ export default function ModalGestao({ open, title, description, onClose, childre
   useEffect(() => {
     if (!open) {
       focusSessionRef.current = false
+      previousFocusRef.current?.focus()
+      previousFocusRef.current = null
       return
     }
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -60,7 +84,9 @@ export default function ModalGestao({ open, title, description, onClose, childre
         event.preventDefault()
         event.stopPropagation()
         onCloseRef.current()
+        return
       }
+      trapFocus(event, contentRef.current, closeButtonRef.current)
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)

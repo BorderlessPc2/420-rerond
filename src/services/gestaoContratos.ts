@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, validarInputContrato, type ContratoInput, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
@@ -236,7 +236,7 @@ export const atualizarPonto = async (contratoId: string, id: string, patch: Part
   const longitude = patch.longitude ?? point.longitude
   if ((latitude === undefined) !== (longitude === undefined) || (latitude !== undefined && (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude! < -180 || longitude! > 180))) throw new Error('Coordenadas inválidas.')
   if (patch.resultado && ((point.tipo === 'regularizacao') !== (patch.resultado === 'regularizado'))) throw new Error('Resultado incompatível com classificação do ponto.')
-  await updateDoc(doc(db, 'gestaoPontos', id), { ...patch, ...(patch.resultado ? { realizadoEm: patch.realizadoEm || point.realizadoEm || new Date().toISOString().slice(0, 10) } : {}) })
+  await updateDoc(doc(db, 'gestaoPontos', id), { ...patch, ...(patch.resultado ? { realizadoEm: patch.realizadoEm || point.realizadoEm || new Date().toISOString().slice(0, 10) } : {}), ...(patch.resultado === undefined && 'resultado' in patch ? { resultado: deleteField(), realizadoEm: deleteField() } : {}) })
 }
 export const listMovimentos = async (contratoId: string, protocoloId: string) => {
   if (!(await getProtocolo(contratoId, protocoloId))) throw new Error('Protocolo não encontrado neste contrato.')
