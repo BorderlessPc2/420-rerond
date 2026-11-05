@@ -61,9 +61,9 @@ O relatório de 03/11 foi atualizado com o resultado do emulador (27 operações
 
 | Item | Resultado |
 |------|-----------|
-| Commit | registrado neste ciclo, na mensagem do Git |
-| Push | `main` → `origin/main` |
-| Deploy | hosting do projeto `rerond-c747b` |
+| Commit | `dfde43d` — deixar o mapa percorrível e o relatório mais legível |
+| Push | `main` → `origin/main` em `dfde43d` |
+| Deploy | hosting publicado em `rerond-c747b` |
 | URL | https://rerond-c747b.web.app |
 
 Regras do Firestore, índices e Storage não foram republicados neste ciclo.
