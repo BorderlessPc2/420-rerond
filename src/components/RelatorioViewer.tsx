@@ -461,32 +461,29 @@ export default function RelatorioViewer({
                 {badgeVersao}
               </span>
             )}
-            {documentosProcessados && documentosProcessados.length > 0 && (
-              <p className="relatorio-viewer-docs">
-                Documentos processados ({documentosProcessados.length}):{' '}
-                {documentosProcessados.join(', ')}
-                {documentosOmitidos && documentosOmitidos.length > 0
-                  ? ` · Omitidos: ${documentosOmitidos.join(', ')}`
-                  : ''}
-              </p>
-            )}
-            {(goldenCaseIdsInjetados != null || feedbackIdsInjetados != null) && (
-              <p className="relatorio-viewer-docs" role="status">
-                Ensino injetado
-                {goldenCaseIdsInjetados && goldenCaseIdsInjetados.length > 0
-                  ? ` · golden cases (${goldenCaseIdsInjetados.length}): ${goldenCaseIdsInjetados.join(', ')}`
-                  : ' · golden cases: nenhum'}
-                {feedbackIdsInjetados && feedbackIdsInjetados.length > 0
-                  ? ` · feedbacks (${feedbackIdsInjetados.length}): ${feedbackIdsInjetados.join(', ')}`
-                  : ''}
-              </p>
-            )}
-            {assertividadeScore && (
-              <p className="relatorio-viewer-docs" role="status">
-                Assertividade eval: {assertividadeScore.percentual}% · críticos{' '}
-                {assertividadeScore.passouCriticos ? 'OK' : 'NOK'}
-                {assertividadeScore.casoId ? ` · ${assertividadeScore.casoId}` : ''}
-              </p>
+            {(documentosProcessados?.length || goldenCaseIdsInjetados || feedbackIdsInjetados || assertividadeScore) && (
+              <details className="relatorio-viewer-trace">
+                <summary>Como esta análise foi montada</summary>
+                {documentosProcessados && documentosProcessados.length > 0 && (
+                  <p>
+                    Documentos processados ({documentosProcessados.length}): {documentosProcessados.join(', ')}
+                    {documentosOmitidos && documentosOmitidos.length > 0 ? ` · Omitidos: ${documentosOmitidos.join(', ')}` : ''}
+                  </p>
+                )}
+                {(goldenCaseIdsInjetados != null || feedbackIdsInjetados != null) && (
+                  <p>
+                    Ensino usado
+                    {goldenCaseIdsInjetados && goldenCaseIdsInjetados.length > 0 ? ` · casos (${goldenCaseIdsInjetados.length}): ${goldenCaseIdsInjetados.join(', ')}` : ' · nenhum caso de referência'}
+                    {feedbackIdsInjetados && feedbackIdsInjetados.length > 0 ? ` · feedbacks (${feedbackIdsInjetados.length}): ${feedbackIdsInjetados.join(', ')}` : ''}
+                  </p>
+                )}
+                {assertividadeScore && (
+                  <p>
+                    Avaliação interna: {assertividadeScore.percentual}% · itens críticos {assertividadeScore.passouCriticos ? 'atendidos' : 'com falha'}
+                    {assertividadeScore.casoId ? ` · ${assertividadeScore.casoId}` : ''}
+                  </p>
+                )}
+              </details>
             )}
           </div>
           <button className="relatorio-viewer-close" onClick={onClose} aria-label="Fechar">
@@ -531,9 +528,7 @@ export default function RelatorioViewer({
         )}
 
         <p className="relatorio-distincao-hint">
-          Complementos e edição neste relatório <strong>não treinam</strong> a IA. Instrução só desta
-          reanálise fica no modal de reanálise; feedback permanente (aprendizado) é cadastrado em
-          Configurações.
+          O que você edita aqui muda a apresentação deste relatório. Não entra no aprendizado da IA.
         </p>
 
         {showTabs && (

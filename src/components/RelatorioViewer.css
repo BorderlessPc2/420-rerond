@@ -70,6 +70,9 @@
   background: #edf2fa;
 }
 
+.relatorio-viewer-trace { margin-top: 8px; }
+.relatorio-viewer-trace summary { color: #4b5563; font-size: 12px; font-weight: 600; cursor: pointer; }
+.relatorio-viewer-trace p { margin: 6px 0 0; color: #4b5563; font-size: 12px; line-height: 1.4; }
 .relatorio-viewer-docs {
   margin: 6px 0 0;
   font-size: 12px;

@@ -187,6 +187,22 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
   }, [carregarHistorico])
 
   const statusClass = `rc-status rc-status-${payload.statusGeral}`
+  const pdfRecente = ultimoGerado
+    ? { id: ultimoGerado.reportId, fileName: ultimoGerado.fileName, versao: ultimoGerado.versao }
+    : historico[0]
+      ? { id: historico[0].id, fileName: historico[0].fileName, versao: historico[0].versao }
+      : null
+  const [filtroItens, setFiltroItens] = useState<'todos' | 'pendencias' | 'conformes'>('pendencias')
+  const itensVisiveis = payload.itens.filter((item) => {
+    if (filtroItens === 'conformes') return item.status === 'conforme'
+    if (filtroItens === 'pendencias') return item.status === 'nao_conforme' || item.status === 'exige_atencao' || item.status === 'parcialmente_conforme'
+    return true
+  })
+  const contagemItens = {
+    todos: payload.itens.length,
+    pendencias: payload.itens.filter((item) => item.status === 'nao_conforme' || item.status === 'exige_atencao' || item.status === 'parcialmente_conforme').length,
+    conformes: payload.itens.filter((item) => item.status === 'conforme').length,
+  }
 
   const handleGerar = async () => {
     if (gerandoLock.current) return
@@ -202,9 +218,7 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
         downloadUrl: result.downloadUrl,
         versao: result.versao,
       })
-      setSucesso(
-        `PDF gerado (v${result.versao}): Relatório de Análise Técnica com identidade BaseInfra.`,
-      )
+      setSucesso(`PDF v${result.versao} pronto: ${result.fileName}. Use Baixar PDF para salvar o arquivo.`)
       await carregarHistorico()
     } catch (error: unknown) {
       const message =
@@ -217,7 +231,7 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
   }
 
   const handleBaixar = async (reportId?: string, fileName?: string) => {
-    const id = reportId || ultimoGerado?.reportId
+    const id = reportId || pdfRecente?.id
     if (!id) {
       setErro('Gere o PDF antes de baixar.')
       return
@@ -227,7 +241,7 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
       await baixarRelatorioPdf(
         props.solicitacaoId,
         id,
-        fileName || ultimoGerado?.fileName,
+        fileName || pdfRecente?.fileName,
       )
     } catch (error: unknown) {
       setErro(error instanceof Error ? error.message : 'Falha ao baixar o PDF.')
@@ -359,58 +373,64 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
       </div>
 
       <div className="rc-actions" role="toolbar" aria-label="Ações do relatório">
-        <button
-          type="button"
-          className={`rc-btn ${mode === 'preview' ? 'rc-btn-primary' : 'rc-btn-ghost'}`}
-          onClick={() => setMode('preview')}
-        >
-          <Eye size={16} />
-          Visualizar relatório
-        </button>
-        <button
-          type="button"
-          className={`rc-btn ${mode === 'edit' ? 'rc-btn-primary' : 'rc-btn-ghost'}`}
-          onClick={() => setMode('edit')}
-        >
-          <Pencil size={16} />
-          Editar informações
-        </button>
-        <button
-          type="button"
-          className="rc-btn rc-btn-ghost"
-          onClick={() => logoInputRef.current?.click()}
-          disabled={uploadingLogo || gerando}
-        >
-          {uploadingLogo ? <Loader2 size={16} className="rc-spin" /> : <ImagePlus size={16} />}
-          Selecionar ou enviar logotipo
-        </button>
-        <input
-          ref={logoInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/jpg"
-          className="rc-file-input"
-          onChange={handleLogoChange}
-          aria-label="Enviar logotipo da concessionária"
-        />
-        <button
-          type="button"
-          className="rc-btn rc-btn-accent"
-          onClick={handleGerar}
-          disabled={gerando}
-          aria-busy={gerando}
-        >
-          {gerando ? <Loader2 size={16} className="rc-spin" /> : <FileDown size={16} />}
-          {gerando ? 'Gerando PDF...' : ultimoGerado ? 'Gerar novamente' : 'Gerar PDF'}
-        </button>
-        <button
-          type="button"
-          className="rc-btn rc-btn-primary"
-          onClick={() => handleBaixar()}
-          disabled={gerando || !ultimoGerado}
-        >
-          <Download size={16} />
-          Baixar PDF
-        </button>
+        <div className="rc-actions-group" role="group" aria-label="Leitura">
+          <button
+            type="button"
+            className={`rc-btn ${mode === 'preview' ? 'rc-btn-primary' : 'rc-btn-ghost'}`}
+            onClick={() => setMode('preview')}
+            aria-pressed={mode === 'preview'}
+          >
+            <Eye size={16} />
+            Ler
+          </button>
+          <button
+            type="button"
+            className={`rc-btn ${mode === 'edit' ? 'rc-btn-primary' : 'rc-btn-ghost'}`}
+            onClick={() => setMode('edit')}
+            aria-pressed={mode === 'edit'}
+          >
+            <Pencil size={16} />
+            Capa e dados
+          </button>
+        </div>
+        <div className="rc-actions-group" role="group" aria-label="Arquivo">
+          <button
+            type="button"
+            className="rc-btn rc-btn-ghost"
+            onClick={() => logoInputRef.current?.click()}
+            disabled={uploadingLogo || gerando}
+          >
+            {uploadingLogo ? <Loader2 size={16} className="rc-spin" /> : <ImagePlus size={16} />}
+            Logotipo
+          </button>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg"
+            className="rc-file-input"
+            onChange={handleLogoChange}
+            aria-label="Enviar logotipo da concessionária"
+          />
+          <button
+            type="button"
+            className="rc-btn rc-btn-accent"
+            onClick={handleGerar}
+            disabled={gerando}
+            aria-busy={gerando}
+          >
+            {gerando ? <Loader2 size={16} className="rc-spin" /> : <FileDown size={16} />}
+            {gerando ? 'Gerando PDF…' : pdfRecente ? 'Gerar nova versão' : 'Gerar PDF'}
+          </button>
+          <button
+            type="button"
+            className="rc-btn rc-btn-primary"
+            onClick={() => handleBaixar()}
+            disabled={gerando || !pdfRecente}
+          >
+            <Download size={16} />
+            {pdfRecente ? `Baixar v${pdfRecente.versao}` : 'Baixar PDF'}
+          </button>
+        </div>
       </div>
 
       {erro && (
@@ -427,16 +447,6 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
           {sucesso}
         </div>
       )}
-      {ultimoGerado && (
-        <div className="rc-alert rc-alert-success" role="status">
-          Arquivo baixado com logos BaseInfra
-          {getLogoConcessionariaPath(metadados.nomeConcessionaria, props.concessionariaId)
-            ? ` e ${metadados.nomeConcessionaria || 'concessionária'}`
-            : ''}
-          . Título: Relatório de Análise Técnica – Ocupação em Faixa de Domínio.
-        </div>
-      )}
-
       {mode === 'edit' ? (
         <section className="rc-editor" aria-label="Editar informações do relatório">
           <p className="rc-editor-hint">
@@ -572,9 +582,17 @@ export default function RelatorioConformidadeView(props: RelatorioConformidadeVi
           </article>
 
           <article className="rc-preview-card">
-            <h4>Verificações detalhadas</h4>
+            <div className="rc-items-head">
+              <h4>Verificações</h4>
+              <div className="rc-item-filters" role="group" aria-label="Filtrar verificações">
+                <button type="button" className={filtroItens === 'pendencias' ? 'is-selected' : ''} aria-pressed={filtroItens === 'pendencias'} onClick={() => setFiltroItens('pendencias')}>Pendências {contagemItens.pendencias}</button>
+                <button type="button" className={filtroItens === 'conformes' ? 'is-selected' : ''} aria-pressed={filtroItens === 'conformes'} onClick={() => setFiltroItens('conformes')}>Conformes {contagemItens.conformes}</button>
+                <button type="button" className={filtroItens === 'todos' ? 'is-selected' : ''} aria-pressed={filtroItens === 'todos'} onClick={() => setFiltroItens('todos')}>Todas {contagemItens.todos}</button>
+              </div>
+            </div>
             <div className="rc-items">
-              {payload.itens.map((item) => (
+              {itensVisiveis.length === 0 && <p className="rc-items-empty">{filtroItens === 'pendencias' ? 'Nenhuma pendência neste relatório.' : 'Nenhuma verificação neste recorte.'}</p>}
+              {itensVisiveis.map((item) => (
                 <div key={item.codigo} className={`rc-item rc-item-${item.status}`}>
                   <header>
                     <span className={`rc-badge rc-badge-${item.status}`}>

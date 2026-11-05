@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId } from './mapaUtils'
+import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId, separarPontosSobrepostos } from './mapaUtils'
 import type { Ponto, Protocolo } from '../../services/gestaoContratos'
 
 const protocolo: Protocolo = { id: 'protocolo', contratoId: 'contrato', titulo: 'Protocolo', concessionaria: 'Eco', rodovia: 'BR-101', etapa: 'fase_1', status: 'em_andamento' }
@@ -13,6 +13,13 @@ describe('utilitários do mapa de gestão', () => {
   })
   it('classifica ponto concluído com cor operacional', () => {
     expect(getPontoColor(ponto, protocolo)).toBe('#1f8f5f')
+  })
+  it('separa pontos sobrepostos sem alterar o ponto original', () => {
+    const vizinho = { ...ponto, id: 'ponto-2', codigo: 'P-02' }
+    const separados = separarPontosSobrepostos([ponto, vizinho])
+    expect(separados).toHaveLength(2)
+    expect(separados[0].ponto).toBe(ponto)
+    expect(separados[0].latitude).not.toBe(separados[1].latitude)
   })
   it('aceita seleção por URL somente dentro do escopo informado', () => {
     expect(getSelectedPointId('?ponto=ponto', [ponto])).toBe('ponto')

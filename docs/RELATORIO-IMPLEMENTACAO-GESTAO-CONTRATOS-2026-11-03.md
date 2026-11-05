@@ -55,25 +55,22 @@ Marcar após executar no app (emulator ou staging) com usuário autorizado:
 - [ ] Filtros + busca → conferir dashboard/gráficos → exportar XLSX
 - [ ] Excluir contrato de teste (cascade)
 
-## 6. Emulator / staging (6.2)
+## 6. Emulator (regras)
 
-- **Não executado nesta sessão** (sem ambiente autenticado disponível para o agente).
-- **Recomendado:** `firebase emulators:start` ou staging; validar cascade delete, upload de anexo em movimentação e update de `anexos` em `gestaoMovimentos` contra rules publicadas.
+Na tarde de 03/11, 27 operações do módulo foram executadas no emulador de Firestore e Storage com usuário autenticado. Criar, listar, editar e excluir contrato, protocolo, ponto e movimentação foram autorizados. Leitura anônima e anexo fora dos tipos permitidos continuam negados.
 
-## 7. Deploy (6.4)
+## 7. Deploy e Git
 
-- **Tentativa 03/11/2026:** `firebase deploy --only firestore:rules,firestore:indexes` → **403** (`The caller does not have permission`) no projeto `rerond-c747b`.
-- CLI logada como `borderlesspc12@gmail.com`; esse usuário **não aparece** na lista de projetos Firebase com acesso a `rerond-c747b`.
-- **Para concluir:** entrar com conta que tenha *Firebase Rules Admin* / *Editor* no projeto, ou conceder permissão à conta atual no [Console IAM](https://console.cloud.google.com/iam-admin/iam?project=rerond-c747b), depois:
+| Horário | Entrega |
+|---------|---------|
+| 09:25 | Commit `b38b5a7` — conclusão operacional, transições guiadas e UI |
+| 10:19 | Commit `90527a2` — permissões, índice, anexos e recorte da visão geral |
+| 10:19 | Push `main` → `origin/main` (`e41b5fd..90527a2`) |
+| 10:19 | Deploy em `rerond-c747b`: hosting, regras do Firestore, índice de `gestaoPontos` e regras do Storage |
 
-```bash
-cd c:\borderless\projetos\420-rerond
-firebase login   # conta com acesso a rerond-c747b
-firebase use rerond-c747b
-firebase deploy --only firestore:rules,firestore:indexes
-```
+App: https://rerond-c747b.web.app
 
-- Opcional (script do repo): `npm run firebase:deploy:rules` publica **Firestore rules + Storage rules** (não inclui indexes).
+Uma tentativa anterior de deploy das regras retornou 403. O deploy seguinte, com a conta que tem acesso ao projeto, concluiu.
 
 ## 8. Pendências conscientes
 
@@ -106,6 +103,16 @@ Abrir `/gestao-contratos`, percorrer roteiro da seção 5.
 | 6 Qualidade | 148 testes, build OK, spec §8 atualizada |
 
 **Validar:** detalhe do protocolo → Registrar movimentação → chips de intenção → De/Para → conclusão bloqueada se ponto sem resultado.
+
+## 12. Tarde — permissões, índice e visão geral (`90527a2`)
+
+O erro “Missing or insufficient permissions” ao criar protocolo vinha das regras: o ponto era gravado no mesmo lote do protocolo e a regra lia o protocolo antes de ele existir. A gravação passou a criar o protocolo primeiro e os pontos em seguida. A regra dos pontos usa o estado do protocolo depois da escrita.
+
+Também entrou:
+
+- Índice composto `gestaoPontos` por `contratoId` + `protocoloId`, necessário para editar protocolo, importar em protocolo existente e registrar movimentação.
+- Storage aceita PDF, Word, TXT, PNG e JPEG, inclusive quando o Windows envia o arquivo como tipo genérico. O formulário restringe esses formatos e a data vazia na edição de ponto deixa de ir como valor inválido.
+- Painel da visão geral reorganizado em Local, Operação e Prazo e busca, com exportação no cabeçalho.
 
 ## 10. Referências
 

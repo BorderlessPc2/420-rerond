@@ -26,6 +26,31 @@ export const filtrarPontosMapa = (pontos: Ponto[], protocolos: Protocolo[], filt
 
 export const getMapPoints = (pontos: Ponto[]) => pontos.filter((ponto) => Number.isFinite(ponto.latitude) && Number.isFinite(ponto.longitude))
 
+export type PontoNoMapa = { ponto: Ponto; latitude: number; longitude: number }
+
+/** Afasta pontos com a mesma coordenada para que cada um continue clicável. */
+export const separarPontosSobrepostos = (pontos: Ponto[], metros = 28): PontoNoMapa[] => {
+  const groups = new Map<string, Ponto[]>()
+  getMapPoints(pontos).forEach((ponto) => {
+    const key = `${(ponto.latitude as number).toFixed(5)}|${(ponto.longitude as number).toFixed(5)}`
+    groups.set(key, [...(groups.get(key) ?? []), ponto])
+  })
+  const separated: PontoNoMapa[] = []
+  groups.forEach((group) => {
+    group.forEach((ponto, index) => {
+      if (group.length === 1) {
+        separated.push({ ponto, latitude: ponto.latitude as number, longitude: ponto.longitude as number })
+        return
+      }
+      const angle = (2 * Math.PI * index) / group.length
+      const latitude = (ponto.latitude as number) + (metros / 111320) * Math.cos(angle)
+      const longitude = (ponto.longitude as number) + (metros / (111320 * Math.cos(((ponto.latitude as number) * Math.PI) / 180))) * Math.sin(angle)
+      separated.push({ ponto, latitude, longitude })
+    })
+  })
+  return separated
+}
+
 export const getSelectedPointId = (search: string, pontos: Ponto[]) => {
   const requested = new URLSearchParams(search).get('ponto')
   return requested && pontos.some((ponto) => ponto.id === requested) ? requested : null
