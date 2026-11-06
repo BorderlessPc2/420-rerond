@@ -153,8 +153,8 @@
 .gestao-transicao-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .gestao-etapa-stepper { display: grid; gap: 12px; margin-block: 18px 24px; }
 .gestao-etapa-stepper.is-pulse .gestao-stage-track span { animation: gestao-progress-pulse var(--gestao-duration-moderate) var(--gestao-ease-emphasis); }
-.gestao-stepper-nodes { display: flex; gap: 6px; overflow-x: auto; padding: 0; margin: 0; list-style: none; }
-.gestao-stepper-node { display: grid; justify-items: center; gap: 6px; min-inline-size: 72px; color: var(--color-text-soft); font-size: 0.68rem; text-align: center; }
+.gestao-stepper-nodes { display: flex; gap: 6px; inline-size: 100%; overflow-x: auto; padding: 0; margin: 0; list-style: none; }
+.gestao-stepper-node { flex: 1 1 0; display: grid; justify-items: center; gap: 6px; min-inline-size: 72px; color: var(--color-text-soft); font-size: 0.68rem; text-align: center; }
 .gestao-stepper-node.is-done { color: var(--color-primary-800); font-weight: 700; }
 .gestao-stepper-node.is-current .gestao-stepper-label { color: var(--color-text); font-weight: 800; }
 .gestao-stepper-dot { inline-size: 12px; block-size: 12px; border-radius: 50%; background: var(--color-border); box-shadow: 0 0 0 3px var(--color-surface); }

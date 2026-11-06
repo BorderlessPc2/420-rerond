@@ -3,7 +3,7 @@ import { formatarDataGestao, nomeGestao } from './gestaoUi'
 
 describe('helpers de UI da gestão', () => {
   it('traduz status técnico para texto legível', () => {
-    expect(nomeGestao('em_correcao')).toBe('Em correcao')
+    expect(nomeGestao('em_correcao')).toBe('Em correção')
   })
   it('representa texto vazio sem quebrar layout', () => {
     expect(nomeGestao('')).toBe('—')

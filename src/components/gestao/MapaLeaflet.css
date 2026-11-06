@@ -22,6 +22,7 @@
 .gestao-leaflet-map .leaflet-tooltip { border: 0; border-radius: 10px; box-shadow: 0 8px 24px rgb(15 23 42 / 18%); font: inherit; font-weight: 700; }
 .gestao-leaflet-map .leaflet-popup-content-wrapper { border: 1px solid rgb(255 255 255 / 78%); border-radius: 14px; box-shadow: 0 14px 34px rgb(15 23 42 / 22%); }
 .gestao-leaflet-map .leaflet-popup-content { display: grid; gap: 4px; min-inline-size: 150px; margin: 14px 16px; color: var(--color-text); }
+.gestao-leaflet-map .leaflet-popup-content > div { display: grid; gap: 4px; }
 .gestao-leaflet-map .leaflet-popup-content strong { font-size: 1rem; letter-spacing: -.02em; }
 .gestao-leaflet-map .leaflet-popup-content span { color: var(--color-text-soft); font-size: .78rem; }
 .gestao-leaflet-map .leaflet-popup-content small { color: var(--color-primary-800); font-size: .76rem; font-weight: 700; }

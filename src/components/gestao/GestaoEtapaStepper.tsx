@@ -20,7 +20,7 @@ export default function GestaoEtapaStepper({ etapa, status, pulse }: GestaoEtapa
   return (
     <div className={`gestao-etapa-stepper ${pulse ? 'is-pulse' : ''}`} aria-label={`Etapa ${nomeGestao(etapa)} de ${ETAPAS_ORDEM.length}`}>
       <div className="gestao-stage-track">
-        <span style={{ inlineSize: `${progresso.percentual}%` }} />
+        <span style={{ inlineSize: `${((progresso.indice + 0.5) / progresso.total) * 100}%` }} />
       </div>
       <ol className="gestao-stepper-nodes">
         {ETAPAS_ORDEM.map((item, index) => {

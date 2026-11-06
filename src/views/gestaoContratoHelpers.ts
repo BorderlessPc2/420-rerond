@@ -17,9 +17,9 @@ export const contratoFromModel = (contrato: ContratoInput & { id?: string }): Co
 export const tituloContratoGestao = (nome: string, numero?: string) =>
   numero?.trim() ? `${numero.trim()} — ${nome}` : nome
 
-export const resumoContratoGestao = (input: Pick<ContratoInput, 'objeto' | 'vigenciaInicio' | 'vigenciaFim' | 'situacao'>) => {
+export const resumoContratoGestao = (input: Pick<ContratoInput, 'objeto' | 'vigenciaInicio' | 'vigenciaFim' | 'situacao'>, opcoes?: { incluirObjeto?: boolean }) => {
   const partes = [
-    input.objeto?.trim(),
+    opcoes?.incluirObjeto === false ? '' : input.objeto?.trim(),
     input.vigenciaInicio || input.vigenciaFim
       ? `Vigência ${formatarDataGestao(input.vigenciaInicio)} – ${formatarDataGestao(input.vigenciaFim)}`
       : '',

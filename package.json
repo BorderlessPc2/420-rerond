@@ -17,6 +17,7 @@
     "score:assertividade": "node --experimental-strip-types scripts/scoreAssertividadeRelatorio.mjs",
     "create:users": "tsx scripts/createPlatformUsers.ts",
     "seed:concessionarias": "tsx scripts/seedConcessionarias.ts",
+    "seed:gestao-demo": "tsx scripts/seedGestaoContratos.ts",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage",
     "firebase:deploy:hosting": "npm run build && firebase deploy --only hosting",
     "firebase:deploy:functions": "npm --prefix functions run build && firebase deploy --only functions"

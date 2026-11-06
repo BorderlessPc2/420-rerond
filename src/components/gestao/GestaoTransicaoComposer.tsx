@@ -129,24 +129,23 @@ export default function GestaoTransicaoComposer({
           </select>
         </label>
       </div>
-      {descricao.erro ? (
+      {descricao.para.etapa === 'concluido' && descricao.pontosSemResultado > 0 ? (
         <p className="gestao-error gestao-transicao-feedback" role="alert">
-          {descricao.erro}
-        </p>
-      ) : (
-        <p className="gestao-transition-preview gestao-transicao-feedback" role="status">
-          Transição permitida para registrar no histórico.
-        </p>
-      )}
-      {descricao.para.etapa === 'concluido' && descricao.pontosSemResultado > 0 && (
-        <p className="gestao-import-limit-hint">
-          {descricao.pontosSemResultado} ponto(s) ainda sem resultado operacional.
+          Conclusão bloqueada: {descricao.pontosSemResultado} ponto(s) sem resultado operacional.
           {pontosPendentesHref && (
             <>
               {' '}
               <a href={pontosPendentesHref}>Ver pontos vinculados</a>
             </>
           )}
+        </p>
+      ) : descricao.erro ? (
+        <p className="gestao-error gestao-transicao-feedback" role="alert">
+          {descricao.erro}
+        </p>
+      ) : (
+        <p className="gestao-transition-preview gestao-transicao-feedback" role="status">
+          Transição permitida para registrar no histórico.
         </p>
       )}
     </div>
