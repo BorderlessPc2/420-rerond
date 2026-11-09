@@ -88,7 +88,8 @@ Este commit agrega o painel de pontos em cima dessa base.
 
 | Item | Resultado |
 |------|-----------|
-| Commit | ver saída do `git log -1` após push |
+| Commit (painel de pontos) | `d4fc8e1` — feat(gestao): painel unificado de pontos com barra de icones |
+| Commit anterior local | `f7b18e4` — fix(gestao): modais e persistência (sobe junto neste push) |
 | Push | `main` → `origin/main` |
 | Deploy hosting | opcional: `npm run firebase:deploy:hosting` após push |
 
