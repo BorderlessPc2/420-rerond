@@ -236,10 +236,10 @@
 .gestao-summary strong { font-variant-numeric: tabular-nums; }
 .gestao-simple-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
 .gestao-simple-list li span { color: var(--color-text-soft); }
-.gestao-point-row { display: flex; justify-content: space-between; gap: 24px; padding: 18px 20px; }
-.gestao-point-row > div:first-child { display: flex; flex-direction: column; gap: 7px; }
+.gestao-point-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 24px; padding: 18px 20px; }
+.gestao-point-row > div:first-child { display: flex; flex: 1 1 240px; flex-direction: column; gap: 7px; min-inline-size: 0; }
 .gestao-point-row > div:first-child > span { font-size: .9rem; }
-.gestao-point-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 12px; }
+.gestao-point-actions { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 12px; padding-block-start: 10px; border-block-start: 1px solid var(--color-border); }
 .gestao-point-actions label { min-inline-size: 175px; }
 .gestao-point-actions a { white-space: nowrap; }
 .gestao-planning-list li { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 15px 18px; }
@@ -306,7 +306,13 @@
 .gestao-map-rail button small { grid-column: 2; }
 .gestao-map-rail button.is-selected { border-color: var(--color-accent-500); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-500) 28%, transparent); }
 .gestao-map-stage { position: relative; }
-.gestao-map-inspector { position: absolute; z-index: 500; inset-block-start: 12px; inset-inline-end: 12px; display: grid; inline-size: min(280px, calc(100% - 70px)); max-block-size: min(360px, 58%); overflow: auto; border: 1px solid var(--color-border); border-radius: 16px; background: rgb(255 255 255 / 96%); box-shadow: 0 16px 40px rgb(15 23 42 / 18%); }
+.gestao-map-inspector { position: absolute; z-index: 500; inset-block-start: 12px; inset-inline-end: 12px; display: grid; inline-size: min(340px, calc(100% - 70px)); max-block-size: min(420px, 70%); overflow: auto; border: 1px solid var(--color-border); border-radius: 16px; background: rgb(255 255 255 / 96%); box-shadow: 0 16px 40px rgb(15 23 42 / 18%); }
+.gestao-form-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin: 0; padding: 0; border: 0; }
+.gestao-form-section legend { grid-column: 1 / -1; color: var(--color-text-soft); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.gestao-file-picker { display: grid; gap: 6px; }
+.gestao-file-picker span { color: var(--color-text-soft); font-size: .78rem; font-weight: 500; }
+.gestao-file-picker input { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.gestao-file-picker strong { justify-self: start; padding: 8px 12px; border: 1px dashed var(--color-border); border-radius: 10px; color: var(--color-primary-800); font-size: .86rem; cursor: pointer; }
 .gestao-map-inspector-body { display: grid; gap: 12px; padding: 14px; animation: gestao-card-in var(--gestao-duration-moderate) var(--gestao-ease-emphasis); }
 .gestao-map-inspector.is-saving { opacity: .72; }
 @keyframes gestao-card-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

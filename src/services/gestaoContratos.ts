@@ -1,5 +1,5 @@
-import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, validarInputContrato, type ContratoInput, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 import { validarTransicao } from './gestaoTransicoes'
@@ -127,11 +127,21 @@ export const criarProtocolo = async (contratoId: string, input: ProtocoloInput) 
   if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
   return (await addDoc(collection(db, 'gestaoProtocolos'), { ...input, contratoId, etapa: 'planejamento', status: 'nao_iniciado', createdAt: serverTimestamp() })).id
 }
+const codigoPontoKey = (codigo: string) => codigo.trim().toLocaleLowerCase('pt-BR')
+
+const codigoPontoDuplicado = async (contratoId: string, protocoloId: string | null, codigo: string, ignoreId?: string) => {
+  const rows = await getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', contratoId)))
+  const key = codigoPontoKey(codigo)
+  return rows.docs.some((item) => item.id !== ignoreId && (item.data().protocoloId ?? null) === protocoloId && codigoPontoKey(String(item.data().codigo ?? '')) === key)
+}
+
 export const criarPonto = async (contratoId: string, protocoloId: string | null, input: PontoInput) => {
-  const protocolo = protocoloId ? await getProtocolo(contratoId, protocoloId) : undefined
-  if (protocoloId && !protocolo) throw new Error('Protocolo não encontrado neste contrato.')
-  const error = validarInputPonto(input, protocolo ?? undefined)[0]
+  if (!protocoloId) throw new Error('Vincule o ponto a um protocolo.')
+  const protocolo = await getProtocolo(contratoId, protocoloId)
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const error = validarInputPonto(input, protocolo)[0]
   if (error) throw new Error(error)
+  if (await codigoPontoDuplicado(contratoId, protocoloId, input.codigo)) throw new Error('Já existe um ponto com este código neste protocolo.')
   return (await addDoc(collection(db, 'gestaoPontos'), { ...input, contratoId, protocoloId })).id
 }
 export const validarPatchProtocoloComPontos = (
@@ -167,6 +177,7 @@ export const atualizarPontoCompleto = async (contratoId: string, id: string, inp
   if (point.protocoloId && !protocolo) throw new Error('Protocolo não encontrado neste contrato.')
   const errors = validarInputPonto(input, protocolo ?? undefined)
   if (errors.length) throw new Error(errors[0])
+  if (await codigoPontoDuplicado(contratoId, point.protocoloId ?? null, input.codigo, id)) throw new Error('Já existe um ponto com este código neste protocolo.')
   await updateDoc(doc(db, 'gestaoPontos', id), { ...input, contratoId, protocoloId: point.protocoloId, ...(input.resultado ? { realizadoEm: input.realizadoEm || point.realizadoEm || new Date().toISOString().slice(0, 10) } : {}) })
 }
 export const vincularPontoProtocolo = async (contratoId: string, pontoId: string, protocoloId: string) => {
@@ -183,6 +194,12 @@ export const criarProtocoloComPontos = async (contratoId: string, input: Protoco
   const protocoloError = validarInputProtocolo(input)[0]
   if (protocoloError) throw new Error(protocoloError)
   if (pontos.length > 499) throw new Error('Limite de 499 pontos por protocolo para gravação atômica.')
+  const codigos = new Set<string>()
+  for (const ponto of pontos) {
+    const key = codigoPontoKey(ponto.codigo)
+    if (codigos.has(key)) throw new Error('Código de ponto duplicado neste protocolo.')
+    codigos.add(key)
+  }
   if (!(await getContrato(contratoId))) throw new Error('Contrato não encontrado.')
   const pontoError = pontos.flatMap((ponto) => validarInputPonto(ponto, input))[0]
   if (pontoError) throw new Error(pontoError)
@@ -200,9 +217,9 @@ export const criarProtocoloComPontos = async (contratoId: string, input: Protoco
     createdAt: serverTimestamp(),
   }
   const protocoloRef = doc(collection(db, 'gestaoProtocolos'))
-  await setDoc(protocoloRef, protocoloData)
+  const batch = writeBatch(db)
+  batch.set(protocoloRef, protocoloData)
   if (pontos.length) {
-    const batch = writeBatch(db)
     pontos.forEach((ponto) => {
       const data: Record<string, unknown> = {
         codigo: ponto.codigo.trim(),
@@ -224,8 +241,8 @@ export const criarProtocoloComPontos = async (contratoId: string, input: Protoco
       if (ponto.realizadoEm) data.realizadoEm = ponto.realizadoEm
       batch.set(doc(collection(db, 'gestaoPontos')), data)
     })
-    await batch.commit()
   }
+  await batch.commit()
   return protocoloRef.id
 }
 export const atualizarPonto = async (contratoId: string, id: string, patch: Partial<Pick<Ponto, 'latitude' | 'longitude' | 'precisao' | 'previsao' | 'realizadoEm' | 'resultado'>>) => {
@@ -240,8 +257,11 @@ export const atualizarPonto = async (contratoId: string, id: string, patch: Part
 }
 export const listMovimentos = async (contratoId: string, protocoloId: string) => {
   if (!(await getProtocolo(contratoId, protocoloId))) throw new Error('Protocolo não encontrado neste contrato.')
-  return (await scoped<Movimento & { contratoId: string; protocoloId: string }>('gestaoMovimentos', contratoId))
-    .filter((item) => item.protocoloId === protocoloId).sort((a, b) => a.em.localeCompare(b.em))
+  const snap = await getDocs(query(collection(db, 'gestaoMovimentos'), where('protocoloId', '==', protocoloId)))
+  return snap.docs
+    .map((item) => ({ id: item.id, ...item.data() }) as Movimento & { contratoId: string; protocoloId: string })
+    .filter((item) => item.contratoId === contratoId)
+    .sort((a, b) => a.em.localeCompare(b.em))
 }
 export const registrarMovimento = async (contratoId: string, protocoloId: string, input: Pick<Movimento, 'tipo' | 'observacao' | 'etapa' | 'status'> & { em: string; files?: File[]; numero?: string; previsao?: string; realizadoEm?: string }) => {
   if (!input.tipo.trim() || !input.em || !Number.isFinite(Date.parse(input.em))) throw new Error('Informe tipo e data válida.')
@@ -258,39 +278,40 @@ export const registrarMovimento = async (contratoId: string, protocoloId: string
   }
   if (files.some((file) => !anexoPermitido(file))) throw new Error('Anexe apenas PDF, Word, TXT, PNG ou JPEG.')
   const movementRef = doc(collection(db, 'gestaoMovimentos'))
-  await runTransaction(db, async (transaction) => {
-    const current = await transaction.get(doc(db, 'gestaoProtocolos', protocoloId))
-    if (!current.exists() || current.data().contratoId !== contratoId) throw new Error('Protocolo não encontrado neste contrato.')
-    transaction.set(movementRef, {
-      contratoId,
-      protocoloId,
-      tipo: input.tipo.trim(),
-      observacao: input.observacao.trim(),
-      em: input.em,
-      etapa: input.etapa,
-      status: input.status,
-      autor: gestaoAutorAtual(),
-      anexos: [],
-    })
-    transaction.update(current.ref, {
-      etapa: input.etapa,
-      status: input.status,
-      ...(input.numero !== undefined ? { numero: input.numero.trim() } : {}),
-      ...(input.previsao !== undefined ? { previsao: input.previsao } : {}),
-      ...(input.realizadoEm !== undefined ? { realizadoEm: input.realizadoEm } : {}),
-    })
-  })
-  if (!files.length) return
   const anexos: Movimento['anexos'] = []
+  const enviados: string[] = []
   try {
     for (const file of files) {
       const path = `gestaoContratos/${contratoId}/${protocoloId}/${movementRef.id}/${crypto.randomUUID()}/${file.name}`
       const uploaded = await uploadBytes(ref(storage, path), file)
+      enviados.push(path)
       anexos.push({ nome: file.name, url: await getDownloadURL(uploaded.ref) })
     }
-    await updateDoc(movementRef, { anexos })
-  } catch {
-    throw new Error('Movimentação registrada, mas falha ao anexar arquivos. Registre os documentos em nova movimentação.')
+    await runTransaction(db, async (transaction) => {
+      const current = await transaction.get(doc(db, 'gestaoProtocolos', protocoloId))
+      if (!current.exists() || current.data().contratoId !== contratoId) throw new Error('Protocolo não encontrado neste contrato.')
+      transaction.set(movementRef, {
+        contratoId,
+        protocoloId,
+        tipo: input.tipo.trim(),
+        observacao: input.observacao.trim(),
+        em: input.em,
+        etapa: input.etapa,
+        status: input.status,
+        autor: gestaoAutorAtual(),
+        anexos,
+      })
+      transaction.update(current.ref, {
+        etapa: input.etapa,
+        status: input.status,
+        ...(input.numero !== undefined ? { numero: input.numero.trim() } : {}),
+        ...(input.previsao !== undefined ? { previsao: input.previsao } : {}),
+        ...(input.realizadoEm !== undefined ? { realizadoEm: input.realizadoEm } : {}),
+      })
+    })
+  } catch (err) {
+    await Promise.all(enviados.map((path) => deleteObject(ref(storage, path)).catch(() => undefined)))
+    throw err instanceof Error ? err : new Error('Erro ao registrar movimentação.')
   }
 }
 export const atualizarPlanejamento = async (contratoId: string, protocoloId: string, previsao: string, realizadoEm: string) => {
@@ -302,22 +323,35 @@ export const atualizarPlanejamentoPonto = async (contratoId: string, id: string,
 export const filtrarGestao = (protocolos: Protocolo[], pontos: Ponto[], filtro: { estado?: string; concessionaria?: string; rodovia?: string; protocoloId?: string; pontoCodigo?: string; busca?: string; status?: string; tipo?: string; etapa?: string; inicio?: string; fim?: string }) => {
   const termoBusca = (filtro.busca ?? '').trim().toLocaleLowerCase('pt-BR')
   const termoPonto = (filtro.pontoCodigo ?? '').trim().toLocaleLowerCase('pt-BR')
-  const pontoMatchesBusca = (p: Ponto) => {
-    const term = termoBusca || termoPonto
-    return !term || [p.codigo, p.estado, p.concessionaria, p.rodovia, p.km].some((value) => value.toLocaleLowerCase('pt-BR').includes(term))
+  const textoPonto = (p: Ponto) => [p.codigo, p.estado, p.concessionaria, p.rodovia, p.km].some((value) => value.toLocaleLowerCase('pt-BR').includes(termoBusca))
+  const pontoMatchesBusca = (p: Ponto, protocolo?: Protocolo) => {
+    if (termoPonto && ![p.codigo, p.estado, p.concessionaria, p.rodovia, p.km].some((value) => value.toLocaleLowerCase('pt-BR').includes(termoPonto))) return false
+    if (!termoBusca) return true
+    const noProtocolo = protocolo ? [protocolo.titulo, protocolo.concessionaria, protocolo.rodovia, protocolo.numero ?? ''].some((value) => value.toLocaleLowerCase('pt-BR').includes(termoBusca)) : false
+    return textoPonto(p) || noProtocolo
   }
   const protocoloMatchesBusca = (p: Protocolo) =>
     !termoBusca
     || [p.titulo, p.concessionaria, p.rodovia, p.numero ?? ''].some((value) => value.toLocaleLowerCase('pt-BR').includes(termoBusca))
+    || pontos.some((ponto) => ponto.protocoloId === p.id && textoPonto(ponto))
+  const hasPointFilters = Boolean(filtro.estado || filtro.tipo || termoBusca || termoPonto)
+  const pontoNoRecorte = (p: Ponto, protocolo?: Protocolo) => {
+    const periodo = protocolo?.previsao || p.previsao || ''
+    return (!filtro.estado || p.estado === filtro.estado) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.protocoloId || p.protocoloId === filtro.protocoloId) && pontoMatchesBusca(p, protocolo) && (!filtro.tipo || p.tipo === filtro.tipo) && (!filtro.etapa || protocolo?.etapa === filtro.etapa) && (!filtro.inicio || periodo >= filtro.inicio) && (!filtro.fim || periodo <= filtro.fim)
+  }
+  const protocolMatches = (p: Protocolo) => (!filtro.protocoloId || p.id === filtro.protocoloId) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.status || p.status === filtro.status) && (!filtro.etapa || p.etapa === filtro.etapa) && (!filtro.inicio || (p.previsao || '') >= filtro.inicio) && (!filtro.fim || (p.previsao || '') <= filtro.fim) && protocoloMatchesBusca(p)
+  const visibleProtocols = protocolos.filter((p) => {
+    if (!protocolMatches(p)) return false
+    if (!hasPointFilters) return true
+    return pontos.some((ponto) => ponto.protocoloId === p.id && pontoNoRecorte(ponto, p))
+  })
+  const ids = new Set(visibleProtocols.map((p) => p.id))
   const selecionados = pontos.filter((p) => {
     const protocolo = p.protocoloId ? protocolos.find((item) => item.id === p.protocoloId) : undefined
-    const periodo = p.previsao || protocolo?.previsao || ''
-    return (!filtro.estado || p.estado === filtro.estado) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.protocoloId || p.protocoloId === filtro.protocoloId) && pontoMatchesBusca(p) && (!filtro.tipo || p.tipo === filtro.tipo) && (!filtro.status || (p.resultado ?? protocolo?.status) === filtro.status) && (!filtro.etapa || protocolo?.etapa === filtro.etapa) && (!filtro.inicio || periodo >= filtro.inicio) && (!filtro.fim || periodo <= filtro.fim)
+    if (p.protocoloId && !ids.has(p.protocoloId)) return false
+    if (!p.protocoloId && (filtro.status || filtro.etapa || filtro.protocoloId)) return false
+    return pontoNoRecorte(p, protocolo)
   })
-  const ids = new Set(selecionados.map((p) => p.protocoloId))
-  const hasPointFilters = Boolean(filtro.estado || filtro.tipo || termoBusca || termoPonto)
-  const protocolMatches = (p: Protocolo) => (!filtro.protocoloId || p.id === filtro.protocoloId) && (!filtro.concessionaria || p.concessionaria === filtro.concessionaria) && (!filtro.rodovia || p.rodovia === filtro.rodovia) && (!filtro.status || p.status === filtro.status) && (!filtro.etapa || p.etapa === filtro.etapa) && (!filtro.inicio || (p.previsao || '') >= filtro.inicio) && (!filtro.fim || (p.previsao || '') <= filtro.fim) && protocoloMatchesBusca(p)
-  const visibleProtocols = protocolos.filter((p) => protocolMatches(p) && (ids.has(p.id) || (!pontos.some((item) => item.protocoloId === p.id) && !hasPointFilters)))
   return { protocolos: visibleProtocols, pontos: selecionados }
 }
 export const indicadoresGestao = (protocolos: Protocolo[], pontos: Ponto[]) => {

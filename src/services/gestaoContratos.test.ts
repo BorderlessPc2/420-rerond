@@ -28,6 +28,9 @@ describe('recorte operacional', () => {
     expect(recorte.pontos.map((p) => p.id)).toEqual(['p2'])
     expect(recorte.protocolos.map((p) => p.id)).toEqual(['a'])
     expect(filtrarGestao(protocolos, pontos, { status: 'nao_iniciado' }).protocolos.map((p) => p.id)).toEqual(['b'])
+    const soResultado = filtrarGestao(protocolos, [pontos[0]], { status: 'em_correcao' })
+    expect(soResultado.protocolos.map((p) => p.id)).toEqual(['a'])
+    expect(soResultado.pontos.map((p) => p.id)).toEqual(['p1'])
   })
   it('combina concessionária, protocolo e código sem trazer pontos fora do recorte', () => {
     const recorte = filtrarGestao(protocolos, pontos, { concessionaria: 'Eco', protocoloId: 'a', pontoCodigo: '2' })

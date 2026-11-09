@@ -94,7 +94,7 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
     const bounds = getMapBounds(located.map(({ ponto, latitude, longitude }) => ({ ...ponto, latitude, longitude })))
     const selected = located.find((item) => item.ponto.id === selectedPointId)
     if (viewMode === 'selected' && selected) {
-      map.fitBounds([[selected.latitude, selected.longitude], [selected.latitude, selected.longitude]], { paddingTopLeft: [48, 72], paddingBottomRight: [320, 48], maxZoom: 16, animate: true })
+      map.fitBounds([[selected.latitude, selected.longitude], [selected.latitude, selected.longitude]], { paddingTopLeft: [48, 72], paddingBottomRight: [380, 48], maxZoom: 16, animate: true })
     } else if (viewMode === 'all' && bounds) {
       map.fitBounds(bounds, { padding: [56, 56], maxZoom: 15, animate: true })
     } else if (bounds && fitBoundsOnChange && !selectedPointId) {

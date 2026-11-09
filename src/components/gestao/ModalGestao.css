@@ -74,8 +74,17 @@
 .gestao-contract-edit-field label { color: var(--color-text); font-size: .88rem; font-weight: 700; }
 .gestao-contract-edit-field > span { color: var(--color-text-soft); font-size: .78rem; }
 .gestao-contract-edit-field input { min-block-size: 50px; padding-inline: 15px; border-color: var(--color-primary-600); box-shadow: 0 0 0 4px var(--color-primary-50); }
-.gestao-form-footer { display: flex; justify-content: flex-end; gap: 10px; padding-block-start: 22px; border-block-start: 1px solid var(--color-border); }
-.gestao-form-footer button { min-inline-size: 142px; }
+.gestao-form-grid > .gestao-form-footer,
+.gestao-form-grid > .gestao-error,
+.gestao-form-grid > .gestao-sheet-import,
+.gestao-form-grid > button,
+.gestao-form-grid > label:has(textarea),
+.gestao-form-grid > label:has(input[type="file"]) { grid-column: 1 / -1; min-inline-size: 0; }
+.gestao-modal-body .gestao-form-grid > button { justify-self: end; white-space: nowrap; }
+.gestao-form-grid > label { min-inline-size: 0; }
+.gestao-form-grid :is(input, select, textarea) { min-inline-size: 0; max-inline-size: 100%; }
+.gestao-form-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding-block-start: 22px; border-block-start: 1px solid var(--color-border); }
+.gestao-form-footer button { flex: 0 0 auto; min-inline-size: max-content; white-space: nowrap; }
 .gestao-contract-edit-form button[type='submit'] { box-shadow: 0 8px 18px rgb(22 63 151 / 18%); }
 .gestao-modal-body .gestao-filtros { margin: 0; padding: 0; border: 0; background: transparent; }
 @media (max-width: 520px) {
