@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { atualizarPonto, atualizarPontoCompleto, criarPonto, pontoStatus, vincularPontoProtocolo, type Ponto } from '../services/gestaoContratos'
-import type { PontoInput } from '../services/gestaoValidacao'
+import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { criarPonto, pontoStatus, type Ponto } from '../services/gestaoContratos'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import ModalGestao from '../components/gestao/ModalGestao'
+import PontoIconBar from '../components/gestao/PontoIconBar'
+import PontoPainelModal from '../components/gestao/PontoPainelModal'
+import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import { ordenarPontos, type GestaoOrdemPonto } from '../services/gestaoLista'
 import { nomeGestao } from './gestaoUi'
 
@@ -20,10 +22,27 @@ export default function GestaoPontos() {
     else next.delete('q')
     setSearchParams(next)
   }
-  const [protocoloId, setProtocoloId] = useState(''), [codigo, setCodigo] = useState(''), [estado, setEstado] = useState(''), [km, setKm] = useState(''), [tipo, setTipo] = useState<Ponto['tipo']>('nova_implantacao'), [latitude, setLatitude] = useState(''), [longitude, setLongitude] = useState(''), [precisao, setPrecisao] = useState<Ponto['precisao']>('confirmada'), [error, setError] = useState(''), [success, setSuccess] = useState('')
-  const [creating, setCreating] = useState(false), [saving, setSaving] = useState(false), [savingResultadoId, setSavingResultadoId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<Ponto | null>(null)
-  const [editCodigo, setEditCodigo] = useState(''), [editEstado, setEditEstado] = useState(''), [editKm, setEditKm] = useState(''), [editTipo, setEditTipo] = useState<Ponto['tipo']>('nova_implantacao'), [editLatitude, setEditLatitude] = useState(''), [editLongitude, setEditLongitude] = useState(''), [editPrecisao, setEditPrecisao] = useState<Ponto['precisao']>('confirmada'), [editPrevisao, setEditPrevisao] = useState(''), [editRealizado, setEditRealizado] = useState(''), [editResultado, setEditResultado] = useState<Ponto['resultado'] | ''>('')
+  const [protocoloId, setProtocoloId] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [estado, setEstado] = useState('')
+  const [km, setKm] = useState('')
+  const [tipo, setTipo] = useState<Ponto['tipo']>('nova_implantacao')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
+  const [precisao, setPrecisao] = useState<Ponto['precisao']>('confirmada')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [painel, setPainel] = useState<{ ponto: Ponto; tab: PontoPainelTab } | null>(null)
+
+  const painelPonto = painel ? pontos.find((item) => item.id === painel.ponto.id) ?? painel.ponto : null
+
+  const openPainel = (ponto: Ponto, tab: PontoPainelTab = 'dados') => {
+    setPainel({ ponto, tab })
+    setError('')
+  }
+
   const resetCreateForm = () => {
     setProtocoloId('')
     setCodigo('')
@@ -35,73 +54,182 @@ export default function GestaoPontos() {
     setPrecisao('confirmada')
   }
 
-  const openEdit = (ponto: Ponto) => {
-    setEditing(ponto)
-    setEditCodigo(ponto.codigo)
-    setEditEstado(ponto.estado)
-    setEditKm(ponto.km)
-    setEditTipo(ponto.tipo)
-    setEditLatitude(Number.isFinite(ponto.latitude) ? String(ponto.latitude) : '')
-    setEditLongitude(Number.isFinite(ponto.longitude) ? String(ponto.longitude) : '')
-    setEditPrecisao(ponto.precisao ?? 'confirmada')
-    setEditPrevisao(ponto.previsao ?? '')
-    setEditRealizado(ponto.realizadoEm ?? '')
-    setEditResultado(ponto.resultado ?? '')
-    setError('')
-  }
-
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     const proc = protocolos.find((p) => p.id === protocoloId)
-    if (!proc) { setError('Selecione o protocolo do ponto.'); return }
-    if (Boolean(latitude) !== Boolean(longitude)) { setError('Informe latitude e longitude juntas.'); return }
-    setSaving(true)
-    try { await criarPonto(contratoId, proc.id, { codigo, estado, km, tipo, concessionaria: proc.concessionaria, rodovia: proc.rodovia, ...(latitude && longitude ? { latitude: Number(latitude), longitude: Number(longitude), precisao } : {}) }); resetCreateForm(); setCreating(false); await refresh(); setError(''); setSuccess(`Ponto ${codigo} criado no protocolo ${proc.titulo}.`) } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao criar ponto.') } finally { setSaving(false) }
-  }
-
-  const saveEdit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!editing) return
-    if (Boolean(editLatitude) !== Boolean(editLongitude)) { setError('Informe latitude e longitude juntas.'); return }
-    const proc = editing.protocoloId ? protocolos.find((item) => item.id === editing.protocoloId) : undefined
-    const input: PontoInput = {
-      codigo: editCodigo,
-      estado: editEstado,
-      km: editKm,
-      tipo: editTipo,
-      concessionaria: proc?.concessionaria ?? editing.concessionaria,
-      rodovia: proc?.rodovia ?? editing.rodovia,
-      previsao: editPrevisao,
-      realizadoEm: editRealizado,
-      ...(editResultado ? { resultado: editResultado } : {}),
-      ...(editLatitude && editLongitude ? { latitude: Number(editLatitude), longitude: Number(editLongitude), precisao: editPrecisao } : {}),
+    if (!proc) {
+      setError('Selecione o protocolo do ponto.')
+      return
+    }
+    if (Boolean(latitude) !== Boolean(longitude)) {
+      setError('Informe latitude e longitude juntas.')
+      return
     }
     setSaving(true)
-    setSuccess('')
     try {
-      await atualizarPontoCompleto(contratoId, editing.id, input)
-      setEditing(null)
-      setSuccess(`Ponto ${input.codigo} atualizado.`)
+      await criarPonto(contratoId, proc.id, {
+        codigo,
+        estado,
+        km,
+        tipo,
+        concessionaria: proc.concessionaria,
+        rodovia: proc.rodovia,
+        ...(latitude && longitude ? { latitude: Number(latitude), longitude: Number(longitude), precisao } : {}),
+      })
+      resetCreateForm()
+      setCreating(false)
       await refresh()
       setError('')
+      setSuccess(`Ponto ${codigo} criado no protocolo ${proc.titulo}.`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao editar ponto.')
+      setError(err instanceof Error ? err.message : 'Erro ao criar ponto.')
     } finally {
       setSaving(false)
     }
   }
 
-  const linkPoint = async (ponto: Ponto, nextId: string) => { if (!nextId) return; setSaving(true); try { await vincularPontoProtocolo(contratoId, ponto.id, nextId); await refresh(); setError('') } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao vincular ponto.') } finally { setSaving(false) } }
-  const setResultado = async (ponto: Ponto, resultado: Ponto['resultado']) => {
-    if (savingResultadoId) return
-    setSavingResultadoId(ponto.id)
-    try { await atualizarPonto(contratoId, ponto.id, { resultado }); await refresh(); setError(''); setSuccess(`Situação de ${ponto.codigo} atualizada.`) } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao atualizar ponto.') } finally { setSavingResultadoId(null) }
-  }
+  return (
+    <section>
+      <div className="gestao-section-head">
+        <div>
+          <h2>Pontos</h2>
+          <p>
+            {pontos.length} {pontos.length === 1 ? 'ponto no recorte' : 'pontos no recorte'}
+          </p>
+        </div>
+        <button type="button" aria-haspopup="dialog" onClick={() => { resetCreateForm(); setCreating(true) }}>
+          Novo ponto
+        </button>
+      </div>
+      <div className="gestao-list-controls">
+        <label>
+          Busca
+          <input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} />
+        </label>
+        <label>
+          Ordenar por
+          <select value={ordem} onChange={(event) => setOrdem(event.target.value as GestaoOrdemPonto)}>
+            <option value="codigo">Código</option>
+            <option value="km">Quilômetro</option>
+          </select>
+        </label>
+      </div>
+      {error && <p className="gestao-error" role="alert">{error}</p>}
+      {success && <p className="gestao-success" role="status">{success}</p>}
 
-  return <section><div className="gestao-section-head"><div><h2>Pontos</h2><p>{pontos.length} {pontos.length === 1 ? 'ponto no recorte' : 'pontos no recorte'}</p></div><button type="button" aria-haspopup="dialog" onClick={() => { resetCreateForm(); setCreating(true) }}>Novo ponto</button></div>
-    <div className="gestao-list-controls"><label>Busca<input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} /></label><label>Ordenar por<select value={ordem} onChange={(event) => setOrdem(event.target.value as GestaoOrdemPonto)}><option value="codigo">Código</option><option value="km">Quilômetro</option></select></label></div>{error && <p className="gestao-error" role="alert">{error}</p>}{success && <p className="gestao-success" role="status">{success}</p>}
-    <ModalGestao open={creating} title="Novo ponto" description="Cadastre a localização e vincule o ponto a um protocolo." labelledBy="gestao-novo-ponto-title" onClose={() => setCreating(false)}><form className="gestao-form gestao-form-grid" onSubmit={(event) => void save(event)}><label>Protocolo<select name="protocolo" required value={protocoloId} onChange={(e) => setProtocoloId(e.target.value)}><option value="">Selecione um protocolo</option>{protocolos.map((p) => <option key={p.id} value={p.id}>{p.titulo} · {p.rodovia}</option>)}</select></label>{protocolos.length === 0 && <p className="gestao-error">Crie um protocolo antes de cadastrar pontos.</p>}<label>Código<input name="codigo" required value={codigo} onChange={(e) => setCodigo(e.target.value)} /></label><label>Estado<input name="estado" required value={estado} onChange={(e) => setEstado(e.target.value)} /></label><label>Quilômetro<input name="km" required value={km} onChange={(e) => setKm(e.target.value)} /></label><label>Classificação<select name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value as Ponto['tipo'])}><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização (já instalado)</option></select></label><label>Latitude<input name="latitude" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label><label>Longitude<input name="longitude" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label><label>Precisão<select name="precisao" value={precisao} onChange={(e) => setPrecisao(e.target.value as Ponto['precisao'])}><option value="confirmada">Confirmada</option><option value="aproximada">Aproximada</option></select></label><div className="gestao-form-footer"><button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar ponto'}</button></div></form></ModalGestao>
-    <ModalGestao open={Boolean(editing)} title="Editar ponto" description="Corrija localização e planejamento sem recriar o ponto." labelledBy="gestao-editar-ponto-title" onClose={() => setEditing(null)}>{editing && <form className="gestao-form gestao-form-grid" onSubmit={(event) => void saveEdit(event)}><label>Código<input name="codigo" required value={editCodigo} onChange={(e) => setEditCodigo(e.target.value)} /></label><label>Estado<input name="estado" required value={editEstado} onChange={(e) => setEditEstado(e.target.value)} /></label><label>Quilômetro<input name="km" required value={editKm} onChange={(e) => setEditKm(e.target.value)} /></label><label>Classificação<select name="tipo" value={editTipo} onChange={(e) => setEditTipo(e.target.value as Ponto['tipo'])}><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select></label><label>Resultado operacional<select value={editResultado} onChange={(e) => setEditResultado((e.target.value || '') as Ponto['resultado'] | '')}><option value="">Ainda não concluído</option><option value={editTipo === 'regularizacao' ? 'regularizado' : 'aprovado_implantacao'}>{editTipo === 'regularizacao' ? 'Regularizado' : 'Aprovado para implantação'}</option></select></label><label>Latitude<input name="latitude" type="number" step="any" value={editLatitude} onChange={(e) => setEditLatitude(e.target.value)} /></label><label>Longitude<input name="longitude" type="number" step="any" value={editLongitude} onChange={(e) => setEditLongitude(e.target.value)} /></label><label>Precisão<select name="precisao" value={editPrecisao} onChange={(e) => setEditPrecisao(e.target.value as Ponto['precisao'])}><option value="confirmada">Confirmada</option><option value="aproximada">Aproximada</option></select></label><label>Previsão<input name="previsao" type="date" value={editPrevisao} onChange={(e) => setEditPrevisao(e.target.value)} /></label><label>Realizado<input name="realizadoEm" type="date" value={editRealizado} onChange={(e) => setEditRealizado(e.target.value)} /></label>{editing.protocoloId && <p><small>Concessionária e rodovia seguem o protocolo vinculado. Para mudar vínculo, use a lista.</small></p>}<div className="gestao-form-footer"><button type="button" className="gestao-button-secondary" onClick={() => setEditing(null)}>Cancelar</button><button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></div></form>}</ModalGestao>
-    {pontosLista.length ? <ul className="gestao-point-list">{pontosLista.map((p) => { const proc = protocolos.find((item) => item.id === p.protocoloId); const situacao = pontoStatus(p, proc); return <li className="gestao-point-row" key={p.id}><div><strong>{p.codigo}</strong><span>{p.estado} · {p.rodovia} km {p.km} · {p.concessionaria}</span><small>{p.tipo === 'regularizacao' ? 'Regularização' : 'Nova implantação'} · {!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) ? 'Coordenadas pendentes' : `${p.latitude}, ${p.longitude} (${p.precisao || 'precisão não informada'})`}</small></div><div className="gestao-point-actions"><span className="gestao-status">{nomeGestao(situacao.valor)}{situacao.herdado && p.protocoloId ? ' · protocolo' : ''}</span><button type="button" className="gestao-button-secondary" onClick={() => openEdit(p)}>Editar</button><label>Resultado operacional<select value={p.resultado ?? ''} disabled={savingResultadoId === p.id} onChange={(e) => void setResultado(p, (e.target.value || undefined) as Ponto['resultado'])}><option value="">Ainda não concluído</option><option value={p.tipo === 'regularizacao' ? 'regularizado' : 'aprovado_implantacao'}>{p.tipo === 'regularizacao' ? 'Regularizado' : 'Aprovado para implantação'}</option></select></label>{!p.protocoloId && <label>Vincular protocolo<select value="" disabled={saving} onChange={(e) => void linkPoint(p, e.target.value)}><option value="">Selecionar</option>{protocolos.map((item) => <option key={item.id} value={item.id}>{item.titulo} · {item.rodovia}</option>)}</select></label>}<Link to={`/gestao-contratos/${contratoId}/mapa?ponto=${p.id}`}>Ver no mapa ↗</Link>{p.protocoloId && <Link to={`/gestao-contratos/${contratoId}/protocolos/${p.protocoloId}?ponto=${p.id}`}>Ver protocolo ↗</Link>}</div></li> })}</ul> : <div className="gestao-empty"><h3>Nenhum ponto neste recorte</h3><p>Adicione ponto a protocolo existente; localização permanece individual.</p></div>}
-  </section>
+      <ModalGestao
+        open={creating}
+        title="Novo ponto"
+        description="Cadastre a localização e vincule o ponto a um protocolo."
+        labelledBy="gestao-novo-ponto-title"
+        onClose={() => setCreating(false)}
+      >
+        <form className="gestao-form gestao-form-grid" onSubmit={(event) => void save(event)}>
+          <label>
+            Protocolo
+            <select name="protocolo" required value={protocoloId} onChange={(e) => setProtocoloId(e.target.value)}>
+              <option value="">Selecione um protocolo</option>
+              {protocolos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.titulo} · {p.rodovia}
+                </option>
+              ))}
+            </select>
+          </label>
+          {protocolos.length === 0 && <p className="gestao-error">Crie um protocolo antes de cadastrar pontos.</p>}
+          <label>
+            Código
+            <input name="codigo" required value={codigo} onChange={(e) => setCodigo(e.target.value)} />
+          </label>
+          <label>
+            Estado
+            <input name="estado" required value={estado} onChange={(e) => setEstado(e.target.value)} />
+          </label>
+          <label>
+            Quilômetro
+            <input name="km" required value={km} onChange={(e) => setKm(e.target.value)} />
+          </label>
+          <label>
+            Classificação
+            <select name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value as Ponto['tipo'])}>
+              <option value="nova_implantacao">Nova implantação</option>
+              <option value="regularizacao">Regularização (já instalado)</option>
+            </select>
+          </label>
+          <label>
+            Latitude
+            <input name="latitude" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} />
+          </label>
+          <label>
+            Longitude
+            <input name="longitude" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} />
+          </label>
+          <label>
+            Precisão
+            <select name="precisao" value={precisao} onChange={(e) => setPrecisao(e.target.value as Ponto['precisao'])}>
+              <option value="confirmada">Confirmada</option>
+              <option value="aproximada">Aproximada</option>
+            </select>
+          </label>
+          <div className="gestao-form-footer">
+            <button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar ponto'}</button>
+          </div>
+        </form>
+      </ModalGestao>
+
+      <PontoPainelModal
+        open={Boolean(painelPonto)}
+        contratoId={contratoId}
+        ponto={painelPonto}
+        protocolos={protocolos}
+        initialTab={painel?.tab ?? 'dados'}
+        onClose={() => setPainel(null)}
+        refresh={refresh}
+        onNotice={(message) => { setSuccess(message); setError('') }}
+        onError={(message) => { if (message) setError(message); else setError('') }}
+      />
+
+      {pontosLista.length ? (
+        <ul className="gestao-point-list">
+          {pontosLista.map((p) => {
+            const proc = protocolos.find((item) => item.id === p.protocoloId)
+            const situacao = pontoStatus(p, proc)
+            return (
+              <li className="gestao-point-row" key={p.id}>
+                <div className="gestao-point-row-meta">
+                  <strong>{p.codigo}</strong>
+                  <span>
+                    {p.estado} · {p.rodovia} km {p.km} · {p.concessionaria}
+                  </span>
+                  <small>
+                    {p.tipo === 'regularizacao' ? 'Regularização' : 'Nova implantação'} ·{' '}
+                    {!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)
+                      ? 'Coordenadas pendentes'
+                      : `${p.latitude}, ${p.longitude} (${p.precisao || 'precisão não informada'})`}
+                  </small>
+                </div>
+                <div className="gestao-point-row-aside">
+                  <span className={`gestao-status gestao-point-status-pill${p.resultado ? ' gestao-point-status-pill-ok' : ''}`}>
+                    {nomeGestao(situacao.valor)}
+                    {situacao.herdado && p.protocoloId ? ' · protocolo' : ''}
+                  </span>
+                  <PontoIconBar
+                    contratoId={contratoId}
+                    ponto={p}
+                    protocolo={proc}
+                    onOpenPainel={(tab) => openPainel(p, tab)}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <div className="gestao-empty">
+          <h3>Nenhum ponto neste recorte</h3>
+          <p>Adicione ponto a protocolo existente; localização permanece individual.</p>
+        </div>
+      )}
+    </section>
+  )
 }

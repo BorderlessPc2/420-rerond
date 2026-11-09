@@ -236,9 +236,34 @@
 .gestao-summary strong { font-variant-numeric: tabular-nums; }
 .gestao-simple-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
 .gestao-simple-list li span { color: var(--color-text-soft); }
-.gestao-point-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 24px; padding: 18px 20px; }
-.gestao-point-row > div:first-child { display: flex; flex: 1 1 240px; flex-direction: column; gap: 7px; min-inline-size: 0; }
-.gestao-point-row > div:first-child > span { font-size: .9rem; }
+.gestao-point-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px 20px; padding: 18px 20px; }
+.gestao-point-row-meta { display: flex; flex: 1 1 240px; flex-direction: column; gap: 7px; min-inline-size: 0; }
+.gestao-point-row-meta > span { font-size: .9rem; }
+.gestao-point-row-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex: 0 1 auto; }
+.gestao-point-status-pill { font-size: .78rem; padding: 4px 11px; border-radius: 999px; background: var(--color-warning-bg); color: #7a5a00; }
+.gestao-point-status-pill-ok { background: var(--color-success-bg); color: #0d6b40; }
+.gestao-point-icon-bar { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.gestao-point-icon-btn, .gestao-modal-host .gestao-point-icon-btn {
+  display: grid; place-items: center; inline-size: 38px; min-block-size: 38px !important; padding: 0 !important;
+  border: 1px solid var(--color-border) !important; border-radius: 10px !important; background: var(--color-surface) !important;
+  color: var(--color-primary-800) !important; cursor: pointer;
+  transition: background-color var(--gestao-duration-fast) var(--gestao-ease-out), border-color var(--gestao-duration-fast) var(--gestao-ease-out);
+}
+.gestao-point-icon-btn:hover, .gestao-modal-host .gestao-point-icon-btn:hover { background: var(--color-primary-50) !important; border-color: var(--color-primary-600) !important; }
+.gestao-ponto-painel-status { margin-block-end: 14px; }
+.gestao-ponto-painel-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-block-end: 18px; border-bottom: 1px solid var(--color-border); }
+.gestao-ponto-painel-tabs button {
+  border: 0; background: none; padding: 10px 14px; margin-bottom: -1px; font: inherit; font-size: .88rem; font-weight: 600;
+  color: var(--color-text-soft); cursor: pointer; border-bottom: 3px solid transparent;
+}
+.gestao-ponto-painel-tabs button.is-active { color: var(--color-primary-800); border-bottom-color: var(--color-primary-700); }
+.gestao-ponto-painel-hint { color: var(--color-text-soft); margin-block: 8px 0; }
+.gestao-protocol-points li { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; padding: 14px 0; }
+.gestao-protocol-points .gestao-point-row-meta { flex: 1 1 200px; }
+.gestao-planning-list li { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; justify-content: space-between; padding: 18px 20px; }
+.gestao-planning-list .gestao-point-row-aside { align-items: flex-end; }
+.gestao-planning-inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; flex: 1 1 100%; padding-block-start: 10px; border-block-start: 1px solid var(--color-border); }
+.gestao-planning-inline label { min-inline-size: 140px; }
 .gestao-point-actions { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 12px; padding-block-start: 10px; border-block-start: 1px solid var(--color-border); }
 .gestao-point-actions label { min-inline-size: 175px; }
 .gestao-point-actions a { white-space: nowrap; }
