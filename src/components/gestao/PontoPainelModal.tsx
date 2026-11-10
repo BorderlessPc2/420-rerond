@@ -12,6 +12,7 @@ import type { PontoInput } from '../../services/gestaoValidacao'
 import ModalGestao from './ModalGestao'
 import { getPontoDetailSummary, getPontoStatusOptions } from '../../views/gestaoMapaHelpers'
 import { nomeGestao } from '../../views/gestaoUi'
+import GestaoEtapaStepper from './GestaoEtapaStepper'
 import type { PontoPainelTab } from './pontoPainelTypes'
 
 type PontoPainelModalProps = {
@@ -185,6 +186,18 @@ export default function PontoPainelModal({
           <span className="gestao-status">{nomeGestao(situacao.valor)}</span>
           {situacao.herdado && ponto.protocoloId ? <small> · herdado do protocolo</small> : null}
         </p>
+        {protocolo && (
+          <section className="gestao-ponto-planejamento" aria-label="Fases do planejamento do protocolo">
+            <div className="gestao-ponto-planejamento-head">
+              <div>
+                <span className="gestao-eyebrow">Planejamento do protocolo</span>
+                <strong>{nomeGestao(protocolo.etapa)}</strong>
+              </div>
+              <small>Etapa herdada do protocolo</small>
+            </div>
+            <GestaoEtapaStepper etapa={protocolo.etapa} status={protocolo.status} />
+          </section>
+        )}
         <div className="gestao-ponto-painel-tabs" role="tablist" aria-label="Seções do ponto">
           {TABS.map((item) => (
             <button

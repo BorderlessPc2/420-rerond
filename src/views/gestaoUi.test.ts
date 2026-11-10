@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatarDataGestao, nomeGestao } from './gestaoUi'
+import { formatarDataGestao, nomeGestao, resumoEtapaPlanejamento } from './gestaoUi'
 
 describe('helpers de UI da gestão', () => {
   it('traduz status técnico para texto legível', () => {
@@ -13,5 +13,11 @@ describe('helpers de UI da gestão', () => {
   })
   it('preserva data inválida sem lançar exceção', () => {
     expect(formatarDataGestao('data-invalida')).toBe('data-invalida')
+  })
+  it('resume fases do planejamento com etapa atual destacada', () => {
+    expect(resumoEtapaPlanejamento('fase_1')).toEqual({
+      etapas: ['Planejamento', 'Elaboração', 'Fase 1', 'Fase 2', 'Homologação', 'Concluído'],
+      indiceAtual: 2,
+    })
   })
 })
