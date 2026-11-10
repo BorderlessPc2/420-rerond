@@ -45,9 +45,15 @@ import {
   getRequisitosFromPerfil,
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
+import { verificarEvidencias } from "./services/pipeline/evidenceVerifier";
 import { selectDocumentosPorPrioridade } from "./services/pipeline/documentPriority";
 import { sanitizeForFirestore } from "./services/firestoreSanitizer";
 import { isLikelyRateLimitError, withRetry } from "./services/pipeline";
+import {
+  getMissingApiKeyFailure,
+  shouldClaimContinuation,
+  validateAnalysisType,
+} from "./services/jobGuards";
 
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
@@ -366,6 +372,13 @@ export const analisarSolicitacao = onCall(
     }
 
     const data = snapshot.data()!;
+    const typeError = validateAnalysisType(
+      typeof data.tipoAnaliseId === "string" ? data.tipoAnaliseId : "",
+      escopoAnalise.incluirDocumentosProjeto && Array.isArray(data.arquivos) && data.arquivos.length > 0,
+    );
+    if (typeError) {
+      throw new HttpsError("failed-precondition", typeError.message);
+    }
     const activeJobId = data.activeAnaliseJobId ? String(data.activeAnaliseJobId) : null;
     const activeJobStatus = data.analiseJobStatus ? String(data.analiseJobStatus) : null;
     const activeStates = new Set([
@@ -383,26 +396,48 @@ export const analisarSolicitacao = onCall(
     const jobRef = docRef.collection("analiseJobs").doc();
     const jobId = jobRef.id;
 
-    await jobRef.set(sanitizeForFirestore({
-      id: jobId,
-      solicitacaoId,
-      state: "queued",
-      progress: 12,
-      stage: "prep",
-      promptCustomizado: promptCustomizado ?? null,
-      tiposProjetoPraComparar,
-      escopoAnalise,
-      createdBy: request.auth.uid,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }));
+    const created = await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(docRef);
+      const currentData = current.data() ?? {};
+      const currentJobId = currentData.activeAnaliseJobId
+        ? String(currentData.activeAnaliseJobId)
+        : null;
+      const currentStatus = currentData.analiseJobStatus
+        ? String(currentData.analiseJobStatus)
+        : null;
+      if (currentJobId && currentStatus && activeStates.has(currentStatus)) return false;
 
-    await docRef.update(sanitizeForFirestore({
-      activeAnaliseJobId: jobId,
-      analiseJobStatus: "queued",
-      analiseJobProgress: 12,
-      updatedAt: FieldValue.serverTimestamp(),
-    }));
+      transaction.set(jobRef, sanitizeForFirestore({
+        id: jobId,
+        solicitacaoId,
+        state: "queued",
+        progress: 12,
+        stage: "prep",
+        promptCustomizado: promptCustomizado ?? null,
+        tiposProjetoPraComparar,
+        escopoAnalise,
+        createdBy: request.auth!.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }));
+      transaction.update(docRef, sanitizeForFirestore({
+        activeAnaliseJobId: jobId,
+        analiseJobStatus: "queued",
+        analiseJobProgress: 12,
+        updatedAt: FieldValue.serverTimestamp(),
+      }));
+      return true;
+    });
+
+    if (!created) {
+      const current = await docRef.get();
+      const currentData = current.data() ?? {};
+      return {
+        jobId: String(currentData.activeAnaliseJobId),
+        solicitacaoId,
+        reused: true,
+      };
+    }
 
     return { jobId, solicitacaoId, reused: false };
   },
@@ -420,7 +455,16 @@ export const processAnaliseJob = onDocumentCreated(
     const apiKey =
       openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
     if (!apiKey) {
-      console.error("OPENAI_API_KEY não configurada para processamento do job.");
+      const failure = getMissingApiKeyFailure();
+      console.error(failure.message);
+      const solicitacaoId = String(event.params.solicitacaoId ?? "");
+      const jobId = String(event.params.jobId ?? "");
+      if (solicitacaoId && jobId) {
+        const jobRef = db.collection(COLLECTION).doc(solicitacaoId).collection("analiseJobs").doc(jobId);
+        const solicitacaoRef = db.collection(COLLECTION).doc(solicitacaoId);
+        await jobRef.update({ state: "failed", progress: 0, stage: "prep", error: failure, updatedAt: FieldValue.serverTimestamp() });
+        await solicitacaoRef.update({ activeAnaliseJobId: null, analiseJobStatus: "failed", analiseErroCodigo: failure.code, analiseErroMensagem: failure.message, updatedAt: FieldValue.serverTimestamp() });
+      }
       return;
     }
 
@@ -452,16 +496,43 @@ export const continueAnaliseJob = onDocumentUpdated(
     if (before.state === "queued" || after.state !== "queued") return;
     if (!after.continuation?.requested) return;
 
-    const apiKey =
-      openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
-    if (!apiKey) {
-      console.error("OPENAI_API_KEY nao configurada para continuar o job.");
-      return;
-    }
-
     const solicitacaoId = String(event.params.solicitacaoId ?? "");
     const jobId = String(event.params.jobId ?? "");
     if (!solicitacaoId || !jobId) return;
+    const continuationRef = db.collection(COLLECTION).doc(solicitacaoId).collection("analiseJobs").doc(jobId);
+    const claimId = `${jobId}:${Date.now()}`;
+    let claimed = false;
+    await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(continuationRef);
+      const continuation = current.data()?.continuation as { requested?: boolean; claimId?: string } | undefined;
+      if (!shouldClaimContinuation(undefined, { requested: continuation?.requested, claimId: continuation?.claimId || claimId })) return;
+      if (continuation?.claimId) return;
+      transaction.update(continuationRef, { "continuation.claimId": claimId, updatedAt: FieldValue.serverTimestamp() });
+      claimed = true;
+    });
+    if (!claimed) return;
+
+    const apiKey =
+      openaiApiKey.value()?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
+    if (!apiKey) {
+      const failure = getMissingApiKeyFailure();
+      console.error(failure.message);
+      await continuationRef.update({
+        state: "failed",
+        progress: 0,
+        stage: "continuation",
+        error: failure,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await db.collection(COLLECTION).doc(solicitacaoId).update({
+        activeAnaliseJobId: null,
+        analiseJobStatus: "failed",
+        analiseErroCodigo: failure.code,
+        analiseErroMensagem: failure.message,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return;
+    }
 
     await runAnaliseJob({
       solicitacaoId,
@@ -642,6 +713,30 @@ export const formatarRelatorioComplementos = onCall(
 
     const { checklist, parecerTecnico } = parseAIResponse(result.content);
     const complementosSerializados = JSON.stringify(complementos);
+    const evidenceVerification = verificarEvidencias(checklist);
+    const versoesRef = docRef.collection("analiseVersoes");
+    const versaoAnterior = typeof data.analiseVersaoAtual === "number" ? data.analiseVersaoAtual : 0;
+    if (data.relatorioIA || data.checklistConformidade || data.parecerTecnico) {
+      const versaoArquivada = versaoAnterior > 0 ? versaoAnterior : 1;
+      await versoesRef.doc(`v${versaoArquivada}`).set(sanitizeForFirestore({
+        solicitacaoId,
+        versao: versaoArquivada,
+        relatorioIA: data.relatorioIA ?? null,
+        checklistConformidade: data.checklistConformidade ?? null,
+        parecerTecnico: data.parecerTecnico ?? null,
+        arquivadoEm: FieldValue.serverTimestamp(),
+      }), { merge: true });
+    }
+    const versaoAtual = versaoAnterior > 0 ? versaoAnterior + 1 : 1;
+    await versoesRef.doc(`v${versaoAtual}`).set(sanitizeForFirestore({
+      solicitacaoId,
+      versao: versaoAtual,
+      relatorioIA: result.content,
+      checklistConformidade: JSON.stringify(checklist),
+      parecerTecnico,
+      evidenceVerification,
+      createdAt: FieldValue.serverTimestamp(),
+    }));
 
     await docRef.update(sanitizeForFirestore({
       status: "em_analise",
@@ -649,6 +744,8 @@ export const formatarRelatorioComplementos = onCall(
       parecerTecnico,
       complementosChecklist: complementosSerializados,
       relatorioIA: result.content,
+      analiseVersaoAtual: versaoAtual,
+      evidenceVerification,
       analisadoPorIA: true,
       analisadoEm: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),

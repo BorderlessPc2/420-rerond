@@ -263,10 +263,15 @@
   background: #e2ecff;
 }
 
-.apo-dismiss {
-  display: block;
-  width: 100%;
+.apo-failed-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 12px;
+}
+
+.apo-retry,
+.apo-dismiss {
+  flex: 1;
   padding: 9px 12px;
   border: 1px solid #c5d4eb;
   border-radius: 10px;
@@ -275,6 +280,16 @@
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.apo-retry {
+  border-color: #1f6feb;
+  background: #1f6feb;
+  color: #fff;
+}
+
+.apo-retry:hover {
+  background: #185abd;
 }
 
 .apo-dismiss:hover {

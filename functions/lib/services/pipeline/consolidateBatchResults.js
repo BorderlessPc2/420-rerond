@@ -15,6 +15,14 @@ function statusRank(status) {
     const key = String(status || "").toUpperCase();
     return STATUS_RANK[key] ?? 0;
 }
+function checklistKey(row) {
+    for (const field of ["id", "codigo", "checklistId", "item"]) {
+        const value = row[field];
+        if (typeof value === "string" && value.trim())
+            return value.trim();
+    }
+    return "";
+}
 function pickRicherText(a, b) {
     const sa = typeof a === "string" ? a.trim() : "";
     const sb = typeof b === "string" ? b.trim() : "";
@@ -31,7 +39,7 @@ function mergeChecklistItems(arrays) {
             if (!raw || typeof raw !== "object")
                 continue;
             const row = raw;
-            const id = String(row.item ?? "").trim();
+            const id = checklistKey(row);
             if (!id)
                 continue;
             const prev = byId.get(id);

@@ -328,6 +328,12 @@ export default function Solicitacoes() {
     setActiveJob(null)
   }
 
+  const retryFailedAnalysis = () => {
+    if (!solicitacaoEmAnalise) return
+    setModalReanaliseAberto(solicitacaoEmAnalise)
+    dismissAnaliseOverlay()
+  }
+
   const handleAprovar = async (solicitacao: SolicitacaoWithFiles) => {
     if (!solicitacao.id) return
 
@@ -400,6 +406,11 @@ export default function Solicitacoes() {
         onDismiss={
           activeJob?.state === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'failed'
             ? dismissAnaliseOverlay
+            : undefined
+        }
+        onRetry={
+          activeJob?.state === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'failed'
+            ? retryFailedAnalysis
             : undefined
         }
       />
