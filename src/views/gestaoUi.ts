@@ -32,3 +32,10 @@ export const formatarDataGestao = (valor?: string) => {
   const data = new Date(`${valor}T00:00:00`)
   return Number.isNaN(data.getTime()) ? valor : new Intl.DateTimeFormat('pt-BR').format(data)
 }
+
+const ETAPAS_PLANEJAMENTO = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido'] as const
+
+export const resumoEtapaPlanejamento = (etapa: string) => ({
+  etapas: ETAPAS_PLANEJAMENTO.map(nomeGestao),
+  indiceAtual: Math.max(0, ETAPAS_PLANEJAMENTO.indexOf(etapa as (typeof ETAPAS_PLANEJAMENTO)[number])),
+})
