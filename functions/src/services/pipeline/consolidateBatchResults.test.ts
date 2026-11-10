@@ -16,6 +16,26 @@ describe("mergeChecklistItems", () => {
     expect(merged[0].status).toBe("NAO_CONFORME");
     expect(merged[0].fundamentacao).toContain("mais longo");
   });
+
+  it("deduplica pelo id do checklist, não pelo texto exibido", () => {
+    const merged = mergeChecklistItems([
+      [{ id: "POC_MEMORIAL", item: "Memorial", status: "OK" }],
+      [{ id: "POC_MEMORIAL", item: "Memorial técnico", status: "NAO_CONFORME" }],
+    ]) as Array<{ id: string; status: string }>;
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: "POC_MEMORIAL", status: "NAO_CONFORME" });
+  });
+
+  it("preserva item anterior que não apareceu na reanálise", () => {
+    const merged = mergeChecklistItems([
+      [
+        { id: "ITEM_A", item: "A", status: "OK" },
+        { id: "ITEM_B", item: "B", status: "NAO_CONFORME" },
+      ],
+      [{ id: "ITEM_A", item: "A", status: "OK", fundamentacao: "revisado" }],
+    ]) as Array<{ id: string }>;
+    expect(merged.map((item) => item.id)).toEqual(["ITEM_A", "ITEM_B"]);
+  });
 });
 
 describe("mergeDadosExtraidos", () => {

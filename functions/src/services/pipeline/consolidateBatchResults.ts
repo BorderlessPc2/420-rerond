@@ -1,4 +1,7 @@
 export type ChecklistItemLike = {
+  id?: unknown
+  codigo?: unknown
+  checklistId?: unknown
   item?: unknown
   status?: unknown
   situacaoEncontrada?: unknown
@@ -18,6 +21,14 @@ function statusRank(status: unknown): number {
   return STATUS_RANK[key] ?? 0
 }
 
+function checklistKey(row: ChecklistItemLike): string {
+  for (const field of ["id", "codigo", "checklistId", "item"] as const) {
+    const value = row[field]
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return ""
+}
+
 function pickRicherText(a: unknown, b: unknown): string | undefined {
   const sa = typeof a === "string" ? a.trim() : ""
   const sb = typeof b === "string" ? b.trim() : ""
@@ -34,7 +45,7 @@ export function mergeChecklistItems(arrays: unknown[][]): unknown[] {
     for (const raw of arr) {
       if (!raw || typeof raw !== "object") continue
       const row = raw as ChecklistItemLike
-      const id = String(row.item ?? "").trim()
+      const id = checklistKey(row)
       if (!id) continue
       const prev = byId.get(id)
       if (!prev) {

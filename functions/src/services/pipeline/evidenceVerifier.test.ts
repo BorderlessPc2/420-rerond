@@ -26,6 +26,20 @@ describe("verificarEvidencias", () => {
     expect(result.percentualComEvidenciaCompleta).toBe(0.5);
   });
 
+  it("marca não conformidade sem fundamento normativo como frágil", () => {
+    const result = verificarEvidencias([
+      {
+        id: "C",
+        status: "NAO_CONFORME",
+        evidencia: "Planta mostra divergência",
+        localizacao: "planta.pdf p. 2",
+        justificativa: "A medida diverge do memorial",
+      },
+    ]);
+
+    expect(result.itensFrageis).toEqual(["C"]);
+  });
+
   it("aceita campos alternativos produzidos por diferentes prompts", () => {
     const result = verificarEvidencias([
       {

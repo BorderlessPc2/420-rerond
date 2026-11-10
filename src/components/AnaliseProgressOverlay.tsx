@@ -26,6 +26,8 @@ export type AnaliseProgressOverlayProps = {
   errorMessage?: string | null
   /** Fecha o overlay (ex.: após falha). */
   onDismiss?: () => void
+  /** Reabre análise na mesma solicitação após falha. */
+  onRetry?: () => void
 }
 
 type Stage = {
@@ -109,6 +111,7 @@ export default function AnaliseProgressOverlay({
   progress,
   errorMessage,
   onDismiss,
+  onRetry,
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
@@ -321,10 +324,19 @@ export default function AnaliseProgressOverlay({
           </button>
         )}
 
-        {isFailed && onDismiss && (
-          <button type="button" className="apo-dismiss" onClick={onDismiss}>
-            Fechar
-          </button>
+        {isFailed && (onRetry || onDismiss) && (
+          <div className="apo-failed-actions">
+            {onRetry && (
+              <button type="button" className="apo-retry" onClick={onRetry}>
+                Tentar novamente
+              </button>
+            )}
+            {onDismiss && (
+              <button type="button" className="apo-dismiss" onClick={onDismiss}>
+                Fechar
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
