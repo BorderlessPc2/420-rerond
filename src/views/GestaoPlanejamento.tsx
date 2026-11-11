@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useOutletContext, useParams } from 'react-router-dom'
 import { atualizarPlanejamento, atualizarPlanejamentoPonto, pontoStatus, type Ponto } from '../services/gestaoContratos'
 import PontoIconBar from '../components/gestao/PontoIconBar'
+import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import type { GestaoContext } from './GestaoContratoDetalhe'
@@ -9,7 +10,7 @@ import { nomeGestao } from './gestaoUi'
 
 export default function GestaoPlanejamento() {
   const { contratoId = '' } = useParams()
-  const { protocolos, pontos, refresh } = useOutletContext<GestaoContext>()
+  const { protocolos, pontos, loading, refresh } = useOutletContext<GestaoContext>()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [savingId, setSavingId] = useState('')
@@ -40,6 +41,8 @@ export default function GestaoPlanejamento() {
       setSavingId('')
     }
   }
+
+  if (loading) return <GestaoLoadingSkeleton variant="planejamento" label="Carregando planejamento" />
 
   return (
     <section>

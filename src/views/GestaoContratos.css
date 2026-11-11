@@ -377,6 +377,14 @@
 .gestao-point-detail-grid span { color: var(--color-text-soft); font-size: .76rem; }
 .gestao-point-detail-grid strong { color: var(--color-text); font-size: .9rem; }
 .gestao-map-modal { display: grid; gap: 18px; }
+.gestao-map-modal-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.gestao-map-modal-head h3, .gestao-map-modal-head p { margin-block: 4px 0; }
+.gestao-map-inspector-close { flex: 0 0 auto; min-block-size: 34px !important; padding: 6px 10px !important; }
+.gestao-loading { display: grid; gap: 14px; min-inline-size: 0; }
+.gestao-skeleton-card { flex: 1 1 235px; min-block-size: 165px; border-radius: var(--radius-lg); }
+.gestao-skeleton-filter { block-size: 76px; border-radius: var(--radius-lg); }
+.gestao-skeleton-list { block-size: 72px; border-radius: var(--radius-md); }
+.gestao-skeleton-planning { block-size: 118px; border-radius: var(--radius-lg); }
 .gestao-map-modal-status { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-block-end: 18px; border-block-end: 1px solid var(--color-border); }
 .gestao-map-status-form { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-primary-50); }
 .gestao-map-location-details { padding-block-start: 4px; border-block-start: 1px solid var(--color-border); }
@@ -450,6 +458,6 @@
 @media (max-width: 800px) { .gestao-health { grid-template-columns: 1fr; } }
 @media (max-width: 1080px) { .gestao-overview-filters { grid-template-columns: 1fr 1fr; } .gestao-overview-period { grid-column: 1 / -1; } }
 @media (max-width: 880px) { .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gestao-overview-fields > :last-child { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-overview-fields > :last-child { grid-column: auto; } .gestao-overview-panel { padding-inline: 16px; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
+@media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions, .gestao-map-modal-head { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-overview-fields > :last-child { grid-column: auto; } .gestao-overview-panel { padding-inline: 16px; } .gestao-map-inspector-close { align-self: start; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
 @media (max-width: 460px) { .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } }
 @media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover, .gestao-metrics > div:hover { transform: none; } }

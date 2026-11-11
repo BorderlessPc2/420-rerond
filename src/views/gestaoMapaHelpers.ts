@@ -1,5 +1,11 @@
 import type { Ponto, Protocolo } from '../services/gestaoContratos'
 
+export const removerPontoSelecionado = (search: string) => {
+  const params = new URLSearchParams(search)
+  params.delete('ponto')
+  return params.toString()
+}
+
 export const getPontoDetailSummary = (ponto: Ponto, protocolo?: Protocolo) => ({
   local: `${ponto.estado} · ${ponto.rodovia} · km ${ponto.km}`,
   classificacao: ponto.tipo === 'regularizacao' ? 'Regularização' : 'Nova implantação',

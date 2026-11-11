@@ -6,6 +6,7 @@ import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGest
 import { calcularDashboardGestao } from '../services/gestaoDashboard'
 import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
 import GestaoDashboardCharts from '../components/gestao/GestaoDashboardCharts'
+import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
 import { classificarPrazo, resumirPrioridades } from '../utils/gestaoPrioridades'
 import { nomeGestao } from './gestaoUi'
@@ -15,7 +16,7 @@ import './GestaoContratos.css'
 const etapasFiltro: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
 type DashboardQueryKey = 'estado' | 'concessionaria' | 'rodovia' | 'status' | 'tipo' | 'etapa' | 'inicio' | 'fim' | 'q'
 
-export type GestaoContext = { contrato: Contrato; protocolos: Protocolo[]; pontos: Ponto[]; refresh: () => Promise<void> }
+export type GestaoContext = { contrato: Contrato; protocolos: Protocolo[]; pontos: Ponto[]; loading: boolean; refresh: () => Promise<void> }
 export default function GestaoContratoDetalhe() {
   const { contratoId = '' } = useParams()
   const navigate = useNavigate()
@@ -24,6 +25,7 @@ export default function GestaoContratoDetalhe() {
   const [contrato, setContrato] = useState<Contrato | null>(null)
   const [protocolos, setProtocolos] = useState<Protocolo[]>([])
   const [pontos, setPontos] = useState<Ponto[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
@@ -45,8 +47,10 @@ export default function GestaoContratoDetalhe() {
       const [ps, pts] = await Promise.all([listProtocolos(contratoId), listPontos(contratoId)])
       setContrato(found); setProtocolos(ps); setPontos(pts); setError('')
     } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao carregar contrato.') }
+    finally { setLoading(false) }
   }, [contratoId])
   useEffect(() => {
+    setLoading(true)
     void refresh()
     const unsubscribeContrato = onSnapshot(doc(db, 'gestaoContratos', contratoId), (snapshot) => {
       if (!snapshot.exists()) { setContrato(null); setError('Contrato não encontrado.'); return }
@@ -85,7 +89,7 @@ export default function GestaoContratoDetalhe() {
   }
   const statusOpcoes = useMemo(() => [...new Set(protocolos.map((item) => item.status))].sort(), [protocolos])
   const prioridades = resumirPrioridades(filtrado.protocolos)
-  if (!contrato) return error ? <div className="gestao-page"><Link to="/gestao-contratos">Voltar aos contratos</Link><p role="alert">{error}</p></div> : <GestaoPageSkeleton />
+  if (!contrato) return error ? <div className="gestao-page"><Link to="/gestao-contratos">Voltar aos contratos</Link><p role="alert">{error}</p></div> : <div className="gestao-page"><GestaoLoadingSkeleton variant="detalhe" label="Carregando contrato" /></div>
   const base = `/gestao-contratos/${contratoId}`
   const isOverview = location.pathname === base
   return <div className="gestao-page">
@@ -148,19 +152,9 @@ export default function GestaoContratoDetalhe() {
     <GestaoDashboardCharts data={dashboard} />
 <section className="gestao-dashboard-map"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>Clique em um ponto para abrir a ficha, com protocolo e situação.</p></div><Link className="gestao-button-secondary" to={{ pathname: `${base}/mapa`, search: searchParams.toString() }}>Abrir mapa completo ↗</Link></div><div className="gestao-map-preview"><MapaLeaflet pontos={filtrado.pontos} protocolos={filtrado.protocolos} onSelectPoint={(ponto) => { const next = new URLSearchParams(searchParams); next.set('ponto', ponto.id); navigate({ pathname: `${base}/mapa`, search: next.toString() }) }} height={380} fitBoundsOnChange /></div></section>
     </>}
-    <Outlet context={{ contrato, protocolos: filtrado.protocolos, pontos: filtrado.pontos, refresh } satisfies GestaoContext} />
+    <Outlet context={{ contrato, protocolos: filtrado.protocolos, pontos: filtrado.pontos, loading, refresh } satisfies GestaoContext} />
   </div>
 }
-function GestaoPageSkeleton() {
-  return <div className="gestao-page" aria-busy="true" aria-live="polite">
-    <span className="gestao-sr">Carregando contrato</span>
-    <span className="gestao-skeleton gestao-skeleton-title" />
-    <span className="gestao-skeleton gestao-skeleton-line" />
-    <div className="gestao-skeleton-row" aria-hidden="true">{[0, 1, 2, 3, 4].map((item) => <span className="gestao-skeleton gestao-skeleton-pill" key={item} />)}</div>
-    <span className="gestao-skeleton gestao-skeleton-map" />
-  </div>
-}
-
 export function GestaoVisaoGeral() {
   const { contratoId = '' } = useParams()
   const [searchParams] = useSearchParams()

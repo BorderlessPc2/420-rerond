@@ -3,16 +3,17 @@ import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { pontoStatus, type Ponto, type Protocolo } from '../services/gestaoContratos'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
 import PontoIconBar from '../components/gestao/PontoIconBar'
+import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import { filtrarPontosMapa, getPontoColor, getSelectedPointId } from '../components/gestao/mapaUtils'
 import { nomeGestao } from './gestaoUi'
-import { getPontoDetailSummary } from './gestaoMapaHelpers'
+import { getPontoDetailSummary, removerPontoSelecionado } from './gestaoMapaHelpers'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 
 export default function GestaoMapa() {
   const { contratoId = '' } = useParams()
-  const { pontos, protocolos, refresh } = useOutletContext<GestaoContext>()
+  const { pontos, protocolos, loading, refresh } = useOutletContext<GestaoContext>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedPointId, setSelectedPointId] = useState<string | null>(() => getSelectedPointId(searchParams.toString(), pontos))
   const [viewMode, setViewMode] = useState<'selected' | 'all'>(() => getSelectedPointId(searchParams.toString(), pontos) ? 'selected' : 'all')
@@ -52,8 +53,14 @@ export default function GestaoMapa() {
     const next = ordenados[index]
     if (next) selectPoint(next)
   }
+  const closeSelectedPoint = () => {
+    setSelectedPointId(null)
+    setViewMode('all')
+    setSearchParams(removerPontoSelecionado(searchParams.toString()))
+  }
   const onMapKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, a')) return
+    if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, a, button')) return
+    if (event.key === 'Escape' && selectedPointId) { event.preventDefault(); closeSelectedPoint() }
     if (event.key === 'ArrowRight') { event.preventDefault(); stepPoint(1) }
     if (event.key === 'ArrowLeft') { event.preventDefault(); stepPoint(-1) }
   }
@@ -66,6 +73,8 @@ export default function GestaoMapa() {
     if (!selectedPointId) return
     document.getElementById(`gestao-map-point-${selectedPointId}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
   }, [selectedPointId])
+  if (loading) return <GestaoLoadingSkeleton variant="mapa" label="Carregando mapa operacional" />
+
   return <section onKeyDown={onMapKeyDown}><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>Percorra a faixa, use as setas do teclado ou clique no pino.</p></div><span className="gestao-count">{geolocated.length} visíveis · {pontosFiltrados.length} no filtro</span></div>{error && <p className="gestao-error" role="alert">{error}</p>}{notice && <p className="gestao-success" role="status">{notice}</p>}
     <PontoPainelModal open={Boolean(painelPonto)} contratoId={contratoId} ponto={painelPonto} protocolos={protocolos} initialTab={painel?.tab ?? 'dados'} onClose={() => setPainel(null)} refresh={refresh} onNotice={(message) => { setNotice(message); setError('') }} onError={(message) => { if (message) setError(message); else setError('') }} />
     <div className="gestao-map-filters" aria-label="Filtros do mapa"><div className="gestao-map-search"><label htmlFor="gestao-mapa-busca">Buscar ponto</label><input id="gestao-mapa-busca" type="search" value={filtro.busca} placeholder="Código, rodovia ou km" onChange={(event) => setFilter('busca', event.target.value)} /></div><label>Estado<select value={filtro.estado} onChange={(event) => setFilter('estado', event.target.value)}><option value="">Todos os estados</option>{estados.map((estado) => <option value={estado} key={estado}>{estado}</option>)}</select></label><label>Tipo<select value={filtro.tipo} onChange={(event) => setFilter('tipo', event.target.value)}><option value="">Todos os tipos</option><option value="regularizacao">Regularização</option><option value="nova_implantacao">Nova implantação</option></select></label><label>Situação<select value={filtro.status} onChange={(event) => setFilter('status', event.target.value)}><option value="">Todas as situações</option>{statusOpcoes.map((status) => <option value={status} key={status}>{nomeGestao(status)}</option>)}</select></label>{hasFilters && <button type="button" className="gestao-button-link gestao-map-clear" onClick={() => setSearchParams({})}>Limpar filtros</button>}</div>
@@ -100,6 +109,7 @@ export default function GestaoMapa() {
               ponto={selected}
               protocolo={protocolos.find((item) => item.id === selected.protocoloId)}
               onOpenPainel={(tab) => openPainel(selected, tab)}
+              onClose={closeSelectedPoint}
             />
           ) : (
             <div className="gestao-map-inspector-empty">
@@ -116,20 +126,24 @@ export default function GestaoMapa() {
   </section>
 }
 
-function MapaPontoFicha({ contratoId, ponto, protocolo, onOpenPainel }: {
+function MapaPontoFicha({ contratoId, ponto, protocolo, onOpenPainel, onClose }: {
   contratoId: string
   ponto: Ponto
   protocolo?: Protocolo
   onOpenPainel: (tab: PontoPainelTab) => void
+  onClose: () => void
 }) {
   const resumo = getPontoDetailSummary(ponto, protocolo)
   const situacao = pontoStatus(ponto, protocolo)
   return (
     <div className="gestao-map-modal">
-      <div>
-        <span className="gestao-eyebrow">Ponto selecionado</span>
-        <h3>{ponto.codigo}</h3>
-        <p>{resumo.local}</p>
+      <div className="gestao-map-modal-head">
+        <div>
+          <span className="gestao-eyebrow">Ponto selecionado</span>
+          <h3>{ponto.codigo}</h3>
+          <p>{resumo.local}</p>
+        </div>
+        <button type="button" className="gestao-map-inspector-close" onClick={onClose} aria-label="Fechar ficha do ponto">Fechar</button>
       </div>
       <div className="gestao-point-detail-grid">
         <div>
