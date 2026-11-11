@@ -342,10 +342,14 @@
 .gestao-map-rail { display: flex; gap: 8px; overflow-x: auto; padding-block: 2px 8px; scroll-snap-type: x proximity; }
 .gestao-map-rail button { display: grid; grid-template-columns: 10px auto; gap: 2px 8px; align-items: center; flex: 0 0 auto; min-inline-size: 148px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); color: var(--color-text); text-align: start; scroll-snap-align: start; cursor: pointer; }
 .gestao-map-rail button i { grid-row: 1 / span 2; inline-size: 10px; block-size: 10px; border-radius: 50%; }
-.gestao-map-rail button b { font-size: .84rem; }
+.gestao-map-rail button b { font-size: .84rem; color: inherit; }
 .gestao-map-rail button span, .gestao-map-rail button small { color: var(--color-text-soft); font-size: .72rem; }
 .gestao-map-rail button small { grid-column: 2; }
-.gestao-map-rail button.is-selected { border-color: var(--color-accent-500); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-500) 28%, transparent); }
+.gestao-page .gestao-map-rail button:is(:hover, :focus, :focus-visible) { background: var(--color-primary-50); border-color: var(--color-primary-600); color: var(--color-text); }
+.gestao-page .gestao-map-rail button.is-selected { background: var(--color-surface); border-color: var(--color-accent-500); color: var(--color-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-500) 28%, transparent); }
+.gestao-page .gestao-map-rail button.is-selected:is(:hover, :focus, :focus-visible) { background: var(--color-primary-50); border-color: var(--color-accent-500); color: var(--color-text); }
+.gestao-page .gestao-map-rail button:is(:hover, :focus, :focus-visible, .is-selected) span,
+.gestao-page .gestao-map-rail button:is(:hover, :focus, :focus-visible, .is-selected) small { color: var(--color-text-soft); }
 .gestao-map-stage { position: relative; }
 .gestao-map-inspector { position: absolute; z-index: 500; inset-block-start: 12px; inset-inline-end: 12px; display: grid; inline-size: min(340px, calc(100% - 70px)); max-block-size: min(420px, 70%); overflow: auto; border: 1px solid var(--color-border); border-radius: 16px; background: rgb(255 255 255 / 96%); box-shadow: 0 16px 40px rgb(15 23 42 / 18%); }
 .gestao-form-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin: 0; padding: 0; border: 0; }
