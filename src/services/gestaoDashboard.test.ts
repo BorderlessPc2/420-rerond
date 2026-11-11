@@ -27,6 +27,21 @@ describe('gestaoDashboard', () => {
     expect(data.previstoRealizado).toEqual({ previsto: 0, realizado: 0 })
   })
 
+  it('inclui concessionária e rodovia existentes somente em protocolos nas opções de filtro', () => {
+    const data = calcularDashboardGestao([...protocolos, {
+      id: 'sem-ponto',
+      contratoId: 'c',
+      titulo: 'Protocolo sem ponto',
+      concessionaria: 'Via Nova',
+      rodovia: 'BR-999',
+      etapa: 'planejamento',
+      status: 'nao_iniciado',
+    }], pontos)
+
+    expect(data.concessionarias).toEqual(['Eco', 'Via Nova'])
+    expect(data.rodovias).toEqual(['BR-101', 'BR-153', 'BR-999'])
+  })
+
   it('monta segmentos de donut proporcionais', () => {
     const segments = toDonutSegments([
       { color: '#111', label: 'A', total: 1 },

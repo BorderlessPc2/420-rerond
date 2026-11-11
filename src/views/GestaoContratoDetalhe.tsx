@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGestao, type Contrato, type Etapa, type Ponto, type Protocolo } from '../services/gestaoContratos'
 import { calcularDashboardGestao } from '../services/gestaoDashboard'
 import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
@@ -27,23 +29,44 @@ export default function GestaoContratoDetalhe() {
   const [exportMessage, setExportMessage] = useState('')
   const filtro = useMemo(() => gestaoFiltroFromSearchParams(searchParams), [searchParams])
   const { estado, concessionaria, rodovia, status, tipo, etapa, inicio, fim, busca } = filtro
-  const setDashboardParam = (key: DashboardQueryKey, value: string) => {
+  const [buscaDraft, setBuscaDraft] = useState(busca ?? '')
+  const setDashboardParam = useCallback((key: DashboardQueryKey, value: string) => {
     const next = new URLSearchParams(searchParams)
     if (value) next.set(key, value)
     else next.delete(key)
     setSearchParams(next)
-  }
+  }, [searchParams, setSearchParams])
   const clearDashboardFilters = () => setSearchParams({})
   const hasDashboardFilter = Boolean(estado || concessionaria || rodovia || status || tipo || etapa || inicio || fim || busca)
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const found = await getContrato(contratoId)
       if (!found) { setError('Contrato não encontrado.'); return }
       const [ps, pts] = await Promise.all([listProtocolos(contratoId), listPontos(contratoId)])
       setContrato(found); setProtocolos(ps); setPontos(pts); setError('')
     } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao carregar contrato.') }
-  }
-  useEffect(() => { void refresh() }, [contratoId])
+  }, [contratoId])
+  useEffect(() => {
+    void refresh()
+    const unsubscribeContrato = onSnapshot(doc(db, 'gestaoContratos', contratoId), (snapshot) => {
+      if (!snapshot.exists()) { setContrato(null); setError('Contrato não encontrado.'); return }
+      setContrato({ id: snapshot.id, ...snapshot.data() } as Contrato)
+      setError('')
+    }, (err) => setError(err.message || 'Erro ao atualizar contrato.'))
+    const subscribeCollection = <T extends { id: string }>(name: 'gestaoProtocolos' | 'gestaoPontos', setData: (items: T[]) => void) =>
+      onSnapshot(query(collection(db, name), where('contratoId', '==', contratoId)), (snapshot) => {
+        setData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as T)))
+      }, (err) => setError(err.message || 'Erro ao atualizar dados do contrato.'))
+    const unsubscribeProtocolos = subscribeCollection<Protocolo>('gestaoProtocolos', setProtocolos)
+    const unsubscribePontos = subscribeCollection<Ponto>('gestaoPontos', setPontos)
+    return () => { unsubscribeContrato(); unsubscribeProtocolos(); unsubscribePontos() }
+  }, [contratoId, refresh])
+  useEffect(() => { setBuscaDraft(busca ?? '') }, [busca])
+  useEffect(() => {
+    if (buscaDraft === (busca ?? '')) return
+    const timer = window.setTimeout(() => setDashboardParam('q', buscaDraft), 250)
+    return () => window.clearTimeout(timer)
+  }, [busca, buscaDraft, setDashboardParam])
   const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
   const totals = indicadoresGestao(filtrado.protocolos, filtrado.pontos)
   const dashboard = useMemo(() => calcularDashboardGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
@@ -108,7 +131,7 @@ export default function GestaoContratoDetalhe() {
           <div className="gestao-overview-fields">
             <label htmlFor="gestao-dashboard-inicio">Previsão de<input id="gestao-dashboard-inicio" lang="pt-BR" type="date" value={inicio ?? ''} onChange={(event) => setDashboardParam('inicio', event.target.value)} /></label>
             <label htmlFor="gestao-dashboard-fim">Previsão até<input id="gestao-dashboard-fim" lang="pt-BR" type="date" value={fim ?? ''} onChange={(event) => setDashboardParam('fim', event.target.value)} /></label>
-            <label className="gestao-overview-search" htmlFor="gestao-dashboard-busca">Busca<input id="gestao-dashboard-busca" type="search" placeholder="Título, código ou rodovia" value={busca ?? ''} onChange={(event) => setDashboardParam('q', event.target.value)} /></label>
+            <label className="gestao-overview-search" htmlFor="gestao-dashboard-busca">Busca<input id="gestao-dashboard-busca" type="search" placeholder="Título, código ou rodovia" value={buscaDraft} onChange={(event) => setBuscaDraft(event.target.value)} /></label>
           </div>
         </fieldset>
       </div>

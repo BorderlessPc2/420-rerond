@@ -52,8 +52,8 @@
 .gestao-page :is(button, a, input, select, textarea):focus-visible,
 .gestao-modal-host :is(button, a, input, select, textarea):focus-visible { outline: 3px solid var(--color-primary-600); outline-offset: 3px; }
 
-.gestao-nav { display: flex; gap: 6px; overflow-x: auto; padding-block: 0 12px; margin-block-end: 18px; border-bottom: 1px solid var(--color-border); }
-.gestao-nav a { position: relative; white-space: nowrap; padding: 10px 13px; border-radius: var(--radius-md); font-size: .91rem; font-weight: 600; text-decoration: none; transition: background-color var(--gestao-duration-fast) var(--gestao-ease-out), color var(--gestao-duration-fast) var(--gestao-ease-out); }
+.gestao-nav { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-inline: contain; padding-block: 0 12px; margin-block-end: 18px; border-bottom: 1px solid var(--color-border); scrollbar-width: thin; mask-image: linear-gradient(90deg, transparent, #000 18px calc(100% - 28px), transparent); }
+.gestao-nav a { position: relative; flex: 0 0 auto; white-space: nowrap; padding: 10px 13px; border-radius: var(--radius-md); font-size: .91rem; font-weight: 600; text-decoration: none; transition: background-color var(--gestao-duration-fast) var(--gestao-ease-out), color var(--gestao-duration-fast) var(--gestao-ease-out); }
 .gestao-nav a:hover { background: var(--color-primary-50); }
 .gestao-nav a.active { background: var(--color-primary-800); color: white; }
 .gestao-nav a.active::after { content: ''; position: absolute; inset-inline: 10px; inset-block-end: -13px; block-size: 3px; border-radius: 999px; background: var(--color-accent-500); transition: opacity var(--gestao-duration-fast) var(--gestao-ease-out); }
@@ -449,6 +449,7 @@
 .gestao-health-stat-danger strong { color: var(--color-danger); }
 @media (max-width: 800px) { .gestao-health { grid-template-columns: 1fr; } }
 @media (max-width: 1080px) { .gestao-overview-filters { grid-template-columns: 1fr 1fr; } .gestao-overview-period { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
+@media (max-width: 880px) { .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gestao-overview-fields > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-overview-fields > :last-child { grid-column: auto; } .gestao-overview-panel { padding-inline: 16px; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
 @media (max-width: 460px) { .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } }
 @media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-attention, .gestao-quicklinks .gestao-card { animation: none; } .gestao-health-stat:hover, .gestao-metrics > div:hover { transform: none; } }

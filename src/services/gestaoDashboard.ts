@@ -101,8 +101,8 @@ export function calcularDashboardGestao(
     pontoCodigo: '',
   })
   const estados = [...new Set(pontos.map((ponto) => ponto.estado).filter(Boolean))].sort()
-  const concessionarias = [...new Set(pontos.map((ponto) => ponto.concessionaria).filter(Boolean))].sort()
-  const rodovias = [...new Set(pontos.map((ponto) => ponto.rodovia).filter(Boolean))].sort()
+  const concessionarias = [...new Set([...pontos, ...protocolos].map((item) => item.concessionaria).filter(Boolean))].sort()
+  const rodovias = [...new Set([...pontos, ...protocolos].map((item) => item.rodovia).filter(Boolean))].sort()
   const statusTotals = [...new Set(recorte.protocolos.map((protocolo) => protocolo.status))].map((status) => ({
     status,
     total: recorte.protocolos.filter((protocolo) => protocolo.status === status).length,
