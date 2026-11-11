@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { criarPonto, pontoStatus, type Ponto } from '../services/gestaoContratos'
 import type { GestaoContext } from './GestaoContratoDetalhe'
@@ -38,11 +38,29 @@ export default function GestaoPontos() {
   const [painel, setPainel] = useState<{ ponto: Ponto; tab: PontoPainelTab } | null>(null)
 
   const painelPonto = painel ? pontos.find((item) => item.id === painel.ponto.id) ?? painel.ponto : null
+  const requestedPointId = searchParams.get('ponto')
 
   const openPainel = (ponto: Ponto, tab: PontoPainelTab = 'dados') => {
     setPainel({ ponto, tab })
     setError('')
+    const next = new URLSearchParams(searchParams)
+    next.set('ponto', ponto.id)
+    setSearchParams(next)
   }
+
+  const closePainel = () => {
+    setPainel(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('ponto')
+    setSearchParams(next)
+  }
+
+  useEffect(() => {
+    if (!requestedPointId) return
+    const ponto = pontos.find((item) => item.id === requestedPointId)
+    if (!ponto) return
+    setPainel((atual) => atual?.ponto.id === ponto.id ? atual : { ponto, tab: 'dados' })
+  }, [pontos, requestedPointId])
 
   const resetCreateForm = () => {
     setProtocoloId('')
@@ -186,7 +204,7 @@ export default function GestaoPontos() {
         ponto={painelPonto}
         protocolos={protocolos}
         initialTab={painel?.tab ?? 'dados'}
-        onClose={() => setPainel(null)}
+        onClose={closePainel}
         refresh={refresh}
         onNotice={(message) => { setSuccess(message); setError('') }}
         onError={(message) => { if (message) setError(message); else setError('') }}
