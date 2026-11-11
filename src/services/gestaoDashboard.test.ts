@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDashboardGestao, toDonutSegments } from './gestaoDashboard'
+import { calcularDashboardGestao, fatiarPontosStatus, toDonutSegments } from './gestaoDashboard'
 import type { Ponto, Protocolo } from './gestaoContratos'
 
 const protocolos: Protocolo[] = [
@@ -25,6 +25,20 @@ describe('gestaoDashboard', () => {
     expect(data.status).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'em_correcao', total: 1 })]))
     expect(data.percentualPontosConcluidos).toBe(33)
     expect(data.previstoRealizado).toEqual({ previsto: 0, realizado: 0 })
+  })
+
+  it('agrupa pontos do recorte pelo status do protocolo vinculado', () => {
+    const data = calcularDashboardGestao(protocolos, pontos)
+    const correcao = data.status.find((item) => item.status === 'em_correcao')
+    const naoIniciado = data.status.find((item) => item.status === 'nao_iniciado')
+    expect(correcao?.pontos).toEqual([{ id: 'p1', codigo: '1', rodovia: 'BR-101', km: '10' }])
+    expect(naoIniciado?.pontos).toEqual([{ id: 'p3', codigo: '3', rodovia: 'BR-153', km: '30' }])
+  })
+
+  it('fatia a lista de pontos para carregar aos poucos', () => {
+    const { visiveis, restantes } = fatiarPontosStatus(['a', 'b', 'c', 'd'], 2)
+    expect(visiveis).toEqual(['a', 'b'])
+    expect(restantes).toBe(2)
   })
 
   it('inclui concessionária e rodovia existentes somente em protocolos nas opções de filtro', () => {

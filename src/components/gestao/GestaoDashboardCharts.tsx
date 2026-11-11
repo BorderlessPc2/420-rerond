@@ -1,5 +1,12 @@
-import { toDonutSegments, type GestaoDashboardData } from '../../services/gestaoDashboard'
+import { useState, type KeyboardEvent, type SyntheticEvent } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { fatiarPontosStatus, STATUS_PONTOS_PAGE_SIZE, toDonutSegments, type DashboardStatusSlice, type GestaoDashboardData } from '../../services/gestaoDashboard'
+import { nomeGestao } from '../../views/gestaoUi'
 import './GestaoDashboardCharts.css'
+
+function conterEvento(event: SyntheticEvent) {
+  event.stopPropagation()
+}
 
 type GestaoDashboardChartsProps = {
   data: GestaoDashboardData
@@ -9,17 +16,35 @@ const DONUT_RADIUS = 40
 const DONUT_C = 2 * Math.PI * DONUT_RADIUS
 
 export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsProps) {
+  const { contratoId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const [abertos, setAbertos] = useState<string[]>([])
+  const [visiveis, setVisiveis] = useState<Record<string, number>>({})
   const statusSegments = toDonutSegments(
     data.status.map((item) => ({ color: item.color, label: item.label, total: item.total })),
     data.totalProtocolos,
     DONUT_C,
   )
-  const statusSummary = data.status.map((item) => `${item.label}: ${item.total}`).join('. ')
   const maxPrevistoRealizado = Math.max(data.previstoRealizado.previsto, data.previstoRealizado.realizado, 1)
+  const toggleStatus = (status: string) => {
+    setAbertos((atuais) => atuais.includes(status) ? atuais.filter((item) => item !== status) : [...atuais, status])
+    setVisiveis((atuais) => atuais[status] ? atuais : { ...atuais, [status]: STATUS_PONTOS_PAGE_SIZE })
+  }
+  const fecharStatus = (status: string) => {
+    setAbertos((atuais) => atuais.filter((item) => item !== status))
+  }
+  const carregarMais = (status: string) => {
+    setVisiveis((atuais) => ({ ...atuais, [status]: (atuais[status] ?? STATUS_PONTOS_PAGE_SIZE) + STATUS_PONTOS_PAGE_SIZE }))
+  }
+  const hrefPonto = (pontoId: string) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('ponto', pontoId)
+    return { pathname: `/gestao-contratos/${contratoId}/pontos`, search: next.toString() }
+  }
 
   return (
     <section className="gestao-dashboard-charts" aria-label="Indicadores visuais">
-      <div className="gestao-chart-card gestao-chart-status" role="img" aria-label={data.totalProtocolos ? `Distribuição de ${data.totalProtocolos} protocolos por status. ${statusSummary}` : 'Nenhum protocolo neste recorte.'}>
+      <div className="gestao-chart-card gestao-chart-status">
         <div className="gestao-section-head">
           <div><span className="gestao-eyebrow">Distribuição</span><h3>Status dos protocolos</h3></div>
           <strong>{data.totalProtocolos}</strong>
@@ -43,12 +68,17 @@ export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsPro
             </svg>
             <ul className="gestao-pie-legend">
               {data.status.map((item) => (
-                <li key={item.status}>
-                  <i style={{ background: item.color }} aria-hidden="true" />
-                  <span>{item.label}</span>
-                  <strong>{item.total}</strong>
-                  <small>{data.totalProtocolos ? Math.round((item.total / data.totalProtocolos) * 100) : 0}%</small>
-                </li>
+                <StatusLegendItem
+                  key={item.status}
+                  item={item}
+                  totalProtocolos={data.totalProtocolos}
+                  aberto={abertos.includes(item.status)}
+                  visivel={visiveis[item.status] ?? STATUS_PONTOS_PAGE_SIZE}
+                  onToggle={() => toggleStatus(item.status)}
+                  onFechar={() => fecharStatus(item.status)}
+                  onMais={() => carregarMais(item.status)}
+                  hrefPonto={hrefPonto}
+                />
               ))}
             </ul>
           </div>
@@ -86,5 +116,79 @@ export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsPro
         </div>
       </div>
     </section>
+  )
+}
+
+function StatusLegendItem({ item, totalProtocolos, aberto, visivel, onToggle, onFechar, onMais, hrefPonto }: {
+  item: DashboardStatusSlice
+  totalProtocolos: number
+  aberto: boolean
+  visivel: number
+  onToggle: () => void
+  onFechar: () => void
+  onMais: () => void
+  hrefPonto: (pontoId: string) => { pathname: string; search: string }
+}) {
+  const painelId = `gestao-status-pontos-${item.status}`
+  const { visiveis, restantes } = fatiarPontosStatus(item.pontos, visivel)
+  const onToggleClick = (event: SyntheticEvent) => {
+    conterEvento(event)
+    onToggle()
+  }
+  const onPainelKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape') return
+    conterEvento(event)
+    event.preventDefault()
+    onFechar()
+  }
+  const onMaisClick = (event: SyntheticEvent) => {
+    conterEvento(event)
+    event.preventDefault()
+    onMais()
+  }
+  return (
+    <li className={aberto ? 'is-open' : undefined} onClick={conterEvento}>
+      <button type="button" className="gestao-status-toggle" aria-expanded={aberto} aria-controls={painelId} onClick={onToggleClick} onPointerDown={conterEvento}>
+        <i style={{ background: item.color }} aria-hidden="true" />
+        <span>{nomeGestao(item.status)}</span>
+        <strong>{item.total}</strong>
+        <small>{totalProtocolos ? Math.round((item.total / totalProtocolos) * 100) : 0}%</small>
+        <b className="gestao-status-chevron" aria-hidden="true" />
+      </button>
+      <div
+        className={`gestao-status-panel${aberto ? ' is-open' : ''}`}
+        id={painelId}
+        inert={!aberto}
+        aria-hidden={!aberto}
+        onClick={conterEvento}
+        onPointerDown={conterEvento}
+        onWheel={conterEvento}
+        onKeyDown={onPainelKeyDown}
+      >
+        <div className="gestao-status-panel-body">
+          {item.pontos.length ? (
+            <>
+              <ul className="gestao-status-points">
+                {visiveis.map((ponto) => (
+                  <li key={ponto.id}>
+                    <Link to={hrefPonto(ponto.id)} onClick={conterEvento}>
+                      <strong>{ponto.codigo}</strong>
+                      <span>{ponto.rodovia} · km {ponto.km}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {restantes > 0 && (
+                <button type="button" className="gestao-button-link gestao-status-more" onClick={onMaisClick} onPointerDown={conterEvento}>
+                  Carregar mais · {restantes} restantes
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="gestao-status-empty">Nenhum ponto vinculado a protocolos neste status.</p>
+          )}
+        </div>
+      </div>
+    </li>
   )
 }
