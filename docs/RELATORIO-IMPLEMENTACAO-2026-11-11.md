@@ -106,7 +106,8 @@ No gráfico da visão geral, cada tag de status (ex.: **Em correção**) abre e 
 - Testes de `gestaoDashboard`: agrupamento de pontos por status do protocolo e fatiamento da lista (**Carregar mais**).
 - Contraste da faixa conferido no browser (hover claro, texto `#14233d`).
 - Accordion conferido no browser: abre no fluxo, empurra o bloco de baixo, **Carregar mais** visível, lista com teto.
-- `npm run build` e deploy de Hosting desta sessão: ver tabela Git e deploy.
+- `npm run build`: passou (warnings preexistentes de CSS e bundle).
+- Firebase Hosting publicado em https://rerond-c747b.web.app.
 
 ## Git e deploy
 
@@ -114,14 +115,14 @@ No gráfico da visão geral, cada tag de status (ex.: **Em correção**) abre e 
 |------|-----------|
 | PR paralelo da manhã | Merge em `main` (`a798f0e`, PR #4) |
 | Contraste da faixa | `c6ee76f` — fix: manter texto visivel nos cartoes da faixa do mapa |
-| Expandir status + contenção | (commit desta entrega) |
+| Expandir status + contenção | `e20eefc` — feat: expandir status do dashboard ate o ponto |
 | Branch | `feat/dashboard-status-expand` |
 | Firebase project | `rerond-c747b` |
-| Hosting | A publicar nesta sessão |
+| Hosting | Publicado |
 | URL | https://rerond-c747b.web.app |
 
 ## Pendências
 
-- Abrir PR de `feat/dashboard-status-expand` para `main` após o Hosting.
+- Abrir PR de `feat/dashboard-status-expand` para `main`.
 - Warnings preexistentes do build: CSS inválido em outro trecho e bundle principal acima de 500 kB.
 - Validar no contrato demo autenticado: abrir **Em correção**, clicar num ponto e salvar no painel.
