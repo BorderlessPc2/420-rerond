@@ -3,6 +3,7 @@ import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { criarPonto, pontoStatus, type Ponto } from '../services/gestaoContratos'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import ModalGestao from '../components/gestao/ModalGestao'
+import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import PontoIconBar from '../components/gestao/PontoIconBar'
 import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
@@ -12,7 +13,7 @@ import { nomeGestao } from './gestaoUi'
 export default function GestaoPontos() {
   const { contratoId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { protocolos, pontos, refresh } = useOutletContext<GestaoContext>()
+  const { protocolos, pontos, loading, refresh } = useOutletContext<GestaoContext>()
   const [ordem, setOrdem] = useState<GestaoOrdemPonto>('codigo')
   const busca = searchParams.get('q') ?? ''
   const pontosLista = useMemo(() => ordenarPontos(pontos, ordem), [pontos, ordem])
@@ -87,6 +88,8 @@ export default function GestaoPontos() {
       setSaving(false)
     }
   }
+
+  if (loading) return <GestaoLoadingSkeleton variant="lista" label="Carregando pontos" />
 
   return (
     <section>
