@@ -9,6 +9,7 @@ import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import { ordenarPontos, type GestaoOrdemPonto } from '../services/gestaoLista'
 import { nomeGestao } from './gestaoUi'
+import SelectDropdown from '../components/ui/selectDropdown'
 
 export default function GestaoPontos() {
   const { contratoId = '' } = useParams()
@@ -109,13 +110,7 @@ export default function GestaoPontos() {
           Busca
           <input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} />
         </label>
-        <label>
-          Ordenar por
-          <select value={ordem} onChange={(event) => setOrdem(event.target.value as GestaoOrdemPonto)}>
-            <option value="codigo">Código</option>
-            <option value="km">Quilômetro</option>
-          </select>
-        </label>
+        <SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemPonto)} options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]} />
       </div>
       {error && <p className="gestao-error" role="alert">{error}</p>}
       {success && <p className="gestao-success" role="status">{success}</p>}

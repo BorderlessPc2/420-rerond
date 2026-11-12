@@ -6,9 +6,10 @@ import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGest
 import { calcularDashboardGestao } from '../services/gestaoDashboard'
 import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
 import GestaoDashboardCharts from '../components/gestao/GestaoDashboardCharts'
+import SelectDropdown from '../components/ui/selectDropdown'
 import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
-import { classificarPrazo, resumirPrioridades } from '../utils/gestaoPrioridades'
+import { classificarPrazo, resumirPrioridades, situacaoOperacional } from '../utils/gestaoPrioridades'
 import { nomeGestao } from './gestaoUi'
 import { resumoContratoGestao, tituloContratoGestao } from './gestaoContratoHelpers'
 import './GestaoContratos.css'
@@ -89,6 +90,8 @@ export default function GestaoContratoDetalhe() {
   }
   const statusOpcoes = useMemo(() => [...new Set(protocolos.map((item) => item.status))].sort(), [protocolos])
   const prioridades = resumirPrioridades(filtrado.protocolos)
+  const situacao = situacaoOperacional(totals)
+  const percentualNoPrazo = totals.protocolos ? Math.max(0, Math.round(((totals.protocolos - totals.atrasados) / totals.protocolos) * 100)) : 0
   if (!contrato) return error ? <div className="gestao-page"><Link to="/gestao-contratos">Voltar aos contratos</Link><p role="alert">{error}</p></div> : <div className="gestao-page"><GestaoLoadingSkeleton variant="detalhe" label="Carregando contrato" /></div>
   const base = `/gestao-contratos/${contratoId}`
   const isOverview = location.pathname === base
@@ -117,17 +120,17 @@ export default function GestaoContratoDetalhe() {
         <fieldset>
           <legend>Local</legend>
           <div className="gestao-overview-fields">
-            <label htmlFor="gestao-dashboard-estado">Estado<select id="gestao-dashboard-estado" value={estado} onChange={(event) => setDashboardParam('estado', event.target.value)}><option value="">Todos</option>{dashboard.estados.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-            <label htmlFor="gestao-dashboard-concessionaria">Concessionária<select id="gestao-dashboard-concessionaria" value={concessionaria} onChange={(event) => setDashboardParam('concessionaria', event.target.value)}><option value="">Todas</option>{dashboard.concessionarias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-            <label htmlFor="gestao-dashboard-rodovia">Rodovia<select id="gestao-dashboard-rodovia" value={rodovia} onChange={(event) => setDashboardParam('rodovia', event.target.value)}><option value="">Todas</option>{dashboard.rodovias.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+            <SelectDropdown id="gestao-dashboard-estado" label="Estado" value={estado ?? ''} onChange={(value) => setDashboardParam('estado', value)} options={[{ value: '', label: 'Todos' }, ...dashboard.estados.map((item) => ({ value: item, label: item }))]} />
+            <SelectDropdown id="gestao-dashboard-concessionaria" label="Concessionária" value={concessionaria ?? ''} onChange={(value) => setDashboardParam('concessionaria', value)} options={[{ value: '', label: 'Todas' }, ...dashboard.concessionarias.map((item) => ({ value: item, label: item }))]} />
+            <SelectDropdown id="gestao-dashboard-rodovia" label="Rodovia" value={rodovia ?? ''} onChange={(value) => setDashboardParam('rodovia', value)} options={[{ value: '', label: 'Todas' }, ...dashboard.rodovias.map((item) => ({ value: item, label: item }))]} />
           </div>
         </fieldset>
         <fieldset>
           <legend>Operação</legend>
           <div className="gestao-overview-fields">
-            <label htmlFor="gestao-dashboard-status">Status<select id="gestao-dashboard-status" value={status ?? ''} onChange={(event) => setDashboardParam('status', event.target.value)}><option value="">Todos</option>{statusOpcoes.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
-            <label htmlFor="gestao-dashboard-tipo">Tipo de ponto<select id="gestao-dashboard-tipo" value={tipo ?? ''} onChange={(event) => setDashboardParam('tipo', event.target.value)}><option value="">Todos</option><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select></label>
-            <label htmlFor="gestao-dashboard-etapa">Etapa<select id="gestao-dashboard-etapa" value={etapa ?? ''} onChange={(event) => setDashboardParam('etapa', event.target.value)}><option value="">Todas</option>{etapasFiltro.map((item) => <option value={item} key={item}>{nomeGestao(item)}</option>)}</select></label>
+            <SelectDropdown id="gestao-dashboard-status" label="Status" value={status ?? ''} onChange={(value) => setDashboardParam('status', value)} options={[{ value: '', label: 'Todos' }, ...statusOpcoes.map((item) => ({ value: item, label: nomeGestao(item) }))]} />
+            <SelectDropdown id="gestao-dashboard-tipo" label="Tipo de ponto" value={tipo ?? ''} onChange={(value) => setDashboardParam('tipo', value)} options={[{ value: '', label: 'Todos' }, { value: 'nova_implantacao', label: 'Nova implantação' }, { value: 'regularizacao', label: 'Regularização' }]} />
+            <SelectDropdown id="gestao-dashboard-etapa" label="Etapa" value={etapa ?? ''} onChange={(value) => setDashboardParam('etapa', value)} options={[{ value: '', label: 'Todas' }, ...etapasFiltro.map((item) => ({ value: item, label: nomeGestao(item) }))]} />
           </div>
         </fieldset>
         <fieldset className="gestao-overview-period">
@@ -141,14 +144,32 @@ export default function GestaoContratoDetalhe() {
       </div>
       <p className="gestao-overview-live" aria-live="polite">{totals.protocolos} protocolos · {totals.pontos} pontos{dashboard.pontosSemProtocolo ? ` · ${dashboard.pontosSemProtocolo} sem protocolo` : ''}</p>
     </section>
-    <section className="gestao-health" aria-label="Saúde operacional do contrato">
-      <div className="gestao-health-main">
-        <div><span className="gestao-eyebrow">Saúde operacional</span><h2>{totals.atrasados ? 'Atenção necessária' : totals.protocolos ? 'Operação sob controle' : 'Pronto para começar'}</h2><p>{totals.atrasados ? `${totals.atrasados} protocolo${totals.atrasados === 1 ? '' : 's'} com prazo vencido pede${totals.atrasados === 1 ? '' : 'm'} ação.` : 'Acompanhe prazos, aprovações e localização dos pontos em um só lugar.'}</p></div>
-        <div className="gestao-health-ring" style={{ '--gestao-progress': `${totals.protocolos ? Math.round(((totals.protocolos - totals.atrasados) / totals.protocolos) * 100) : 0}%` } as React.CSSProperties}><strong>{totals.protocolos ? Math.max(0, Math.round(((totals.protocolos - totals.atrasados) / totals.protocolos) * 100)) : 0}%</strong><span>em dia</span></div>
+    <section className="gestao-health" aria-labelledby="gestao-health-title">
+      <header className="gestao-health-heading"><span className="gestao-eyebrow">Visão do recorte</span><h2 id="gestao-health-title">Situação operacional</h2></header>
+      <div className="gestao-health-content">
+        <div className="gestao-health-summary">
+          <div className="gestao-health-main">
+            <div><h3>{situacao.titulo}</h3><p>{situacao.descricao}</p></div>
+            <div className="gestao-health-ring" style={{ '--gestao-progress': `${percentualNoPrazo}%` } as React.CSSProperties}><strong>{totals.protocolos ? `${percentualNoPrazo}%` : '—'}</strong><span>{totals.protocolos ? 'no prazo' : 'sem dados'}</span></div>
+          </div>
+          <div className="gestao-health-stats">
+            <div className="gestao-health-stat"><span>Protocolos</span><strong>{totals.protocolos}</strong><small>{totals.paralisados} {totals.paralisados === 1 ? 'paralisado' : 'paralisados'}</small></div>
+            <div className="gestao-health-stat"><span>Pontos</span><strong>{totals.pontos}</strong><small>{totals.realizados} realizados</small></div>
+            <div className="gestao-health-stat gestao-health-stat-success"><span>Entregas</span><strong>{totals.realizados}</strong><small>{totals.previstos} previstas</small></div>
+          </div>
+        </div>
+        <div className="gestao-attention">
+          <h3>Pendências que exigem acompanhamento</h3>
+          <p>Protocolos deste recorte. Um protocolo pode aparecer em mais de uma categoria.</p>
+          <div className="gestao-attention-items">
+            <div className="gestao-attention-item gestao-attention-item-urgent"><strong>{totals.atrasados}</strong><span>com prazo vencido</span></div>
+            <div className="gestao-attention-item"><strong>{prioridades.emCorrecao}</strong><span>em correção</span></div>
+            <div className="gestao-attention-item"><strong>{prioridades.aguardandoTerceiros}</strong><span>aguardando terceiros</span></div>
+            <div className="gestao-attention-item"><strong>{prioridades.proximos}</strong><span>com entrega em até 7 dias</span></div>
+          </div>
+        </div>
       </div>
-      <div className="gestao-health-stats"><div className="gestao-health-stat"><span>Protocolos</span><strong>{totals.protocolos}</strong><small>{totals.paralisados} {totals.paralisados === 1 ? 'paralisado' : 'paralisados'}</small></div><div className="gestao-health-stat"><span>Pontos</span><strong>{totals.pontos}</strong><small>{totals.realizados} realizados</small></div><div className="gestao-health-stat gestao-health-stat-success"><span>Entregas</span><strong>{totals.realizados}</strong><small>{totals.previstos} previstas</small></div><div className={`gestao-health-stat ${totals.atrasados ? 'gestao-health-stat-danger' : 'gestao-health-stat-success'}`}><span>Prazo</span><strong>{totals.atrasados}</strong><small>{totals.atrasados ? 'em atraso' : 'sem atrasos'}</small></div></div>
     </section>
-    <section className="gestao-attention" aria-label="Atenção operacional"><div><span className="gestao-eyebrow">Atenção operacional</span><p>Protocolos que pedem acompanhamento neste recorte.</p></div><div className="gestao-attention-items"><span><strong>{prioridades.emCorrecao}</strong> em correção</span><span><strong>{prioridades.aguardandoTerceiros}</strong> aguardando terceiros</span><span><strong>{prioridades.vencidos}</strong> com prazo vencido</span><span><strong>{prioridades.proximos}</strong> com entrega em até 7 dias</span></div></section>
     <GestaoDashboardCharts data={dashboard} />
 <section className="gestao-dashboard-map"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>Clique em um ponto para abrir a ficha, com protocolo e situação.</p></div><Link className="gestao-button-secondary" to={{ pathname: `${base}/mapa`, search: searchParams.toString() }}>Abrir mapa completo ↗</Link></div><div className="gestao-map-preview"><MapaLeaflet pontos={filtrado.pontos} protocolos={filtrado.protocolos} onSelectPoint={(ponto) => { const next = new URLSearchParams(searchParams); next.set('ponto', ponto.id); navigate({ pathname: `${base}/mapa`, search: next.toString() }) }} height={380} fitBoundsOnChange /></div></section>
     </>}

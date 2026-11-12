@@ -7,6 +7,7 @@ import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import { nomeGestao } from './gestaoUi'
+import { gestaoSaveFeedback, type GestaoSaveState } from '../utils/gestaoSaveFeedback'
 
 export default function GestaoPlanejamento() {
   const { contratoId = '' } = useParams()
@@ -14,6 +15,7 @@ export default function GestaoPlanejamento() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [savingId, setSavingId] = useState('')
+  const [saveStates, setSaveStates] = useState<Record<string, GestaoSaveState | undefined>>({})
   const [painel, setPainel] = useState<{ ponto: Ponto; tab: PontoPainelTab } | null>(null)
   const painelPonto = painel ? pontos.find((item) => item.id === painel.ponto.id) ?? painel.ponto : null
 
@@ -29,14 +31,18 @@ export default function GestaoPlanejamento() {
     const previsto = String(data.get('previsto') ?? '')
     const realizado = String(data.get('realizado') ?? '')
     setSavingId(id)
+    setSaveStates((states) => ({ ...states, [id]: undefined }))
     try {
       if (unit === 'protocolo') await atualizarPlanejamento(contratoId, id, previsto, realizado)
       else await atualizarPlanejamentoPonto(contratoId, id, previsto, realizado)
       await refresh()
       setError('')
-      setNotice(unit === 'protocolo' ? 'Prazo do protocolo salvo.' : 'Prazo do ponto salvo.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar planejamento.')
+      setNotice('')
+      setSaveStates((states) => ({ ...states, [id]: 'success' }))
+    } catch {
+      setError('')
+      setNotice('')
+      setSaveStates((states) => ({ ...states, [id]: 'error' }))
     } finally {
       setSavingId('')
     }
@@ -89,7 +95,8 @@ export default function GestaoPlanejamento() {
                   Realizado
                   <input name="realizado" type="date" defaultValue={item.realizadoEm ?? ''} key={`${item.id}-r-${item.realizadoEm}`} />
                 </label>
-                <button type="submit" disabled={savingId === item.id}>{savingId === item.id ? 'Salvando…' : 'Salvar protocolo'}</button>
+                <button type="submit" className={`gestao-save-button${saveStates[item.id] ? ` gestao-save-button-${saveStates[item.id]}` : ''}`} disabled={savingId === item.id}>{savingId === item.id ? 'Salvando…' : saveStates[item.id] ? gestaoSaveFeedback(saveStates[item.id]!, 'protocolo').label : 'Salvar protocolo'}</button>
+                {saveStates[item.id] && <p className={`gestao-save-feedback gestao-save-feedback-${saveStates[item.id]}`} role={saveStates[item.id] === 'error' ? 'alert' : 'status'}>{saveStates[item.id] === 'success' ? '✓ Prazo do protocolo salvo.' : '× Não foi possível salvar protocolo. Tente novamente.'}</p>}
               </form>
             </li>
           ))}
@@ -129,7 +136,8 @@ export default function GestaoPlanejamento() {
                     Realizado
                     <input name="realizado" type="date" defaultValue={item.realizadoEm ?? ''} key={`${item.id}-r-${item.realizadoEm}`} />
                   </label>
-                  <button type="submit" disabled={savingId === item.id}>{savingId === item.id ? 'Salvando…' : 'Salvar datas'}</button>
+                  <button type="submit" className={`gestao-save-button${saveStates[item.id] ? ` gestao-save-button-${saveStates[item.id]}` : ''}`} disabled={savingId === item.id}>{savingId === item.id ? 'Salvando…' : saveStates[item.id] ? gestaoSaveFeedback(saveStates[item.id]!, 'ponto').label : 'Salvar datas'}</button>
+                {saveStates[item.id] && <p className={`gestao-save-feedback gestao-save-feedback-${saveStates[item.id]}`} role={saveStates[item.id] === 'error' ? 'alert' : 'status'}>{saveStates[item.id] === 'success' ? '✓ Datas do ponto salvas.' : '× Não foi possível salvar ponto. Tente novamente.'}</p>}
                 </form>
               </li>
             )

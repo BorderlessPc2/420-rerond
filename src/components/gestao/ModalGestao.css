@@ -55,7 +55,7 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
-.gestao-modal-shell { position: relative; display: grid; max-block-size: inherit; grid-template-rows: auto minmax(0, 1fr); }
+.gestao-modal-shell { position: relative; display: grid; min-block-size: min(520px, calc(100dvh - 32px)); max-block-size: inherit; grid-template-rows: auto minmax(0, 1fr); }
 .gestao-modal-header { display: flex; justify-content: space-between; gap: 24px; padding: 28px 56px 20px 32px; border-block-end: 1px solid var(--color-border); }
 .gestao-modal-header h2 { margin: 7px 0 6px; font-size: clamp(1.35rem, 2vw, 1.7rem); letter-spacing: -.035em; }
 .gestao-modal-header p { max-inline-size: 48ch; margin: 0; font-size: .9rem; }
@@ -91,6 +91,7 @@
 @media (max-width: 520px) {
   .gestao-modal-root { padding: 10px; }
   .gestao-modal { inline-size: calc(100% - 20px); max-block-size: calc(100dvh - 20px); }
+  .gestao-modal-shell { min-block-size: min(560px, calc(100dvh - 20px)); }
   .gestao-modal-header, .gestao-modal-body { padding-inline: 18px; }
   .gestao-form-footer { flex-direction: column-reverse; }
   .gestao-form-footer button { inline-size: 100%; }
