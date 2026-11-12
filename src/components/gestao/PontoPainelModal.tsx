@@ -15,6 +15,14 @@ import { nomeGestao } from '../../views/gestaoUi'
 import GestaoEtapaStepper from './GestaoEtapaStepper'
 import type { PontoPainelTab } from './pontoPainelTypes'
 
+function SaveButton({ saving, state, label, disabled = false }: { saving: boolean; state?: 'success' | 'error'; label: string; disabled?: boolean }) {
+  return <button type="submit" className={`gestao-save-button${state ? ` gestao-save-button-${state}` : ''}`} disabled={disabled || saving}>{saving ? 'Salvando…' : state === 'success' ? '✓ Salvo' : state === 'error' ? '× Não salvou' : label}</button>
+}
+
+function SaveFeedback({ state, message }: { state?: 'success' | 'error'; message: string }) {
+  return state ? <p className={`gestao-save-feedback gestao-save-feedback-${state}`} role={state === 'error' ? 'alert' : 'status'}>{message}</p> : null
+}
+
 type PontoPainelModalProps = {
   open: boolean
   contratoId: string
@@ -48,6 +56,7 @@ export default function PontoPainelModal({
   const modalTitleId = useId()
   const [tab, setTab] = useState<PontoPainelTab>(initialTab)
   const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<'success' | 'error' | undefined>()
 
   const [editCodigo, setEditCodigo] = useState('')
   const [editEstado, setEditEstado] = useState('')
@@ -66,6 +75,7 @@ export default function PontoPainelModal({
   useEffect(() => {
     if (!open || !ponto) return
     setTab(initialTab)
+    setSaveState(undefined)
     setEditCodigo(ponto.codigo)
     setEditEstado(ponto.estado)
     setEditKm(ponto.km)
@@ -85,7 +95,19 @@ export default function PontoPainelModal({
   const resumo = getPontoDetailSummary(ponto, protocolo)
 
   const fail = (err: unknown) => {
+    setSaveState('error')
     onError?.(err instanceof Error ? err.message : 'Erro ao salvar ponto.')
+  }
+
+  const beginSave = () => {
+    setSaveState(undefined)
+    setSaving(true)
+  }
+
+  const finishSave = (message: string) => {
+    setSaveState('success')
+    onNotice?.(message)
+    onError?.('')
   }
 
   const saveDados = async (event: React.FormEvent) => {
@@ -108,12 +130,11 @@ export default function PontoPainelModal({
         ? { latitude: Number(editLatitude), longitude: Number(editLongitude), precisao: editPrecisao }
         : {}),
     }
-    setSaving(true)
+    beginSave()
     try {
       await atualizarPontoCompleto(contratoId, ponto.id, input)
       await refresh()
-      onNotice?.(`Ponto ${input.codigo} atualizado.`)
-      onError?.('')
+      finishSave(`Ponto ${input.codigo} atualizado.`)
     } catch (err) {
       fail(err)
     } finally {
@@ -123,15 +144,14 @@ export default function PontoPainelModal({
 
   const saveSituacao = async (event: React.FormEvent) => {
     event.preventDefault()
-    setSaving(true)
+    beginSave()
     try {
       const patch = resultado
         ? { resultado: resultado as Ponto['resultado'] }
         : { resultado: undefined as undefined }
       await atualizarPonto(contratoId, ponto.id, patch)
       await refresh()
-      onNotice?.(`Situação de ${ponto.codigo} atualizada.`)
-      onError?.('')
+      finishSave(`Situação de ${ponto.codigo} atualizada.`)
     } catch (err) {
       fail(err)
     } finally {
@@ -141,12 +161,11 @@ export default function PontoPainelModal({
 
   const savePlanejamento = async (event: React.FormEvent) => {
     event.preventDefault()
-    setSaving(true)
+    beginSave()
     try {
       await atualizarPlanejamentoPonto(contratoId, ponto.id, previsao, realizadoEm)
       await refresh()
-      onNotice?.(`Planejamento de ${ponto.codigo} salvo.`)
-      onError?.('')
+      finishSave(`Planejamento de ${ponto.codigo} salvo.`)
     } catch (err) {
       fail(err)
     } finally {
@@ -160,12 +179,11 @@ export default function PontoPainelModal({
       onError?.('Selecione um protocolo.')
       return
     }
-    setSaving(true)
+    beginSave()
     try {
       await vincularPontoProtocolo(contratoId, ponto.id, vinculoId)
       await refresh()
-      onNotice?.(`Ponto ${ponto.codigo} vinculado.`)
-      onError?.('')
+      finishSave(`Ponto ${ponto.codigo} vinculado.`)
     } catch (err) {
       fail(err)
     } finally {
@@ -255,13 +273,10 @@ export default function PontoPainelModal({
               </p>
             )}
             <div className="gestao-form-footer">
-              <button type="button" className="gestao-button-secondary" onClick={onClose}>
-                Fechar
-              </button>
-              <button type="submit" disabled={saving}>
-                {saving ? 'Salvando…' : 'Salvar dados'}
-              </button>
+              <button type="button" className="gestao-button-secondary" onClick={onClose}>Fechar</button>
+              <SaveButton saving={saving} state={saveState} label="Salvar dados" />
             </div>
+            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Dados do ponto salvos.' : '× Não foi possível salvar ponto. Tente novamente.'} />
           </form>
         )}
 
@@ -288,10 +303,9 @@ export default function PontoPainelModal({
               <button type="button" className="gestao-button-secondary" onClick={onClose}>
                 Cancelar
               </button>
-              <button type="submit" disabled={saving}>
-                {saving ? 'Salvando…' : 'Salvar situação'}
-              </button>
+              <SaveButton saving={saving} state={saveState} label="Salvar situação" />
             </div>
+            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Situação do ponto salva.' : '× Não foi possível salvar situação. Tente novamente.'} />
           </form>
         )}
 
@@ -309,10 +323,9 @@ export default function PontoPainelModal({
               <button type="button" className="gestao-button-secondary" onClick={onClose}>
                 Cancelar
               </button>
-              <button type="submit" disabled={saving}>
-                {saving ? 'Salvando…' : 'Salvar planejamento'}
-              </button>
+              <SaveButton saving={saving} state={saveState} label="Salvar planejamento" />
             </div>
+            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Planejamento do ponto salvo.' : '× Não foi possível salvar planejamento. Tente novamente.'} />
           </form>
         )}
 
@@ -340,10 +353,9 @@ export default function PontoPainelModal({
               <button type="button" className="gestao-button-secondary" onClick={onClose}>
                 Cancelar
               </button>
-              <button type="submit" disabled={saving || !vinculoId || vinculoId === ponto.protocoloId}>
-                {saving ? 'Salvando…' : ponto.protocoloId ? 'Alterar vínculo' : 'Vincular'}
-              </button>
+              <SaveButton saving={saving} state={saveState} label={ponto.protocoloId ? 'Alterar vínculo' : 'Vincular'} disabled={saving || !vinculoId || vinculoId === ponto.protocoloId} />
             </div>
+            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Vínculo do ponto salvo.' : '× Não foi possível salvar vínculo. Tente novamente.'} />
           </form>
         )}
 
