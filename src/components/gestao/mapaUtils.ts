@@ -56,6 +56,18 @@ export const getSelectedPointId = (search: string, pontos: Ponto[]) => {
   return requested && pontos.some((ponto) => ponto.id === requested) ? requested : null
 }
 
+export type MarcadorProtocolo = { protocolo: Protocolo; latitude: number; longitude: number; total: number }
+
+export const marcadoresDeProtocolo = (protocolos: Protocolo[], pontos: Ponto[]): MarcadorProtocolo[] =>
+  protocolos.flatMap((protocolo) => {
+    const doProtocolo = pontos.filter((ponto) => ponto.protocoloId === protocolo.id)
+    const localizados = getMapPoints(doProtocolo)
+    if (!localizados.length) return []
+    const latitude = localizados.reduce((total, ponto) => total + (ponto.latitude as number), 0) / localizados.length
+    const longitude = localizados.reduce((total, ponto) => total + (ponto.longitude as number), 0) / localizados.length
+    return [{ protocolo, latitude, longitude, total: doProtocolo.length }]
+  })
+
 export const getMapBounds = (pontos: Ponto[]): LatLngBoundsExpression | null => {
   const located = getMapPoints(pontos)
   if (!located.length) return null

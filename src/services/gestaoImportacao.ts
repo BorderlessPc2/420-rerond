@@ -117,8 +117,8 @@ const number = (value: unknown) => {
 export const normalizarCabecalho = (value: string) => aliases[value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, '_')] ?? value.toLowerCase().trim().replace(/\s+/g, '_')
 export const normalizeKey = (value: string) => value.trim().toLocaleLowerCase('pt-BR')
 
-export const protocoloImportKey = (input: Pick<ProtocoloInput, 'titulo' | 'concessionaria' | 'rodovia'>) =>
-  [input.titulo, input.concessionaria, input.rodovia].map(normalizeKey).join('|')
+export const protocoloImportKey = (input: Pick<ProtocoloInput, 'titulo' | 'concessionaria'> & Partial<Pick<ProtocoloInput, 'numero'>>) =>
+  [input.titulo, input.concessionaria, input.numero ?? ''].map(normalizeKey).join('|')
 
 const rowNormalizada = (raw: RawImportRow) =>
   Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'linha').map(([key, value]) => [normalizarCabecalho(key), value]))

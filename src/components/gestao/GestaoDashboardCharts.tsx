@@ -25,6 +25,7 @@ export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsPro
     data.totalProtocolos,
     DONUT_C,
   )
+  const statusSummary = data.status.map((item) => `${item.label}: ${item.total}`).join('. ')
   const maxPrevistoRealizado = Math.max(data.previstoRealizado.previsto, data.previstoRealizado.realizado, 1)
   const toggleStatus = (status: string) => {
     setAbertos((atuais) => atuais.includes(status) ? atuais.filter((item) => item !== status) : [...atuais, status])
@@ -44,7 +45,7 @@ export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsPro
 
   return (
     <section className="gestao-dashboard-charts" aria-label="Indicadores visuais">
-      <div className="gestao-chart-card gestao-chart-status">
+      <div className="gestao-chart-card gestao-chart-status" aria-label={data.totalProtocolos ? `Distribuição de ${data.totalProtocolos} protocolos por status. ${statusSummary}` : 'Nenhum protocolo neste recorte.'}>
         <div className="gestao-section-head">
           <div><span className="gestao-eyebrow">Distribuição</span><h3>Status dos protocolos</h3></div>
           <strong>{data.totalProtocolos}</strong>

@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch, type WriteBatch } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, validarInputContrato, type ContratoInput, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
@@ -144,31 +144,68 @@ export const criarPonto = async (contratoId: string, protocoloId: string | null,
   if (await codigoPontoDuplicado(contratoId, protocoloId, input.codigo)) throw new Error('Já existe um ponto com este código neste protocolo.')
   return (await addDoc(collection(db, 'gestaoPontos'), { ...input, contratoId, protocoloId })).id
 }
-export const validarPatchProtocoloComPontos = (
-  atual: Pick<Protocolo, 'concessionaria' | 'rodovia'>,
-  patch: Pick<ProtocoloInput, 'concessionaria' | 'rodovia'>,
-  pontosVinculados: number,
-) => {
-  if (
-    pontosVinculados > 0
-    && (patch.concessionaria.trim() !== atual.concessionaria.trim() || patch.rodovia.trim() !== atual.rodovia.trim())
-  ) {
-    return 'Não é possível alterar concessionária ou rodovia com pontos vinculados.'
-  }
-  return null
-}
-
 export const atualizarProtocolo = async (contratoId: string, id: string, patch: Pick<ProtocoloInput, 'titulo' | 'concessionaria' | 'rodovia' | 'numero' | 'previsao' | 'realizadoEm'>) => {
   const protocolo = await getProtocolo(contratoId, id)
   if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
   const next = { ...protocolo, ...patch }
   const error = validarInputProtocolo(next)[0]
   if (error) throw new Error(error)
-  const linked = await getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', contratoId), where('protocoloId', '==', id)))
-  const patchError = validarPatchProtocoloComPontos(protocolo, patch, linked.size)
-  if (patchError) throw new Error(patchError)
   await updateDoc(doc(db, 'gestaoProtocolos', id), { titulo: next.titulo.trim(), concessionaria: next.concessionaria.trim(), rodovia: next.rodovia.trim(), numero: next.numero?.trim() || '', previsao: next.previsao || '', realizadoEm: next.realizadoEm || '' })
 }
+
+const commitEmLotes = async (operations: Array<(batch: WriteBatch) => void>, size = 450) => {
+  for (let index = 0; index < operations.length; index += size) {
+    const batch = writeBatch(db)
+    operations.slice(index, index + size).forEach((operation) => operation(batch))
+    await batch.commit()
+  }
+}
+
+const caminhoStorageGestao = (url: string) => {
+  try {
+    const parsed = new URL(url)
+    const marker = '/o/'
+    const index = parsed.pathname.indexOf(marker)
+    if (index < 0) return null
+    return decodeURIComponent(parsed.pathname.slice(index + marker.length))
+  } catch {
+    return null
+  }
+}
+
+const apagarAnexosMovimento = async (anexos: { url?: string }[]) => {
+  await Promise.all(anexos.map(async (anexo) => {
+    const path = anexo.url ? caminhoStorageGestao(anexo.url) : null
+    if (!path) return
+    await deleteObject(ref(storage, path)).catch(() => undefined)
+  }))
+}
+
+export const situacaoAposExcluirMovimento = (restantes: Pick<Movimento, 'etapa' | 'status'>[]) => {
+  const ultimo = restantes.at(-1)
+  return {
+    etapa: ultimo?.etapa ?? 'planejamento' as const,
+    status: ultimo?.status ?? 'nao_iniciado' as const,
+  }
+}
+
+export const excluirProtocolo = async (contratoId: string, id: string) => {
+  const protocolo = await getProtocolo(contratoId, id)
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const [pontosSnap, movimentosSnap] = await Promise.all([
+    getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', contratoId), where('protocoloId', '==', id))),
+    getDocs(query(collection(db, 'gestaoMovimentos'), where('protocoloId', '==', id))),
+  ])
+  const movimentos = movimentosSnap.docs.filter((item) => item.data().contratoId === contratoId)
+  await apagarAnexosMovimento(movimentos.flatMap((item) => (item.data().anexos as { url?: string }[] | undefined) ?? []))
+  const operations: Array<(batch: WriteBatch) => void> = [
+    ...pontosSnap.docs.map((item) => (batch: WriteBatch) => { batch.update(item.ref, { protocoloId: null }) }),
+    ...movimentos.map((item) => (batch: WriteBatch) => { batch.delete(item.ref) }),
+    (batch) => { batch.delete(doc(db, 'gestaoProtocolos', id)) },
+  ]
+  await commitEmLotes(operations)
+}
+
 export const atualizarPontoCompleto = async (contratoId: string, id: string, input: PontoInput) => {
   const snap = await getDoc(doc(db, 'gestaoPontos', id))
   if (!snap.exists() || snap.data().contratoId !== contratoId) throw new Error('Ponto não encontrado neste contrato.')
@@ -188,6 +225,32 @@ export const vincularPontoProtocolo = async (contratoId: string, pontoId: string
   const errors = validarInputPonto({ ...point, protocoloId: undefined } as PontoInput, protocolo)
   if (errors.length) throw new Error(errors[0])
   await updateDoc(doc(db, 'gestaoPontos', pontoId), { protocoloId })
+}
+
+export const vincularPontosProtocolo = async (contratoId: string, pontoIds: string[], protocoloId: string) => {
+  const ids = [...new Set(pontoIds)]
+  if (!ids.length) throw new Error('Selecione ao menos um ponto.')
+  const protocolo = await getProtocolo(contratoId, protocoloId)
+  if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
+  const snaps = await Promise.all(ids.map((id) => getDoc(doc(db, 'gestaoPontos', id))))
+  if (snaps.some((snap) => !snap.exists() || snap.data()?.contratoId !== contratoId)) throw new Error('Ponto não encontrado neste contrato.')
+  const vistos = new Set<string>()
+  for (const snap of snaps) {
+    const point = snap.data() as Ponto
+    const errors = validarInputPonto({ ...point, protocoloId: undefined } as PontoInput, protocolo)
+    if (errors.length) throw new Error(`${point.codigo}: ${errors[0]}`)
+    const key = codigoPontoKey(point.codigo)
+    if (vistos.has(key)) throw new Error(`Há mais de um ponto selecionado com o código ${point.codigo}.`)
+    vistos.add(key)
+  }
+  const atuais = await getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', contratoId), where('protocoloId', '==', protocoloId)))
+  const idsSelecionados = new Set(ids)
+  for (const item of atuais.docs) {
+    if (idsSelecionados.has(item.id)) continue
+    const codigo = String(item.data().codigo ?? '')
+    if (vistos.has(codigoPontoKey(codigo))) throw new Error(`Já existe um ponto com o código ${codigo} neste protocolo.`)
+  }
+  await commitEmLotes(snaps.map((snap) => (batch: WriteBatch) => { batch.update(snap.ref, { protocoloId }) }))
 }
 
 export const criarProtocoloComPontos = async (contratoId: string, input: ProtocoloInput, pontos: PontoInput[]) => {
@@ -262,6 +325,23 @@ export const listMovimentos = async (contratoId: string, protocoloId: string) =>
     .map((item) => ({ id: item.id, ...item.data() }) as Movimento & { contratoId: string; protocoloId: string })
     .filter((item) => item.contratoId === contratoId)
     .sort((a, b) => a.em.localeCompare(b.em))
+}
+export const excluirMovimento = async (contratoId: string, protocoloId: string, movimentoId: string) => {
+  const movimentos = await listMovimentos(contratoId, protocoloId)
+  const alvoIndex = movimentos.findIndex((item) => item.id === movimentoId)
+  if (alvoIndex < 0) throw new Error('Movimentação não encontrada neste protocolo.')
+  const alvo = movimentos[alvoIndex]
+  const eraAMaisRecente = alvoIndex === movimentos.length - 1
+  await apagarAnexosMovimento(alvo.anexos ?? [])
+  const situacao = situacaoAposExcluirMovimento(movimentos.filter((item) => item.id !== movimentoId))
+  await runTransaction(db, async (transaction) => {
+    const current = await transaction.get(doc(db, 'gestaoProtocolos', protocoloId))
+    const movement = await transaction.get(doc(db, 'gestaoMovimentos', movimentoId))
+    if (!current.exists() || current.data().contratoId !== contratoId) throw new Error('Protocolo não encontrado neste contrato.')
+    if (!movement.exists() || movement.data().contratoId !== contratoId || movement.data().protocoloId !== protocoloId) throw new Error('Movimentação não encontrada neste protocolo.')
+    transaction.delete(movement.ref)
+    if (eraAMaisRecente) transaction.update(current.ref, situacao)
+  })
 }
 export const registrarMovimento = async (contratoId: string, protocoloId: string, input: Pick<Movimento, 'tipo' | 'observacao' | 'etapa' | 'status'> & { em: string; files?: File[]; numero?: string; previsao?: string; realizadoEm?: string }) => {
   if (!input.tipo.trim() || !input.em || !Number.isFinite(Date.parse(input.em))) throw new Error('Informe tipo e data válida.')

@@ -57,6 +57,7 @@ export default function PontoPainelModal({
   const [tab, setTab] = useState<PontoPainelTab>(initialTab)
   const [saving, setSaving] = useState(false)
   const [saveState, setSaveState] = useState<'success' | 'error' | undefined>()
+  const [feedback, setFeedback] = useState('')
 
   const [editCodigo, setEditCodigo] = useState('')
   const [editEstado, setEditEstado] = useState('')
@@ -76,6 +77,7 @@ export default function PontoPainelModal({
     if (!open || !ponto) return
     setTab(initialTab)
     setSaveState(undefined)
+    setFeedback('')
     setEditCodigo(ponto.codigo)
     setEditEstado(ponto.estado)
     setEditKm(ponto.km)
@@ -95,8 +97,10 @@ export default function PontoPainelModal({
   const resumo = getPontoDetailSummary(ponto, protocolo)
 
   const fail = (err: unknown) => {
+    const message = err instanceof Error ? err.message : 'Erro ao salvar ponto.'
     setSaveState('error')
-    onError?.(err instanceof Error ? err.message : 'Erro ao salvar ponto.')
+    setFeedback(message)
+    onError?.(message)
   }
 
   const beginSave = () => {
@@ -106,6 +110,7 @@ export default function PontoPainelModal({
 
   const finishSave = (message: string) => {
     setSaveState('success')
+    setFeedback(message)
     onNotice?.(message)
     onError?.('')
   }
@@ -116,14 +121,13 @@ export default function PontoPainelModal({
       onError?.('Informe latitude e longitude juntas.')
       return
     }
-    const proc = ponto.protocoloId ? protocolos.find((item) => item.id === ponto.protocoloId) : undefined
     const input: PontoInput = {
       codigo: editCodigo,
       estado: editEstado,
       km: editKm,
       tipo: editTipo,
-      concessionaria: proc?.concessionaria ?? ponto.concessionaria,
-      rodovia: proc?.rodovia ?? ponto.rodovia,
+      concessionaria: ponto.concessionaria,
+      rodovia: ponto.rodovia,
       previsao,
       realizadoEm,
       ...(editLatitude && editLongitude
@@ -269,14 +273,14 @@ export default function PontoPainelModal({
             </label>
             {ponto.protocoloId && (
               <p className="gestao-ponto-painel-hint">
-                <small>Concessionária e rodovia seguem o protocolo vinculado. Troque o vínculo na aba Vínculo.</small>
+                <small>Este ponto permanece em {ponto.concessionaria} · {ponto.rodovia}. O vínculo aceita rodovia diferente da do protocolo.</small>
               </p>
             )}
             <div className="gestao-form-footer">
               <button type="button" className="gestao-button-secondary" onClick={onClose}>Fechar</button>
               <SaveButton saving={saving} state={saveState} label="Salvar dados" />
             </div>
-            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Dados do ponto salvos.' : '× Não foi possível salvar ponto. Tente novamente.'} />
+            <SaveFeedback state={saveState} message={feedback} />
           </form>
         )}
 
@@ -305,7 +309,7 @@ export default function PontoPainelModal({
               </button>
               <SaveButton saving={saving} state={saveState} label="Salvar situação" />
             </div>
-            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Situação do ponto salva.' : '× Não foi possível salvar situação. Tente novamente.'} />
+            <SaveFeedback state={saveState} message={feedback} />
           </form>
         )}
 
@@ -325,7 +329,7 @@ export default function PontoPainelModal({
               </button>
               <SaveButton saving={saving} state={saveState} label="Salvar planejamento" />
             </div>
-            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Planejamento do ponto salvo.' : '× Não foi possível salvar planejamento. Tente novamente.'} />
+            <SaveFeedback state={saveState} message={feedback} />
           </form>
         )}
 
@@ -336,8 +340,9 @@ export default function PontoPainelModal({
                 Vinculado a <strong>{protocolo?.titulo ?? ponto.protocoloId}</strong> · {ponto.concessionaria} · {ponto.rodovia}
               </p>
             ) : (
-              <p>Nenhum protocolo vinculado. Escolha um para alinhar concessionária e rodovia.</p>
+              <p>Nenhum protocolo vinculado.</p>
             )}
+            <p className="gestao-ponto-painel-hint"><small>O ponto pode ficar em outra rodovia ou concessionária. O vínculo não altera esses dados.</small></p>
             <label>
               Protocolo
               <select value={vinculoId} required onChange={(e) => setVinculoId(e.target.value)}>
@@ -355,7 +360,7 @@ export default function PontoPainelModal({
               </button>
               <SaveButton saving={saving} state={saveState} label={ponto.protocoloId ? 'Alterar vínculo' : 'Vincular'} disabled={saving || !vinculoId || vinculoId === ponto.protocoloId} />
             </div>
-            <SaveFeedback state={saveState} message={saveState === 'success' ? '✓ Vínculo do ponto salvo.' : '× Não foi possível salvar vínculo. Tente novamente.'} />
+            <SaveFeedback state={saveState} message={feedback} />
           </form>
         )}
 

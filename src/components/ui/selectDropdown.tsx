@@ -38,7 +38,7 @@ export default function SelectDropdown({ label, value, options, onChange, id }: 
   }, [selectedIndex])
 
   useEffect(() => {
-    if (open) optionRefs.current[activeIndex]?.focus()
+    if (open) optionRefs.current[activeIndex]?.focus({ preventScroll: true })
   }, [open, activeIndex])
 
   const close = () => {

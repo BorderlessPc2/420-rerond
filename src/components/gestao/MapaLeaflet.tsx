@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ponto, Protocolo } from '../../services/gestaoContratos'
-import { getMapBounds, getPontoColor, getPontoMapLabel, getPontoMapMeta, separarPontosSobrepostos } from './mapaUtils'
+import { getMapBounds, getPontoColor, getPontoMapLabel, getPontoMapMeta, marcadoresDeProtocolo, separarPontosSobrepostos } from './mapaUtils'
 import { nomeGestao } from '../../views/gestaoUi'
 import './MapaLeaflet.css'
 
@@ -11,13 +11,18 @@ export type MapaLeafletProps = {
   protocolos: Protocolo[]
   selectedPointId?: string
   onSelectPoint: (ponto: Ponto) => void
+  onSelectProtocolo?: (protocolo: Protocolo) => void
+  /** `pontos` desenha cada localização. `protocolos` desenha um marcador por protocolo. */
+  camada?: 'pontos' | 'protocolos'
   height?: number
   fitBoundsOnChange?: boolean
   /** `all` enquadra o recorte. `selected` aproxima o ponto sem cobri-lo com a ficha. */
   viewMode?: 'selected' | 'all'
 }
 
-export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSelectPoint, height = 460, fitBoundsOnChange = true, viewMode }: MapaLeafletProps) {
+const textoMapa = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char)
+
+export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSelectPoint, onSelectProtocolo, camada = 'pontos', height = 460, fitBoundsOnChange = true, viewMode }: MapaLeafletProps) {
   const [mapError, setMapError] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const elementRef = useRef<HTMLDivElement>(null)
@@ -50,6 +55,50 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
     const layers = layersRef.current
     if (!map || !layers) return
     layers.clearLayers()
+    if (camada === 'protocolos') {
+      const marcadores = marcadoresDeProtocolo(protocolos, pontos)
+      marcadores.forEach((marcador) => {
+        const { protocolo, latitude, longitude, total } = marcador
+        const color = getPontoColor({ id: '', contratoId: protocolo.contratoId, protocoloId: protocolo.id, codigo: '', estado: '', concessionaria: protocolo.concessionaria, rodovia: protocolo.rodovia, km: '', tipo: 'nova_implantacao' }, protocolo)
+        const titulo = protocolo.titulo
+        const resumo = `${total} ${total === 1 ? 'ponto' : 'pontos'}`
+        const marker = L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: 'gestao-pin-icon',
+            html: `<span class="gestao-pin gestao-pin-protocolo"><i style="--pin:${color};background:${color}"></i><b>${textoMapa(titulo)}</b><small>${resumo}</small></span>`,
+            iconSize: [240, 44],
+            iconAnchor: [22, 22],
+          }),
+          keyboard: true,
+          title: `${titulo} · ${resumo}`,
+        })
+        const popup = document.createElement('div')
+        const code = document.createElement('strong')
+        code.textContent = titulo
+        const location = document.createElement('span')
+        location.textContent = `${protocolo.concessionaria} · ${protocolo.rodovia}`
+        const status = document.createElement('small')
+        status.textContent = `${resumo} · ${nomeGestao(protocolo.status)}`
+        popup.append(code, location, status)
+        marker.bindPopup(popup, { closeButton: false, offset: [40, -4], className: 'gestao-map-popup', autoPan: true })
+        const abrir = () => { marker.openPopup(); onSelectProtocolo?.(protocolo) }
+        marker.on('click', abrir)
+        marker.on('add', () => {
+          const element = marker.getElement()
+          if (!(element instanceof HTMLElement)) return
+          element.tabIndex = 0
+          element.setAttribute('role', 'button')
+          element.setAttribute('aria-label', `Protocolo ${titulo}, ${resumo}`)
+          element.addEventListener('keydown', (event: KeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); abrir() }
+          })
+        })
+        marker.addTo(layers)
+      })
+      const bounds = getMapBounds(marcadores.map((item) => ({ id: item.protocolo.id, contratoId: item.protocolo.contratoId, protocoloId: item.protocolo.id, codigo: item.protocolo.titulo, estado: '', concessionaria: item.protocolo.concessionaria, rodovia: item.protocolo.rodovia, km: '', tipo: 'nova_implantacao' as const, latitude: item.latitude, longitude: item.longitude })))
+      if (bounds && fitBoundsOnChange) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 12 })
+      return
+    }
     const located = separarPontosSobrepostos(pontos)
     located.forEach(({ ponto, latitude, longitude }) => {
       const protocolo = protocolos.find((item) => item.id === ponto.protocoloId)
@@ -60,7 +109,7 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
       const marker = L.marker([latitude, longitude], {
         icon: L.divIcon({
           className: 'gestao-pin-icon',
-          html: `<span class="gestao-pin${selected ? ' is-selected' : ''}${ponto.precisao === 'aproximada' ? ' is-approx' : ''}"><i style="--pin:${color};background:${color}"></i><b>${ponto.codigo.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char)}</b></span>`,
+          html: `<span class="gestao-pin${selected ? ' is-selected' : ''}${ponto.precisao === 'aproximada' ? ' is-approx' : ''}"><i style="--pin:${color};background:${color}"></i><b>${textoMapa(ponto.codigo)}</b></span>`,
           iconSize: [156, 44],
           iconAnchor: [22, 22],
         }),
@@ -102,11 +151,11 @@ export default function MapaLeaflet({ pontos, protocolos, selectedPointId, onSel
     } else if (selected) {
       map.setView([selected.latitude, selected.longitude], Math.max(map.getZoom(), 14), { animate: true })
     }
-  }, [pontos, protocolos, selectedPointId, onSelectPoint, fitBoundsOnChange, viewMode])
+  }, [pontos, protocolos, selectedPointId, onSelectPoint, onSelectProtocolo, camada, fitBoundsOnChange, viewMode])
 
   if (mapError) return <div className="gestao-map-fallback" style={{ minHeight: height }} role="status"><strong>Mapa temporariamente indisponível.</strong><span>Os dados e pontos continuam disponíveis nas listas. Abra a aba de pontos para registrar ou revisar coordenadas.</span></div>
   return <div className="gestao-map-frame" style={{ height }}>
-    <div ref={elementRef} className="gestao-leaflet-map" style={{ height }} role="application" aria-label="Mapa interativo dos pontos do contrato" />
+    <div ref={elementRef} className="gestao-leaflet-map" style={{ height }} role="application" aria-label={camada === 'protocolos' ? 'Mapa dos protocolos do contrato' : 'Mapa interativo dos pontos do contrato'} />
     <div className={`gestao-map-skeleton${mapReady ? ' is-done' : ''}`} aria-hidden={mapReady} role={mapReady ? undefined : 'status'}>
       {!mapReady && <span className="gestao-sr">Carregando mapa</span>}
       <i /><i /><i />

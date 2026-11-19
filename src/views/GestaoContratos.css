@@ -198,7 +198,7 @@
 .gestao-overview-filters { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(220px, .9fr); gap: 18px 28px; }
 .gestao-overview-filters fieldset { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
 .gestao-overview-filters legend { margin-block-end: 10px; padding: 0; color: var(--color-text-soft); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.gestao-overview-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gestao-overview-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); gap: 10px; }
 .gestao-overview-period .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gestao-overview-search { grid-column: 1 / -1; }
 .gestao-overview-panel label { display: grid; gap: 5px; min-inline-size: 0; color: var(--color-text-soft); font-size: .74rem; font-weight: 600; }
@@ -220,6 +220,11 @@
 .gestao-list, .gestao-point-list, .gestao-planning-list, .gestao-simple-list { padding: 0; margin: 0; list-style: none; }
 .gestao-list, .gestao-point-list, .gestao-planning-list { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; }
 .gestao-list li + li, .gestao-point-list li + li, .gestao-planning-list li + li { border-top: 1px solid var(--color-border); }
+.gestao-list-row { display: flex; align-items: center; }
+.gestao-list-row .gestao-list-link { flex: 1; min-width: 0; }
+.gestao-list-delete { margin-inline-end: 16px; white-space: nowrap; }
+.gestao-timeline-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.gestao-timeline-delete { min-block-size: 32px !important; padding: 4px 10px !important; font-size: .8rem; }
 .gestao-list-link { display: grid; grid-template-columns: minmax(190px, 1fr) auto minmax(110px, auto) auto; align-items: center; gap: 16px; padding: 18px 20px; text-decoration: none; transition: background-color var(--gestao-duration-fast) var(--gestao-ease-out), box-shadow var(--gestao-duration-fast) var(--gestao-ease-out); }
 .gestao-list-link:hover { background: var(--color-primary-50); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-600) 25%, transparent); }
 .gestao-list-main { display: flex; flex-direction: column; gap: 5px; min-inline-size: 0; }
@@ -240,6 +245,12 @@
 .gestao-simple-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
 .gestao-simple-list li span { color: var(--color-text-soft); }
 .gestao-point-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px 20px; min-inline-size: 0; padding: 18px 20px; }
+.gestao-point-row.is-selected { background: color-mix(in srgb, var(--color-primary-50) 80%, white); }
+.gestao-point-check { display: flex; align-items: center; gap: 8px; font-size: .86rem; }
+.gestao-point-check input { inline-size: 18px; block-size: 18px; }
+.gestao-bulk-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-primary-50); }
+.gestao-bulk-bar label { display: grid; gap: 4px; min-inline-size: 220px; font-size: .78rem; font-weight: 700; }
+.gestao-bulk-bar select { min-block-size: 40px; }
 .gestao-point-row-meta { display: flex; flex: 1 1 240px; flex-direction: column; gap: 7px; min-inline-size: 0; overflow-wrap: anywhere; }
 .gestao-point-row-meta > span { font-size: .9rem; }
 .gestao-point-row-aside { display: flex; flex: 0 1 auto; flex-direction: column; align-items: flex-end; min-inline-size: 0; gap: 10px; }
@@ -474,7 +485,7 @@
 .gestao-attention-item-urgent strong { color: var(--color-danger); }
 @media (max-width: 1050px) { .gestao-health-content { grid-template-columns: 1fr; } }
 @media (max-width: 1080px) { .gestao-overview-filters { grid-template-columns: 1fr 1fr; } .gestao-overview-period { grid-column: 1 / -1; } }
-@media (max-width: 880px) { .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gestao-overview-fields > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 880px) { .gestao-overview-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); } .gestao-overview-fields > :last-child { grid-column: auto; } }
 @media (max-width: 700px) { .gestao-overview-head, .gestao-overview-actions, .gestao-map-modal-head { align-items: stretch; flex-direction: column; } .gestao-overview-filters, .gestao-overview-fields, .gestao-overview-period .gestao-overview-fields { grid-template-columns: 1fr; } .gestao-overview-fields > :last-child { grid-column: auto; } .gestao-overview-panel { padding-inline: 16px; } .gestao-map-inspector-close { align-self: start; } .gestao-health-main { min-block-size: 160px; padding: 22px; } }
 @media (max-width: 600px) { .gestao-health { padding: 14px; } .gestao-health-main { align-items: start; flex-direction: column; } .gestao-health-ring { align-self: end; } .gestao-health-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gestao-attention { padding: 16px; } }
 @media (max-width: 380px) { .gestao-attention-items { grid-template-columns: 1fr; } }
