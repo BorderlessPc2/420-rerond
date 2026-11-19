@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { criarPonto, pontoStatus, type Ponto } from '../services/gestaoContratos'
+import { criarPonto, pontoStatus, vincularPontosProtocolo, type Ponto } from '../services/gestaoContratos'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import ModalGestao from '../components/gestao/ModalGestao'
 import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
@@ -36,6 +36,9 @@ export default function GestaoPontos() {
   const [success, setSuccess] = useState('')
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [selecionados, setSelecionados] = useState<string[]>([])
+  const [vinculoEmLote, setVinculoEmLote] = useState('')
+  const [vinculando, setVinculando] = useState(false)
   const [painel, setPainel] = useState<{ ponto: Ponto; tab: PontoPainelTab } | null>(null)
 
   const painelPonto = painel ? pontos.find((item) => item.id === painel.ponto.id) ?? painel.ponto : null
@@ -90,6 +93,31 @@ export default function GestaoPontos() {
     }
   }
 
+  const idsVisiveis = pontosLista.map((ponto) => ponto.id)
+  const todosSelecionados = idsVisiveis.length > 0 && idsVisiveis.every((id) => selecionados.includes(id))
+  const alternarPonto = (id: string) => setSelecionados((atual) => atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id])
+  const alternarTodos = () => setSelecionados((atual) => todosSelecionados ? atual.filter((id) => !idsVisiveis.includes(id)) : [...new Set([...atual, ...idsVisiveis])])
+  const vincularSelecionados = async () => {
+    if (!vinculoEmLote) {
+      setError('Selecione o protocolo.')
+      return
+    }
+    setVinculando(true)
+    try {
+      const total = selecionados.length
+      await vincularPontosProtocolo(contratoId, selecionados, vinculoEmLote)
+      setSelecionados([])
+      setVinculoEmLote('')
+      await refresh()
+      setError('')
+      setSuccess(`${total} ${total === 1 ? 'ponto vinculado' : 'pontos vinculados'} ao protocolo.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao vincular pontos.')
+    } finally {
+      setVinculando(false)
+    }
+  }
+
   if (loading) return <GestaoLoadingSkeleton variant="lista" label="Carregando pontos" />
 
   return (
@@ -112,6 +140,22 @@ export default function GestaoPontos() {
         </label>
         <SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemPonto)} options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]} />
       </div>
+      {selecionados.length > 0 && (
+        <div className="gestao-bulk-bar">
+          <strong>{selecionados.length} {selecionados.length === 1 ? 'ponto selecionado' : 'pontos selecionados'}</strong>
+          <label>
+            Protocolo
+            <select value={vinculoEmLote} onChange={(event) => setVinculoEmLote(event.target.value)}>
+              <option value="">Selecionar protocolo</option>
+              {protocolos.map((item) => (
+                <option key={item.id} value={item.id}>{item.titulo} · {item.rodovia}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={() => void vincularSelecionados()} disabled={vinculando || !vinculoEmLote}>{vinculando ? 'Vinculando…' : 'Vincular selecionados'}</button>
+          <button type="button" className="gestao-button-secondary" onClick={() => setSelecionados([])}>Limpar seleção</button>
+        </div>
+      )}
       {error && <p className="gestao-error" role="alert">{error}</p>}
       {success && <p className="gestao-success" role="status">{success}</p>}
 
@@ -188,12 +232,22 @@ export default function GestaoPontos() {
       />
 
       {pontosLista.length ? (
+        <>
+        <div className="gestao-list-controls">
+          <label className="gestao-point-check">
+            <input type="checkbox" checked={todosSelecionados} onChange={alternarTodos} />
+            Selecionar pontos visíveis
+          </label>
+        </div>
         <ul className="gestao-point-list">
           {pontosLista.map((p) => {
             const proc = protocolos.find((item) => item.id === p.protocoloId)
             const situacao = pontoStatus(p, proc)
             return (
-              <li className="gestao-point-row" key={p.id}>
+              <li className={`gestao-point-row${selecionados.includes(p.id) ? ' is-selected' : ''}`} key={p.id}>
+                <label className="gestao-point-check">
+                  <input type="checkbox" checked={selecionados.includes(p.id)} aria-label={`Selecionar ponto ${p.codigo}`} onChange={() => alternarPonto(p.id)} />
+                </label>
                 <div className="gestao-point-row-meta">
                   <strong>{p.codigo}</strong>
                   <span>
@@ -222,6 +276,7 @@ export default function GestaoPontos() {
             )
           })}
         </ul>
+        </>
       ) : (
         <div className="gestao-empty">
           <h3>Nenhum ponto neste recorte</h3>

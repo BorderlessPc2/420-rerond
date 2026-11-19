@@ -11,6 +11,16 @@ describe('importação de planilhas', () => {
     expect(preview.protocolos).toHaveLength(1)
     expect(preview.protocolos[0].pontos).toHaveLength(2)
     expect(preview.linhasInvalidas).toEqual([])
+  })
+  it('reúne pontos de rodovias diferentes no mesmo protocolo', () => {
+    const preview = agruparLinhasImportacao([
+      { linha: 2, titulo_protocolo: 'Implantação', concessionaria: 'Triunfo', rodovia: 'BR-153', codigo_ponto: '621256', estado: 'GO', km: '491' },
+      { linha: 3, titulo_protocolo: 'Implantação', concessionaria: 'Triunfo', rodovia: 'BR-060', codigo_ponto: '621300', estado: 'GO', km: '10' },
+      { linha: 4, titulo_protocolo: 'Implantação', concessionaria: 'Triunfo', rodovia: 'BR-153', numero_protocolo: '2', codigo_ponto: '700', estado: 'GO', km: '12' },
+    ])
+    expect(preview.protocolos).toHaveLength(2)
+    expect(preview.protocolos[0].pontos.map((item) => item.rodovia)).toEqual(['BR-153', 'BR-060'])
+    expect(preview.protocolos[1].pontos).toHaveLength(1)
     expect(normalizarCabecalho('Código Ponto')).toBe('codigo_ponto')
   })
   it('retorna erro por linha para campo obrigatório e coordenadas inválidas', () => {

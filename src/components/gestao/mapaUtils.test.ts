@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId, separarPontosSobrepostos } from './mapaUtils'
+import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId, marcadoresDeProtocolo, separarPontosSobrepostos } from './mapaUtils'
 import type { Ponto, Protocolo } from '../../services/gestaoContratos'
 
 const protocolo: Protocolo = { id: 'protocolo', contratoId: 'contrato', titulo: 'Protocolo', concessionaria: 'Eco', rodovia: 'BR-101', etapa: 'fase_1', status: 'em_andamento' }
@@ -20,6 +20,13 @@ describe('utilitários do mapa de gestão', () => {
     expect(separados).toHaveLength(2)
     expect(separados[0].ponto).toBe(ponto)
     expect(separados[0].latitude).not.toBe(separados[1].latitude)
+  })
+  it('mostra um marcador por protocolo a partir dos pontos geolocalizados', () => {
+    const outro: Protocolo = { ...protocolo, id: 'outro', titulo: 'Outro' }
+    const segundo = { ...ponto, id: 'p2', latitude: 12, longitude: -42 }
+    const semCoordenada = { ...ponto, id: 'sem', protocoloId: 'outro', latitude: undefined, longitude: undefined }
+    const marcadores = marcadoresDeProtocolo([protocolo, outro], [ponto, segundo, semCoordenada])
+    expect(marcadores).toEqual([{ protocolo, latitude: 11, longitude: -41, total: 2 }])
   })
   it('aceita seleção por URL somente dentro do escopo informado', () => {
     expect(getSelectedPointId('?ponto=ponto', [ponto])).toBe('ponto')

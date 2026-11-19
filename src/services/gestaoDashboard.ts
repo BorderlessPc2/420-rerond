@@ -12,11 +12,29 @@ export type DashboardFiltro = {
   busca?: string
 }
 
+export type DashboardStatusPonto = {
+  id: string
+  codigo: string
+  rodovia: string
+  km: string
+}
+
 export type DashboardStatusSlice = {
   status: Situacao
   total: number
   color: string
   label: string
+  pontos: DashboardStatusPonto[]
+}
+
+export const STATUS_PONTOS_PAGE_SIZE = 8
+
+export function fatiarPontosStatus<T>(items: T[], visible: number) {
+  const limite = Math.max(0, visible)
+  return {
+    visiveis: items.slice(0, limite),
+    restantes: Math.max(0, items.length - limite),
+  }
 }
 
 export type GestaoDashboardData = {
@@ -103,11 +121,23 @@ export function calcularDashboardGestao(
   const estados = [...new Set(pontos.map((ponto) => ponto.estado).filter(Boolean))].sort()
   const concessionarias = [...new Set([...pontos, ...protocolos].map((item) => item.concessionaria).filter(Boolean))].sort()
   const rodovias = [...new Set([...pontos, ...protocolos].map((item) => item.rodovia).filter(Boolean))].sort()
+  const statusByProtocolo = new Map(recorte.protocolos.map((protocolo) => [protocolo.id, protocolo.status]))
+  const pontosPorStatus = new Map<Situacao, DashboardStatusPonto[]>()
+  recorte.pontos.forEach((ponto) => {
+    if (!ponto.protocoloId) return
+    const status = statusByProtocolo.get(ponto.protocoloId)
+    if (!status) return
+    const lista = pontosPorStatus.get(status) ?? []
+    lista.push({ id: ponto.id, codigo: ponto.codigo, rodovia: ponto.rodovia, km: ponto.km })
+    pontosPorStatus.set(status, lista)
+  })
+  pontosPorStatus.forEach((lista) => lista.sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true })))
   const statusTotals = [...new Set(recorte.protocolos.map((protocolo) => protocolo.status))].map((status) => ({
     status,
     total: recorte.protocolos.filter((protocolo) => protocolo.status === status).length,
     color: STATUS_CHART_COLORS[status],
     label: statusLabel(status),
+    pontos: pontosPorStatus.get(status) ?? [],
   })).filter((item) => item.total > 0)
   const indicadores = indicadoresGestao(recorte.protocolos, recorte.pontos)
   const concluidos = indicadores.regularizados + indicadores.aprovadosImplantacao

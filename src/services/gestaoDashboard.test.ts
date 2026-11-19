@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDashboardGestao, toDonutSegments } from './gestaoDashboard'
+import { calcularDashboardGestao, fatiarPontosStatus, toDonutSegments } from './gestaoDashboard'
 import type { Ponto, Protocolo } from './gestaoContratos'
 
 const protocolos: Protocolo[] = [
@@ -22,7 +22,11 @@ describe('gestaoDashboard', () => {
 
   it('calcula distribuição de status e percentual de pontos concluídos', () => {
     const data = calcularDashboardGestao(protocolos, pontos)
-    expect(data.status).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'em_correcao', total: 1 })]))
+    expect(data.status).toEqual(expect.arrayContaining([expect.objectContaining({
+      status: 'em_correcao',
+      total: 1,
+      pontos: [expect.objectContaining({ id: 'p1', codigo: '1', rodovia: 'BR-101', km: '10' })],
+    })]))
     expect(data.percentualPontosConcluidos).toBe(33)
     expect(data.previstoRealizado).toEqual({ previsto: 0, realizado: 0 })
   })
@@ -40,6 +44,11 @@ describe('gestaoDashboard', () => {
 
     expect(data.concessionarias).toEqual(['Eco', 'Via Nova'])
     expect(data.rodovias).toEqual(['BR-101', 'BR-153', 'BR-999'])
+  })
+
+  it('fatia a lista de pontos do status sem ultrapassar o total', () => {
+    expect(fatiarPontosStatus(['a', 'b', 'c'], 2)).toEqual({ visiveis: ['a', 'b'], restantes: 1 })
+    expect(fatiarPontosStatus(['a'], 8)).toEqual({ visiveis: ['a'], restantes: 0 })
   })
 
   it('monta segmentos de donut proporcionais', () => {

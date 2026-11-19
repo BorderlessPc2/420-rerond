@@ -30,6 +30,7 @@ export default function GestaoContratoDetalhe() {
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const [protocoloNoMapa, setProtocoloNoMapa] = useState<string | null>(null)
   const filtro = useMemo(() => gestaoFiltroFromSearchParams(searchParams), [searchParams])
   const { estado, concessionaria, rodovia, status, tipo, etapa, inicio, fim, busca } = filtro
   const [buscaDraft, setBuscaDraft] = useState(busca ?? '')
@@ -73,6 +74,9 @@ export default function GestaoContratoDetalhe() {
     return () => window.clearTimeout(timer)
   }, [busca, buscaDraft, setDashboardParam])
   const filtrado = useMemo(() => filtrarGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
+  const protocoloMapa = filtrado.protocolos.find((item) => item.id === protocoloNoMapa) ?? null
+  const pontosDoProtocoloMapa = protocoloMapa ? filtrado.pontos.filter((ponto) => ponto.protocoloId === protocoloMapa.id) : []
+  const abrirProtocoloNoMapa = useCallback((protocolo: Protocolo) => setProtocoloNoMapa(protocolo.id), [])
   const totals = indicadoresGestao(filtrado.protocolos, filtrado.pontos)
   const dashboard = useMemo(() => calcularDashboardGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
   const exportarRecorte = async () => {
@@ -171,7 +175,7 @@ export default function GestaoContratoDetalhe() {
       </div>
     </section>
     <GestaoDashboardCharts data={dashboard} />
-<section className="gestao-dashboard-map"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>Clique em um ponto para abrir a ficha, com protocolo e situação.</p></div><Link className="gestao-button-secondary" to={{ pathname: `${base}/mapa`, search: searchParams.toString() }}>Abrir mapa completo ↗</Link></div><div className="gestao-map-preview"><MapaLeaflet pontos={filtrado.pontos} protocolos={filtrado.protocolos} onSelectPoint={(ponto) => { const next = new URLSearchParams(searchParams); next.set('ponto', ponto.id); navigate({ pathname: `${base}/mapa`, search: next.toString() }) }} height={380} fitBoundsOnChange /></div></section>
+<section className="gestao-dashboard-map"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>{protocoloMapa ? `Pontos de ${protocoloMapa.titulo}.` : 'Clique em um protocolo para ver os pontos dele.'}</p></div><div className="gestao-actions">{protocoloMapa && <button type="button" className="gestao-button-secondary" onClick={() => setProtocoloNoMapa(null)}>Voltar aos protocolos</button>}<Link className="gestao-button-secondary" to={{ pathname: `${base}/mapa`, search: searchParams.toString() }}>Abrir mapa completo ↗</Link></div></div><div className="gestao-map-preview">{protocoloMapa ? <MapaLeaflet pontos={pontosDoProtocoloMapa} protocolos={[protocoloMapa]} onSelectPoint={(ponto) => { const next = new URLSearchParams(searchParams); next.set('ponto', ponto.id); navigate({ pathname: `${base}/mapa`, search: next.toString() }) }} height={380} fitBoundsOnChange /> : <MapaLeaflet pontos={filtrado.pontos} protocolos={filtrado.protocolos} camada="protocolos" onSelectPoint={() => undefined} onSelectProtocolo={abrirProtocoloNoMapa} height={380} fitBoundsOnChange />}</div>{protocoloMapa && <p className="gestao-map-note" role="status">{pontosDoProtocoloMapa.length} {pontosDoProtocoloMapa.length === 1 ? 'ponto' : 'pontos'} em {protocoloMapa.titulo}. <Link to={`/gestao-contratos/${contratoId}/protocolos/${protocoloMapa.id}`}>Abrir protocolo ↗</Link></p>}</section>
     </>}
     <Outlet context={{ contrato, protocolos: filtrado.protocolos, pontos: filtrado.pontos, loading, refresh } satisfies GestaoContext} />
   </div>

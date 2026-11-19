@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDashboardGestao, criarProtocoloComPontos, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, validarEdicaoPonto, validarPatchProtocoloComPontos, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
+import { calcularDashboardGestao, criarProtocoloComPontos, excluirMovimento, excluirProtocolo, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, situacaoAposExcluirMovimento, validarEdicaoPonto, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
 import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
 import { validarInputContrato, validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
@@ -70,8 +70,11 @@ describe('validação de gestão', () => {
     expect(validarInputPonto({ ...ponto, latitude: 10 }, protocolo)).toContain('Coordenadas inválidas.')
     expect(validarInputPonto({ ...ponto, latitude: 91, longitude: 0 }, protocolo)).toContain('Coordenadas inválidas.')
   })
-  it('rejeita ponto de rodovia diferente e resultado incompatível', () => {
-    expect(validarInputPonto({ ...ponto, rodovia: 'BR-116' }, protocolo)).toContain('Ponto deve pertencer à mesma concessionária e rodovia do protocolo.')
+  it('aceita ponto de outra rodovia ou concessionária no mesmo protocolo', () => {
+    expect(validarInputPonto({ ...ponto, rodovia: 'BR-116' }, protocolo)).toEqual([])
+    expect(validarInputPonto({ ...ponto, concessionaria: 'Outra', rodovia: 'BR-153' }, protocolo)).toEqual([])
+  })
+  it('rejeita resultado incompatível com a classificação', () => {
     expect(validarInputPonto({ ...ponto, resultado: 'regularizado' }, protocolo)).toContain('Resultado incompatível com classificação do ponto.')
   })
   it('calcula progresso da etapa', () => {
@@ -87,17 +90,20 @@ describe('validação de gestão', () => {
     const pontos = Array.from({ length: 500 }, (_, index) => ({ ...ponto, codigo: String(index) }))
     await expect(criarProtocoloComPontos('contrato', protocolo, pontos)).rejects.toThrow('Limite de 499 pontos por protocolo')
   })
-  it('rejeita edição de ponto que quebra vínculo com protocolo', () => {
-    expect(validarEdicaoPonto({ ...ponto, rodovia: 'BR-116' }, protocolo)).toContain('Ponto deve pertencer à mesma concessionária e rodovia do protocolo.')
+  it('aceita edição de ponto em rodovia diferente da do protocolo', () => {
+    expect(validarEdicaoPonto({ ...ponto, rodovia: 'BR-116' }, protocolo)).toEqual([])
+  })
+  it('restaura a situação do protocolo a partir da movimentação anterior', () => {
+    expect(situacaoAposExcluirMovimento([
+      { etapa: 'planejamento', status: 'nao_iniciado' },
+      { etapa: 'elaboracao', status: 'em_andamento' },
+    ])).toEqual({ etapa: 'elaboracao', status: 'em_andamento' })
+    expect(situacaoAposExcluirMovimento([])).toEqual({ etapa: 'planejamento', status: 'nao_iniciado' })
+    expect(excluirProtocolo).toBeTypeOf('function')
+    expect(excluirMovimento).toBeTypeOf('function')
   })
   it('rejeita transição para correção sem observação', () => {
     expect(validarTransicao('fase_1', 'em_andamento', 'fase_1', 'em_correcao', '')).toBe('Informe observação para correção ou paralisação.')
-  })
-  it('bloqueia alteração de rodovia do protocolo quando há pontos vinculados', () => {
-    const atual = { concessionaria: 'Eco', rodovia: 'BR-101' }
-    expect(validarPatchProtocoloComPontos(atual, { ...atual, rodovia: 'BR-116' }, 2)).toBe('Não é possível alterar concessionária ou rodovia com pontos vinculados.')
-    expect(validarPatchProtocoloComPontos(atual, atual, 2)).toBeNull()
-    expect(validarPatchProtocoloComPontos(atual, { ...atual, rodovia: 'BR-116' }, 0)).toBeNull()
   })
   it('valida cadastro contratual estendido', () => {
     expect(validarInputContrato({ nome: 'Contrato A', vigenciaInicio: '2026-12-01', vigenciaFim: '2026-01-01' })).toContain('Vigência inicial não pode ser posterior à final.')
