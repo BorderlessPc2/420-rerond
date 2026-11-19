@@ -31,6 +31,20 @@ describe('gestaoDashboard', () => {
     expect(data.previstoRealizado).toEqual({ previsto: 0, realizado: 0 })
   })
 
+  it('agrupa pontos do recorte pelo status do protocolo vinculado', () => {
+    const data = calcularDashboardGestao(protocolos, pontos)
+    const correcao = data.status.find((item) => item.status === 'em_correcao')
+    const naoIniciado = data.status.find((item) => item.status === 'nao_iniciado')
+    expect(correcao?.pontos).toEqual([{ id: 'p1', codigo: '1', rodovia: 'BR-101', km: '10' }])
+    expect(naoIniciado?.pontos).toEqual([{ id: 'p3', codigo: '3', rodovia: 'BR-153', km: '30' }])
+  })
+
+  it('fatia a lista de pontos para carregar aos poucos', () => {
+    const { visiveis, restantes } = fatiarPontosStatus(['a', 'b', 'c', 'd'], 2)
+    expect(visiveis).toEqual(['a', 'b'])
+    expect(restantes).toBe(2)
+  })
+
   it('inclui concessionária e rodovia existentes somente em protocolos nas opções de filtro', () => {
     const data = calcularDashboardGestao([...protocolos, {
       id: 'sem-ponto',

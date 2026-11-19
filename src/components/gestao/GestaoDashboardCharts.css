@@ -35,7 +35,7 @@
 .gestao-status-points a:hover { background: var(--color-primary-100); color: var(--color-text); }
 .gestao-status-points strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
 .gestao-status-points span { overflow: hidden; color: var(--color-text-soft); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-status-empty { margin: 0; padding: 4px 16px 10px; color: var(--color-text-soft); font-size: .76rem; overflow-wrap: break-word; }
+.gestao-status-empty { margin: 0; padding: 4px 16px 10px; color: var(--color-text-soft); font-size: .76rem; overflow-wrap: anywhere; }
 .gestao-page .gestao-status-more,
 .gestao-status-more { min-block-size: 32px; margin: 0 8px 8px; padding-inline: 8px; color: var(--color-primary-800); background: transparent; border: 0; transform: none; }
 .gestao-chart-side { display: grid; gap: 18px; align-content: start; }
