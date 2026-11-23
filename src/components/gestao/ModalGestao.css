@@ -30,7 +30,8 @@
   position: relative;
   z-index: 1;
   inline-size: min(820px, calc(100vw - 32px));
-  max-block-size: min(820px, calc(100dvh - 32px));
+  block-size: min(620px, calc(100dvh - 32px));
+  max-block-size: min(620px, calc(100dvh - 32px));
   margin: 0;
   padding: 0;
   border: 0;
@@ -90,7 +91,7 @@
 .gestao-modal-body .gestao-filtros { margin: 0; padding: 0; border: 0; background: transparent; }
 @media (max-width: 520px) {
   .gestao-modal-root { padding: 10px; }
-  .gestao-modal { inline-size: calc(100% - 20px); max-block-size: calc(100dvh - 20px); }
+  .gestao-modal { inline-size: calc(100% - 20px); block-size: min(620px, calc(100dvh - 20px)); max-block-size: calc(100dvh - 20px); }
   .gestao-modal-shell { min-block-size: min(560px, calc(100dvh - 20px)); }
   .gestao-modal-header, .gestao-modal-body { padding-inline: 18px; }
   .gestao-form-footer { flex-direction: column-reverse; }

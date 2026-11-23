@@ -56,6 +56,8 @@ export default function Solicitacoes() {
   const [jobError, setJobError] = useState<string | null>(null)
   const [aprovandoId, setAprovandoId] = useState<string | null>(null)
   const [rejeitandoId, setRejeitandoId] = useState<string | null>(null)
+  const [retryCooldownUntil, setRetryCooldownUntil] = useState<number | null>(null)
+  const [retryCooldownSeconds, setRetryCooldownSeconds] = useState(0)
 
   useEffect(() => {
     loadSolicitacoes()
@@ -70,7 +72,7 @@ export default function Solicitacoes() {
       async (job) => {
         setActiveJob(job)
         setJobError(
-          job.state === 'failed'
+          job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
             ? humanizeAnaliseErrorMessage(job.error?.message ?? 'Falha na análise.')
             : null,
         )
@@ -82,12 +84,11 @@ export default function Solicitacoes() {
                   ...item,
                   analiseJobStatus: job.state,
                   analiseJobProgress: job.progress,
-                  activeAnaliseJobId: job.id,
+                  activeAnaliseJobId: job.state === 'completed' || job.state === 'failed' || job.state === 'blocked' || job.state === 'stale' ? null : job.id,
+                  analiseRetryBlockedUntil: job.retryBlockedUntil,
                   analiseErroMensagem:
-                    job.state === 'failed'
-                      ? humanizeAnaliseErrorMessage(
-                          job.error?.message ?? 'Falha na análise.',
-                        )
+                    job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
+                      ? humanizeAnaliseErrorMessage(job.error?.message ?? 'Falha na análise.')
                       : item.analiseErroMensagem,
                 }
               : item,
@@ -149,10 +150,7 @@ export default function Solicitacoes() {
       setSolicitacoes(data)
 
       const emProcessamento = data.find(
-        (item) =>
-          item.id &&
-          item.activeAnaliseJobId &&
-          isActiveJobState(item.analiseJobStatus),
+        (item) => item.id && item.activeAnaliseJobId && isActiveJobState(item.analiseJobStatus),
       )
       if (emProcessamento?.id && emProcessamento.activeAnaliseJobId) {
         setAnalisandoId(emProcessamento.id)
@@ -328,8 +326,28 @@ export default function Solicitacoes() {
     setActiveJob(null)
   }
 
+  useEffect(() => {
+    if (!retryCooldownUntil) {
+      setRetryCooldownSeconds(0)
+      return
+    }
+    const update = () => {
+      const seconds = Math.max(0, Math.ceil((retryCooldownUntil - Date.now()) / 1000))
+      setRetryCooldownSeconds(seconds)
+      if (seconds === 0) setRetryCooldownUntil(null)
+    }
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [retryCooldownUntil])
+
   const retryFailedAnalysis = () => {
     if (!solicitacaoEmAnalise) return
+    const blockedUntil = activeJob?.retryBlockedUntil?.getTime() ?? solicitacaoEmAnalise.analiseRetryBlockedUntil?.getTime() ?? 0
+    if (blockedUntil > Date.now()) {
+      setRetryCooldownUntil(blockedUntil)
+      return
+    }
     setModalReanaliseAberto(solicitacaoEmAnalise)
     dismissAnaliseOverlay()
   }
@@ -391,7 +409,7 @@ export default function Solicitacoes() {
     ? solicitacoes.find((s) => s.id === analisandoId) ?? null
     : null
 
-  const overlayActive = Boolean(analisandoId && (activeJobId || activeJob?.state === 'failed'))
+  const overlayActive = Boolean(analisandoId && activeJobId)
 
   return (
     <div className="solicitacoes-container">
@@ -404,15 +422,16 @@ export default function Solicitacoes() {
         progress={activeJob?.progress ?? solicitacaoEmAnalise?.analiseJobProgress ?? null}
         errorMessage={jobError}
         onDismiss={
-          activeJob?.state === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'failed'
+          activeJob?.state === 'failed' || activeJob?.state === 'blocked' || activeJob?.state === 'stale' || solicitacaoEmAnalise?.analiseJobStatus === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'blocked' || solicitacaoEmAnalise?.analiseJobStatus === 'stale'
             ? dismissAnaliseOverlay
             : undefined
         }
         onRetry={
-          activeJob?.state === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'failed'
+          activeJob?.state === 'failed' || activeJob?.state === 'blocked' || activeJob?.state === 'stale' || solicitacaoEmAnalise?.analiseJobStatus === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'blocked' || solicitacaoEmAnalise?.analiseJobStatus === 'stale'
             ? retryFailedAnalysis
             : undefined
         }
+        retryCooldownSeconds={retryCooldownSeconds}
       />
       <div className="solicitacoes-header">
         <h1>Solicitações</h1>
@@ -516,7 +535,7 @@ export default function Solicitacoes() {
                 </div>
               )}
 
-              {solicitacao.analiseJobStatus === 'failed' && (
+              {(solicitacao.analiseJobStatus === 'failed' || solicitacao.analiseJobStatus === 'blocked' || solicitacao.analiseJobStatus === 'stale') && (
                 <div className="solicitacao-erro-analise" role="alert">
                   <AlertCircle size={14} />
                   <span>
@@ -549,13 +568,21 @@ export default function Solicitacoes() {
                 )}
                 <button
                   className="btn-reanalisar"
-                  onClick={() => setModalReanaliseAberto(solicitacao)}
-                  disabled={analisandoId === solicitacao.id}
+                  onClick={() => {
+                    if (solicitacao.id === analisandoId) return
+                    const blockedUntil = solicitacao.analiseRetryBlockedUntil?.getTime() ?? solicitacao.retryBlockedUntil?.getTime() ?? 0
+                    if (blockedUntil > Date.now()) {
+                      setRetryCooldownUntil(blockedUntil)
+                      return
+                    }
+                    setModalReanaliseAberto(solicitacao)
+                  }}
+                  disabled={analisandoId === solicitacao.id || Boolean((solicitacao.analiseRetryBlockedUntil?.getTime() ?? solicitacao.retryBlockedUntil?.getTime() ?? 0) > Date.now() )}
                 >
                   <Sparkles size={16} />
                   {analisandoId === solicitacao.id
                     ? 'Analisando...'
-                    : solicitacao.analiseJobStatus === 'failed'
+                    : solicitacao.analiseJobStatus === 'failed' || solicitacao.analiseJobStatus === 'blocked' || solicitacao.analiseJobStatus === 'stale'
                       ? 'Tentar novamente'
                       : solicitacao.analisadoPorIA
                         ? 'Reanalisar'

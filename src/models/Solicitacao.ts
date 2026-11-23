@@ -107,6 +107,11 @@ export interface Solicitacao {
   analiseJobStatus?: AnaliseJobState
   analiseJobProgress?: number
   activeAnaliseJobId?: string | null
+  analiseRetryBlockedUntil?: Date | null
+  retryBlockedUntil?: Date | null
+  manualRetryCount?: number
+  analiseErroCodigo?: string | null
+  analiseErroMensagem?: string | null
   relatorioIA?: string
   analisadoPorIA?: boolean
   analisadoEm?: Date
@@ -138,8 +143,6 @@ export interface Solicitacao {
   /** IDs de feedbacks aprovados injetados na última análise. */
   feedbackIdsInjetados?: string[] | null
   documentRagChunkIds?: string[] | null
-  analiseErroMensagem?: string | null
-  analiseErroCodigo?: string | null
   documentosProcessados?: string[] | null
   documentosOmitidos?: string[] | null
   /** Telemetria da última análise (Sprint 9/13). */

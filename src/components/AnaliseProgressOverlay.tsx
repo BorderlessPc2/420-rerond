@@ -28,6 +28,7 @@ export type AnaliseProgressOverlayProps = {
   onDismiss?: () => void
   /** Reabre análise na mesma solicitação após falha. */
   onRetry?: () => void
+  retryCooldownSeconds?: number
 }
 
 type Stage = {
@@ -112,12 +113,13 @@ export default function AnaliseProgressOverlay({
   errorMessage,
   onDismiss,
   onRetry,
+  retryCooldownSeconds = 0,
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
   const [minimized, setMinimized] = useState(false)
   const usesRealJob = Boolean(jobState)
-  const isFailed = jobState === 'failed'
+  const isFailed = jobState === 'failed' || jobState === 'blocked' || jobState === 'stale'
 
   const concessionariaLabel = useMemo(() => {
     if (nomeConcessionaria?.trim()) return nomeConcessionaria.trim()
@@ -135,7 +137,7 @@ export default function AnaliseProgressOverlay({
   }, [jobState, simulatedStageIndex])
 
   const displayPercent = useMemo(() => {
-    if (jobState === 'failed') return 0
+    if (isFailed) return 0
     if (jobState === 'completed') return 100
     if (typeof progress === 'number' && progress > 0) return Math.round(progress)
     return Math.round(simulatedPercent)
@@ -256,7 +258,7 @@ export default function AnaliseProgressOverlay({
         </div>
 
         <h2 id="apo-title" className="apo-title">
-          {isFailed ? 'Falha na análise' : 'Gerando relatório técnico'}
+          {jobState === 'blocked' ? 'Análise bloqueada' : jobState === 'stale' ? 'Análise interrompida' : isFailed ? 'Falha na análise' : 'Gerando relatório técnico'}
         </h2>
         <p className="apo-subtitle">
           Processando <strong title={shortTitle}>{shortTitle}</strong>
@@ -313,7 +315,11 @@ export default function AnaliseProgressOverlay({
 
         <p className="apo-hint">
           {isFailed
-            ? 'Edite a solicitação para ajustar PDFs se necessário e use Tentar novamente na mesma ficha — não é preciso abrir um processo novo.'
+            ? jobState === 'blocked'
+              ? 'Corrija créditos ou billing do provedor e tente novamente manualmente.'
+              : jobState === 'stale'
+                ? 'A execução foi interrompida. Tente novamente manualmente.'
+                : 'Edite a solicitação para ajustar PDFs se necessário e use Tentar novamente na mesma ficha — não é preciso abrir um processo novo.'
             : 'Minimize para navegar pelo sistema. A análise continua em segundo plano.'}
         </p>
 
@@ -327,8 +333,8 @@ export default function AnaliseProgressOverlay({
         {isFailed && (onRetry || onDismiss) && (
           <div className="apo-failed-actions">
             {onRetry && (
-              <button type="button" className="apo-retry" onClick={onRetry}>
-                Tentar novamente
+              <button type="button" className="apo-retry" onClick={onRetry} disabled={retryCooldownSeconds > 0}>
+                {retryCooldownSeconds > 0 ? `Aguarde ${retryCooldownSeconds}s` : 'Tentar novamente'}
               </button>
             )}
             {onDismiss && (

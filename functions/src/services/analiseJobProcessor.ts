@@ -83,6 +83,9 @@ import {
 import { verificarEvidencias } from "./pipeline/evidenceVerifier";
 import { sanitizeForFirestore } from "./firestoreSanitizer";
 import { allocateContextBudget } from "./contextSelection/contextBudget";
+import { classifyAnalysisError } from "./analysisPolicy";
+import { finalizeAnalysisJob } from "./analysisJobFinalizers";
+import { providerCall } from "./providerCall";
 
 export type AnaliseJobState =
   | "uploaded"
@@ -143,12 +146,14 @@ async function updateJob(
     progress,
     stage,
     updatedAt: FieldValue.serverTimestamp(),
+    heartbeatAt: FieldValue.serverTimestamp(),
     ...extra,
   });
   await jobRef.update(payload);
   await solicitacaoRef.update(sanitizeForFirestore({
     analiseJobStatus: state,
     analiseJobProgress: progress,
+    heartbeatAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }));
 }
@@ -531,6 +536,8 @@ function parseAIResponse(raw: string) {
 
 async function inferTipoRelatorio(
   pdfBuffers: Array<{ filename: string; buffer: Buffer }>,
+  jobRef: DocumentReference,
+  solicitacaoRef: DocumentReference,
 ): Promise<TipoRelatorio> {
   const parts: InputPart[] = [];
   for (const pdf of pdfBuffers.slice(0, 2)) {
@@ -538,11 +545,11 @@ async function inferTipoRelatorio(
   }
   parts.push(buildTextInput(buildInferTipoPrompt()));
   const result = await withRetry(
-    () => analyze(parts, { maxOutputTokens: 50, temperature: 0 }),
+    () => providerCall({ jobRef, solicitacaoRef, parts, options: { maxOutputTokens: 50, temperature: 0 } }),
     {
       maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
       baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-      isRetryable: isLikelyRateLimitError,
+      isRetryable: (error) => classifyAnalysisError(error).retryable,
     },
   );
   const inferred = result.content.trim().toLowerCase();
@@ -681,7 +688,7 @@ export async function runAnaliseJob(params: {
     if (isValidTipo(data.tipoRelatorio)) {
       tipoBase = data.tipoRelatorio;
     } else if (pdfBuffersLimited.length > 0) {
-      tipoBase = await inferTipoRelatorio(pdfBuffersLimited);
+      tipoBase = await inferTipoRelatorio(pdfBuffersLimited, jobRef, solicitacaoRef);
     } else {
       tipoBase = perfilFirestore?.tipoProjetoPadrao ?? "pit";
     }
@@ -1167,16 +1174,16 @@ export async function runAnaliseJob(params: {
 
     const runAnalyzeCall = async (parts: InputPart[]) =>
       withRetry(
-        () =>
-          analyze(parts, {
-            maxOutputTokens: maxOut,
-            temperature: 0.1,
-            jsonMode: true,
-          }),
+        () => providerCall({
+          jobRef,
+          solicitacaoRef,
+          parts,
+          options: { maxOutputTokens: maxOut, temperature: 0.1, jsonMode: true },
+        }),
         {
           maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
           baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-          isRetryable: isLikelyRateLimitError,
+          isRetryable: (error) => classifyAnalysisError(error).retryable,
         },
       );
 
@@ -1433,15 +1440,16 @@ export async function runAnaliseJob(params: {
           summarizeChecklistForSynthesis(mergedChecklist),
         );
         const synth = await withRetry(
-          () =>
-            analyze([buildTextInput(synthPrompt)], {
-              maxOutputTokens: Math.min(maxOut, 12000),
-              temperature: 0.1,
-            }),
+          () => providerCall({
+            jobRef,
+            solicitacaoRef,
+            parts: [buildTextInput(synthPrompt)],
+            options: { maxOutputTokens: Math.min(maxOut, 12000), temperature: 0.1 },
+          }),
           {
             maxAttempts: 4,
             baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-            isRetryable: isLikelyRateLimitError,
+            isRetryable: (error) => classifyAnalysisError(error).retryable,
           },
         );
         const synthesized = synth.content?.trim();
@@ -1633,50 +1641,24 @@ export async function runAnaliseJob(params: {
       updatedAt: FieldValue.serverTimestamp(),
     }));
 
-    await jobRef.update(sanitizeForFirestore({
+    await finalizeAnalysisJob({
+      jobRef,
+      solicitacaoRef,
+      jobId: params.jobId,
       state: "completed",
       progress: 100,
-      stage: "final",
-      telemetry,
-      evidenceVerification,
-      documentRagChunkIds,
-      completedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }));
+      resultFields: {
+        analiseTelemetry: telemetry,
+        evidenceVerification,
+        documentRagChunkIds,
+      },
+    });
   } catch (error: unknown) {
-    const rawMessage = error instanceof Error ? error.message : "Erro desconhecido na análise.";
     console.error(`Job ${params.jobId} falhou:`, error);
 
-    const lower = rawMessage.toLowerCase();
-    let code = "analysis_failed";
-    let message = rawMessage;
-
-    if (
-      lower.includes("429") ||
-      lower.includes("rate limit") ||
-      lower.includes("too many requests")
-    ) {
-      code = "rate_limit_or_tokens";
-      message =
-        "Limite de processamento/tokens (429). Reduza PDFs em Editar, aguarde e reanalise na mesma solicitação.";
-    } else if (
-      lower.includes("context_length") ||
-      lower.includes("context length") ||
-      lower.includes("maximum context") ||
-      lower.includes("context window") ||
-      (lower.includes("400") && lower.includes("context"))
-    ) {
-      code = "context_window";
-      message =
-        "Volume acima da janela de contexto (400). Envie só os PDFs da fase atual e tente novamente na mesma ficha.";
-    } else if (
-      lower.includes("api key") ||
-      (lower.includes("openai") && lower.includes("key"))
-    ) {
-      code = "missing_api_key";
-      message =
-        "OPENAI_API_KEY ausente/inválida no ambiente das Cloud Functions. Configure o secret e faça o deploy.";
-    }
+    const classified = classifyAnalysisError(error);
+    const code = classified.code;
+    const message = classified.message;
 
     const telemetry: AnaliseTelemetry = {
       durationMs: Date.now() - startedMs,
@@ -1691,25 +1673,15 @@ export async function runAnaliseJob(params: {
       errorCode: code,
     };
 
-    await jobRef.update(sanitizeForFirestore({
+    await finalizeAnalysisJob({
+      jobRef,
+      solicitacaoRef,
+      jobId: params.jobId,
       state: "failed",
       progress: 0,
-      stage: "prep",
       error: { code, message },
-      telemetry,
-      completedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }));
-
-    await solicitacaoRef.update(sanitizeForFirestore({
-      status: "pendente",
-      activeAnaliseJobId: null,
-      analiseJobStatus: "failed",
-      analiseJobProgress: 0,
-      analiseErroCodigo: code,
-      analiseErroMensagem: message,
-      analiseTelemetry: telemetry,
-      updatedAt: FieldValue.serverTimestamp(),
-    }));
+      failure: classified,
+      resultFields: { analiseTelemetry: telemetry },
+    });
   }
 }

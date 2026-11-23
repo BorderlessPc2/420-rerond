@@ -1,8 +1,9 @@
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
 import {
@@ -45,6 +46,8 @@ import {
   getRequisitosFromPerfil,
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
+import { finalizeAnalysisJob } from "./services/analysisJobFinalizers";
+import { JOB_LIMITS, canContinueJob, isJobStale, classifyAnalysisError } from "./services/analysisPolicy";
 import { verificarEvidencias } from "./services/pipeline/evidenceVerifier";
 import { selectDocumentosPorPrioridade } from "./services/pipeline/documentPriority";
 import { sanitizeForFirestore } from "./services/firestoreSanitizer";
@@ -372,6 +375,10 @@ export const analisarSolicitacao = onCall(
     }
 
     const data = snapshot.data()!;
+    const retryBlockedUntil = data.retryBlockedUntil?.toMillis?.() ?? 0;
+    if (retryBlockedUntil > Date.now()) {
+      throw new HttpsError("failed-precondition", `Aguarde ${Math.ceil((retryBlockedUntil - Date.now()) / 1000)} segundos antes de tentar novamente.`);
+    }
     const typeError = validateAnalysisType(
       typeof data.tipoAnaliseId === "string" ? data.tipoAnaliseId : "",
       escopoAnalise.incluirDocumentosProjeto && Array.isArray(data.arquivos) && data.arquivos.length > 0,
@@ -387,10 +394,16 @@ export const analisarSolicitacao = onCall(
       "extracting",
       "analyzing",
       "generating_report",
+      "retry_waiting",
+      "continuation_waiting",
     ]);
 
     if (activeJobId && activeJobStatus && activeStates.has(activeJobStatus)) {
-      return { jobId: activeJobId, solicitacaoId, reused: true };
+      const heartbeatAt = data.heartbeatAt?.toMillis?.() ?? data.updatedAt?.toMillis?.() ?? 0;
+      const deadlineAt = data.deadlineAt?.toMillis?.() ?? 0;
+      if (!isJobStale(activeJobStatus, heartbeatAt) && (!deadlineAt || deadlineAt > Date.now())) {
+        return { jobId: activeJobId, solicitacaoId, reused: true };
+      }
     }
 
     const jobRef = docRef.collection("analiseJobs").doc();
@@ -402,10 +415,28 @@ export const analisarSolicitacao = onCall(
       const currentJobId = currentData.activeAnaliseJobId
         ? String(currentData.activeAnaliseJobId)
         : null;
-      const currentStatus = currentData.analiseJobStatus
+        const currentStatus = currentData.analiseJobStatus
         ? String(currentData.analiseJobStatus)
         : null;
-      if (currentJobId && currentStatus && activeStates.has(currentStatus)) return false;
+      if (currentJobId && currentStatus && activeStates.has(currentStatus)) {
+        const currentJobRef = docRef.collection("analiseJobs").doc(currentJobId);
+        const currentJobSnapshot = await transaction.get(currentJobRef);
+        const currentJob = currentJobSnapshot.data() ?? {};
+        const heartbeatAt = currentJob.heartbeatAt?.toMillis?.() ?? currentJob.updatedAt?.toMillis?.() ?? 0;
+        const deadlineAt = currentJob.deadlineAt?.toMillis?.() ?? 0;
+        const stale = isJobStale(currentStatus, heartbeatAt) || Boolean(deadlineAt && deadlineAt <= Date.now());
+        if (!stale) return false;
+        transaction.update(currentJobRef, sanitizeForFirestore({
+          state: "stale",
+          progress: 0,
+          stage: "stale",
+          error: { code: "job_stale", message: "A análise anterior foi interrompida por falta de atualização dentro do prazo." },
+          failureCategory: deadlineAt && deadlineAt <= Date.now() ? "unknown" : "connection_error",
+          retryable: false,
+          completedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        }));
+      }
 
       transaction.set(jobRef, sanitizeForFirestore({
         id: jobId,
@@ -417,8 +448,21 @@ export const analisarSolicitacao = onCall(
         tiposProjetoPraComparar,
         escopoAnalise,
         createdBy: request.auth!.uid,
+        phase: "initial",
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
+        heartbeatAt: FieldValue.serverTimestamp(),
+        deadlineAt: new Date(Date.now() + JOB_LIMITS.absoluteDeadlineMs),
+        attemptCount: 0,
+        retryCount: 0,
+        continuationCount: 0,
+        providerCallCount: 0,
+        manualRetryCount: 0,
+        maxRetries: JOB_LIMITS.maxRetries,
+        maxContinuations: JOB_LIMITS.maxContinuations,
+        maxProviderCalls: JOB_LIMITS.maxProviderCalls,
+        retryable: true,
+        failureCategory: null,
       }));
       transaction.update(docRef, sanitizeForFirestore({
         activeAnaliseJobId: jobId,
@@ -462,8 +506,15 @@ export const processAnaliseJob = onDocumentCreated(
       if (solicitacaoId && jobId) {
         const jobRef = db.collection(COLLECTION).doc(solicitacaoId).collection("analiseJobs").doc(jobId);
         const solicitacaoRef = db.collection(COLLECTION).doc(solicitacaoId);
-        await jobRef.update({ state: "failed", progress: 0, stage: "prep", error: failure, updatedAt: FieldValue.serverTimestamp() });
-        await solicitacaoRef.update({ activeAnaliseJobId: null, analiseJobStatus: "failed", analiseErroCodigo: failure.code, analiseErroMensagem: failure.message, updatedAt: FieldValue.serverTimestamp() });
+        await finalizeAnalysisJob({
+          jobRef,
+          solicitacaoRef,
+          jobId,
+          state: "failed",
+          progress: 0,
+          error: { code: failure.code, message: failure.message },
+          failure: classifyAnalysisError(failure),
+        });
       }
       return;
     }
@@ -481,6 +532,82 @@ export const processAnaliseJob = onDocumentCreated(
   },
 );
 
+export const watchdogAnaliseJobs = onSchedule(
+  { schedule: "every 1 minutes", region: "southamerica-east1", memory: "256MiB" },
+  async () => {
+    const firestore = getFirestore();
+    const activeStates = ["uploaded", "queued", "extracting", "analyzing", "generating_report", "retry_waiting", "continuation_waiting"];
+    const pageSize = 50;
+    let cursor: QueryDocumentSnapshot | undefined;
+    let hasMore = true;
+    const now = Date.now();
+
+    while (hasMore) {
+      let query = firestore.collectionGroup("analiseJobs")
+        .where("state", "in", activeStates)
+        .orderBy("__name__")
+        .limit(pageSize) as Query;
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      hasMore = snapshot.size === pageSize;
+      cursor = snapshot.docs.at(-1);
+
+      for (const jobSnapshot of snapshot.docs) {
+        const data = jobSnapshot.data();
+        const jobRef = jobSnapshot.ref;
+        const solicitacaoRef = jobRef.parent.parent;
+        if (!solicitacaoRef) continue;
+        const heartbeatAt = data.heartbeatAt?.toMillis?.() ?? data.updatedAt?.toMillis?.() ?? 0;
+        const deadlineAt = data.deadlineAt?.toMillis?.() ?? 0;
+        if (!isJobStale(String(data.state), heartbeatAt, now) && (!deadlineAt || deadlineAt > now)) continue;
+        const reason = deadlineAt && deadlineAt <= now ? "deadline_exceeded" : "heartbeat_timeout";
+        await finalizeAnalysisJob({
+          jobRef,
+          solicitacaoRef,
+          jobId: jobRef.id,
+          state: "stale",
+          progress: 0,
+          error: {
+            code: "job_stale",
+            message: "A análise foi interrompida por falta de atualização dentro do prazo.",
+          },
+          resultFields: { staleReason: reason },
+        });
+      }
+    }
+
+    let solicitationCursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+    let solicitationMore = true;
+    while (solicitationMore) {
+      let query = firestore.collection(COLLECTION).orderBy("updatedAt").limit(pageSize) as Query;
+      if (solicitationCursor) query = query.startAfter(solicitationCursor);
+      const snapshot = await query.get();
+      solicitationMore = snapshot.size === pageSize;
+      solicitationCursor = snapshot.docs.at(-1);
+      for (const solicitationSnapshot of snapshot.docs) {
+        const data = solicitationSnapshot.data();
+        const activeJobId = typeof data.activeAnaliseJobId === "string" ? data.activeAnaliseJobId : "";
+        if (!activeJobId || !activeStates.includes(String(data.analiseJobStatus))) continue;
+        const jobRef = solicitationSnapshot.ref.collection("analiseJobs").doc(activeJobId);
+        const jobSnapshot = await jobRef.get();
+        if (jobSnapshot.exists && activeStates.includes(String(jobSnapshot.data()?.state))) continue;
+        await firestore.runTransaction(async (transaction) => {
+          const current = await transaction.get(solicitationSnapshot.ref);
+          if (current.data()?.activeAnaliseJobId !== activeJobId) return;
+          transaction.update(solicitationSnapshot.ref, {
+            activeAnaliseJobId: null,
+            analiseJobStatus: "stale",
+            analiseJobProgress: 0,
+            analiseErroCodigo: "job_missing",
+            analiseErroMensagem: "A execução anterior não foi encontrada e foi encerrada.",
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        });
+      }
+    }
+  },
+);
+
 export const continueAnaliseJob = onDocumentUpdated(
   {
     document: `${COLLECTION}/{solicitacaoId}/analiseJobs/{jobId}`,
@@ -493,8 +620,18 @@ export const continueAnaliseJob = onDocumentUpdated(
     const before = event.data?.before.data();
     const after = event.data?.after.data();
     if (!before || !after) return;
-    if (before.state === "queued" || after.state !== "queued") return;
-    if (!after.continuation?.requested) return;
+    if (before.continuation?.requested || !after.continuation?.requested) return;
+    if (after.state !== "continuation_waiting" && after.state !== "queued") return;
+    const now = Date.now();
+    const deadlineAt = after.deadlineAt?.toMillis?.() ?? 0;
+    if (isJobStale("continuation_waiting", after.updatedAt?.toMillis?.() ?? now, now) || !canContinueJob({
+      continuationCount: Number(after.continuationCount ?? 0),
+      maxContinuations: Number(after.maxContinuations ?? JOB_LIMITS.maxContinuations),
+      deadlineAtMs: deadlineAt || now,
+      providerCallCount: Number(after.providerCallCount ?? 0),
+      maxProviderCalls: Number(after.maxProviderCalls ?? JOB_LIMITS.maxProviderCalls),
+      retryable: after.retryable !== false,
+    })) return;
 
     const solicitacaoId = String(event.params.solicitacaoId ?? "");
     const jobId = String(event.params.jobId ?? "");
@@ -503,11 +640,33 @@ export const continueAnaliseJob = onDocumentUpdated(
     const claimId = `${jobId}:${Date.now()}`;
     let claimed = false;
     await db.runTransaction(async (transaction) => {
-      const current = await transaction.get(continuationRef);
-      const continuation = current.data()?.continuation as { requested?: boolean; claimId?: string } | undefined;
-      if (!shouldClaimContinuation(undefined, { requested: continuation?.requested, claimId: continuation?.claimId || claimId })) return;
-      if (continuation?.claimId) return;
-      transaction.update(continuationRef, { "continuation.claimId": claimId, updatedAt: FieldValue.serverTimestamp() });
+      const [current, solicitacaoSnapshot] = await Promise.all([
+        transaction.get(continuationRef),
+        transaction.get(db.collection(COLLECTION).doc(solicitacaoId)),
+      ]);
+      const data = current.data() ?? {};
+      const solicitacao = solicitacaoSnapshot.data() ?? {};
+      const continuation = data.continuation as { requested?: boolean; claimId?: string } | undefined;
+      const continuationCount = Number(data.continuationCount ?? 0);
+      const maxContinuations = Number(data.maxContinuations ?? JOB_LIMITS.maxContinuations);
+      const providerCallCount = Number(data.providerCallCount ?? 0);
+      const maxProviderCalls = Number(data.maxProviderCalls ?? JOB_LIMITS.maxProviderCalls);
+      const deadlineAtMs = data.deadlineAt?.toMillis?.() ?? 0;
+      if (
+        !current.exists ||
+        solicitacao.activeAnaliseJobId !== jobId ||
+        continuation?.claimId ||
+        !shouldClaimContinuation(undefined, { requested: continuation?.requested, claimId: claimId }) ||
+        !canContinueJob({ continuationCount, maxContinuations, deadlineAtMs, providerCallCount, maxProviderCalls, retryable: data.retryable !== false })
+      ) return;
+      transaction.update(continuationRef, {
+        state: "analyzing",
+        phase: "continuation",
+        "continuation.claimId": claimId,
+        continuationCount: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+        heartbeatAt: FieldValue.serverTimestamp(),
+      });
       claimed = true;
     });
     if (!claimed) return;
@@ -517,19 +676,14 @@ export const continueAnaliseJob = onDocumentUpdated(
     if (!apiKey) {
       const failure = getMissingApiKeyFailure();
       console.error(failure.message);
-      await continuationRef.update({
+      await finalizeAnalysisJob({
+        jobRef: continuationRef,
+        solicitacaoRef: db.collection(COLLECTION).doc(solicitacaoId),
+        jobId,
         state: "failed",
         progress: 0,
-        stage: "continuation",
-        error: failure,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      await db.collection(COLLECTION).doc(solicitacaoId).update({
-        activeAnaliseJobId: null,
-        analiseJobStatus: "failed",
-        analiseErroCodigo: failure.code,
-        analiseErroMensagem: failure.message,
-        updatedAt: FieldValue.serverTimestamp(),
+        error: { code: failure.code, message: failure.message },
+        failure: classifyAnalysisError(failure),
       });
       return;
     }

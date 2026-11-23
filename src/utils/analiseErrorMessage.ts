@@ -35,6 +35,14 @@ export function humanizeAnaliseErrorMessage(raw: string | null | undefined): str
     )
   }
 
+  if (lower.includes('insufficient_credits') || lower.includes('insufficient credits') || lower.includes('saldo') || lower.includes('crédito')) {
+    return 'A análise foi bloqueada porque o provedor de IA está sem créditos ou saldo disponível. Configure o ambiente antes de tentar novamente.'
+  }
+
+  if (lower.includes('billing') || lower.includes('quota') || lower.includes('payment required')) {
+    return 'A análise foi bloqueada porque a cota ou o billing do provedor de IA está indisponível. Configure o ambiente antes de tentar novamente.'
+  }
+
   if (lower.includes('openai') && (lower.includes('key') || lower.includes('api'))) {
     return (
       'Chave OpenAI ausente ou inválida no ambiente. ' +

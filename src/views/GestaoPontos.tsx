@@ -40,6 +40,7 @@ export default function GestaoPontos() {
   const [vinculoEmLote, setVinculoEmLote] = useState('')
   const [vinculando, setVinculando] = useState(false)
   const [painel, setPainel] = useState<{ ponto: Ponto; tab: PontoPainelTab } | null>(null)
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false)
 
   const painelPonto = painel ? pontos.find((item) => item.id === painel.ponto.id) ?? painel.ponto : null
   const requestedPointId = searchParams.get('ponto')
@@ -151,12 +152,24 @@ export default function GestaoPontos() {
           Novo ponto
         </button>
       </div>
-      <div className="gestao-list-controls">
-        <label>
-          Busca
-          <input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} />
-        </label>
-        <SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemPonto)} options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]} />
+      <div className="gestao-point-filter-head">
+        <div>
+          <span className="gestao-eyebrow">Localizar pontos</span>
+          <strong>{busca ? `Resultados para “${busca}”` : 'Use busca e ordenação para encontrar um ponto'}</strong>
+        </div>
+        <button type="button" className="gestao-button-secondary gestao-filter-toggle" aria-expanded={filtrosAbertos} aria-controls="gestao-pontos-filtros" onClick={() => setFiltrosAbertos((aberto) => !aberto)}>
+          {filtrosAbertos ? 'Ocultar filtros' : 'Abrir filtros'}
+          <span aria-hidden="true">{filtrosAbertos ? '⌃' : '⌄'}</span>
+        </button>
+      </div>
+      <div id="gestao-pontos-filtros" className={`gestao-point-filters${filtrosAbertos ? ' is-open' : ''}`} aria-hidden={!filtrosAbertos}>
+        <div className="gestao-list-controls">
+          <label>
+            Busca
+            <input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} tabIndex={filtrosAbertos ? 0 : -1} />
+          </label>
+          <SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemPonto)} options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]} />
+        </div>
       </div>
       {selecionados.length > 0 && (
         <div className="gestao-bulk-bar">
@@ -252,9 +265,13 @@ export default function GestaoPontos() {
       {pontosLista.length ? (
         <>
         <div className="gestao-list-controls">
-          <label className="gestao-point-check">
+          <label className="gestao-point-check gestao-select-all">
             <input type="checkbox" checked={todosSelecionados} onChange={alternarTodos} />
-            Selecionar pontos visíveis
+            <span className="gestao-checkbox-icon" aria-hidden="true" />
+            <span>
+              <strong>{todosSelecionados ? 'Todos os pontos visíveis selecionados' : 'Selecionar todos os pontos visíveis'}</strong>
+              <small>{idsVisiveis.length} {idsVisiveis.length === 1 ? 'ponto disponível' : 'pontos disponíveis'}</small>
+            </span>
           </label>
         </div>
         <ul className="gestao-point-list">
@@ -265,6 +282,7 @@ export default function GestaoPontos() {
               <li className={`gestao-point-row${selecionados.includes(p.id) ? ' is-selected' : ''}`} key={p.id}>
                 <label className="gestao-point-check">
                   <input type="checkbox" checked={selecionados.includes(p.id)} aria-label={`Selecionar ponto ${p.codigo}`} onChange={() => alternarPonto(p.id)} />
+                  <span className="gestao-checkbox-icon" aria-hidden="true" />
                 </label>
                 <div className="gestao-point-row-meta">
                   <strong>{p.codigo}</strong>
