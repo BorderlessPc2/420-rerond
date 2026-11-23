@@ -3,7 +3,7 @@
   "private": true,
   "main": "lib/index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "copy-assets": "node -e \"require('fs').cpSync('src/config','lib/config',{recursive:true})\"",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "firebase-admin": "^13.9.0",
-    "firebase-functions": "^6.3.2",
+    "firebase-functions": "^7.4.0",
     "openai": "^6.37.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5"

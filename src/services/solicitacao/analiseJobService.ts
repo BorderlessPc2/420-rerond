@@ -48,6 +48,17 @@ const parseJob = (
   startedAt: toDate(raw.startedAt),
   completedAt: toDate(raw.completedAt),
   updatedAt: toDate(raw.updatedAt),
+  heartbeatAt: toDate(raw.heartbeatAt),
+  deadlineAt: toDate(raw.deadlineAt),
+  phase: raw.phase === 'continuation' || raw.phase === 'retry' ? raw.phase : 'initial',
+  failureCategory: raw.failureCategory ? String(raw.failureCategory) : null,
+  retryable: typeof raw.retryable === 'boolean' ? raw.retryable : undefined,
+  attemptCount: typeof raw.attemptCount === 'number' ? raw.attemptCount : undefined,
+  retryCount: typeof raw.retryCount === 'number' ? raw.retryCount : undefined,
+  continuationCount: typeof raw.continuationCount === 'number' ? raw.continuationCount : undefined,
+  providerCallCount: typeof raw.providerCallCount === 'number' ? raw.providerCallCount : undefined,
+  retryBlockedUntil: toDate(raw.retryBlockedUntil),
+  manualRetryCount: typeof raw.manualRetryCount === 'number' ? raw.manualRetryCount : undefined,
 })
 
 export async function enqueueAnaliseJob(params: {

@@ -318,6 +318,11 @@ app.post(
   "/api/solicitacoes/:id/analisar",
   uploadPDFs.array("novosPDFs"),
   async (req, res) => {
+    if (process.env.DISABLE_LEGACY_ANALYSIS_ENDPOINT !== "false") {
+      console.warn("legacy_analysis_endpoint_called", { path: req.path });
+      res.status(410).json({ error: "Endpoint legado desativado. Use Cloud Functions: analisarSolicitacao." });
+      return;
+    }
     try {
       const { id } = req.params;
       const promptCustomizado = req.body.promptCustomizado;

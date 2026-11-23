@@ -23,6 +23,9 @@ const goldenCaseService_1 = require("./goldenCaseService");
 const evidenceVerifier_1 = require("./pipeline/evidenceVerifier");
 const firestoreSanitizer_1 = require("./firestoreSanitizer");
 const contextBudget_1 = require("./contextSelection/contextBudget");
+const analysisPolicy_1 = require("./analysisPolicy");
+const analysisJobFinalizers_1 = require("./analysisJobFinalizers");
+const providerCall_1 = require("./providerCall");
 const MAX_PDFS_PROJETO = 18;
 const MAX_PDF_SIZE_BYTES = 35 * 1024 * 1024;
 /** Orcamento por lote de PDFs do projeto (folga para normas/perfil e limite de tokens). */
@@ -56,12 +59,14 @@ async function updateJob(jobRef, solicitacaoRef, state, progress, stage, extra =
         progress,
         stage,
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        heartbeatAt: firestore_1.FieldValue.serverTimestamp(),
         ...extra,
     });
     await jobRef.update(payload);
     await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
         analiseJobStatus: state,
         analiseJobProgress: progress,
+        heartbeatAt: firestore_1.FieldValue.serverTimestamp(),
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
     }));
 }
@@ -372,16 +377,16 @@ function parseAIResponse(raw) {
     }
     throw new Error("A IA retornou texto em vez de JSON estruturado.");
 }
-async function inferTipoRelatorio(pdfBuffers) {
+async function inferTipoRelatorio(pdfBuffers, jobRef, solicitacaoRef) {
     const parts = [];
     for (const pdf of pdfBuffers.slice(0, 2)) {
         parts.push((0, openaiService_1.buildFileInput)(pdf.filename, pdf.buffer));
     }
     parts.push((0, openaiService_1.buildTextInput)((0, prompts_1.buildInferTipoPrompt)()));
-    const result = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, { maxOutputTokens: 50, temperature: 0 }), {
+    const result = await (0, pipeline_1.withRetry)(() => (0, providerCall_1.providerCall)({ jobRef, solicitacaoRef, parts, options: { maxOutputTokens: 50, temperature: 0 } }), {
         maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
         baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-        isRetryable: pipeline_1.isLikelyRateLimitError,
+        isRetryable: (error) => (0, analysisPolicy_1.classifyAnalysisError)(error).retryable,
     });
     const inferred = result.content.trim().toLowerCase();
     if (isValidTipo(inferred))
@@ -496,7 +501,7 @@ async function runAnaliseJob(params) {
             tipoBase = data.tipoRelatorio;
         }
         else if (pdfBuffersLimited.length > 0) {
-            tipoBase = await inferTipoRelatorio(pdfBuffersLimited);
+            tipoBase = await inferTipoRelatorio(pdfBuffersLimited, jobRef, solicitacaoRef);
         }
         else {
             tipoBase = perfilFirestore?.tipoProjetoPadrao ?? "pit";
@@ -881,14 +886,15 @@ async function runAnaliseJob(params) {
                     parts.push((0, openaiService_1.buildTextInput)(partLabel));
             }
         };
-        const runAnalyzeCall = async (parts) => (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)(parts, {
-            maxOutputTokens: maxOut,
-            temperature: 0.1,
-            jsonMode: true,
+        const runAnalyzeCall = async (parts) => (0, pipeline_1.withRetry)(() => (0, providerCall_1.providerCall)({
+            jobRef,
+            solicitacaoRef,
+            parts,
+            options: { maxOutputTokens: maxOut, temperature: 0.1, jsonMode: true },
         }), {
             maxAttempts: ANALYSIS_RETRY_MAX_ATTEMPTS,
             baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-            isRetryable: pipeline_1.isLikelyRateLimitError,
+            isRetryable: (error) => (0, analysisPolicy_1.classifyAnalysisError)(error).retryable,
         });
         /**
          * Analisa um conjunto de PDFs. Se estourar contexto, fatia novamente e
@@ -1086,13 +1092,15 @@ async function runAnaliseJob(params) {
         if (batchResults.length > 1 && escopoAnalise.gerarParecerTecnico) {
             try {
                 const synthPrompt = (0, pipeline_1.buildSynthesizeParecerPrompt)(batchResults.map((b) => ({ filenames: b.filenames, parecer: b.parecerTecnico })), (0, pipeline_1.summarizeChecklistForSynthesis)(mergedChecklist));
-                const synth = await (0, pipeline_1.withRetry)(() => (0, openaiService_1.analyze)([(0, openaiService_1.buildTextInput)(synthPrompt)], {
-                    maxOutputTokens: Math.min(maxOut, 12000),
-                    temperature: 0.1,
+                const synth = await (0, pipeline_1.withRetry)(() => (0, providerCall_1.providerCall)({
+                    jobRef,
+                    solicitacaoRef,
+                    parts: [(0, openaiService_1.buildTextInput)(synthPrompt)],
+                    options: { maxOutputTokens: Math.min(maxOut, 12000), temperature: 0.1 },
                 }), {
                     maxAttempts: 4,
                     baseDelayMs: ANALYSIS_RETRY_BASE_DELAY_MS,
-                    isRetryable: pipeline_1.isLikelyRateLimitError,
+                    isRetryable: (error) => (0, analysisPolicy_1.classifyAnalysisError)(error).retryable,
                 });
                 const synthesized = synth.content?.trim();
                 if (synthesized && synthesized.length > 80) {
@@ -1248,45 +1256,24 @@ async function runAnaliseJob(params) {
                 : { assertividadeScore: firestore_1.FieldValue.delete() }),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         }));
-        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
+        await (0, analysisJobFinalizers_1.finalizeAnalysisJob)({
+            jobRef,
+            solicitacaoRef,
+            jobId: params.jobId,
             state: "completed",
             progress: 100,
-            stage: "final",
-            telemetry,
-            evidenceVerification,
-            documentRagChunkIds,
-            completedAt: firestore_1.FieldValue.serverTimestamp(),
-            updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        }));
+            resultFields: {
+                analiseTelemetry: telemetry,
+                evidenceVerification,
+                documentRagChunkIds,
+            },
+        });
     }
     catch (error) {
-        const rawMessage = error instanceof Error ? error.message : "Erro desconhecido na análise.";
         console.error(`Job ${params.jobId} falhou:`, error);
-        const lower = rawMessage.toLowerCase();
-        let code = "analysis_failed";
-        let message = rawMessage;
-        if (lower.includes("429") ||
-            lower.includes("rate limit") ||
-            lower.includes("too many requests")) {
-            code = "rate_limit_or_tokens";
-            message =
-                "Limite de processamento/tokens (429). Reduza PDFs em Editar, aguarde e reanalise na mesma solicitação.";
-        }
-        else if (lower.includes("context_length") ||
-            lower.includes("context length") ||
-            lower.includes("maximum context") ||
-            lower.includes("context window") ||
-            (lower.includes("400") && lower.includes("context"))) {
-            code = "context_window";
-            message =
-                "Volume acima da janela de contexto (400). Envie só os PDFs da fase atual e tente novamente na mesma ficha.";
-        }
-        else if (lower.includes("api key") ||
-            (lower.includes("openai") && lower.includes("key"))) {
-            code = "missing_api_key";
-            message =
-                "OPENAI_API_KEY ausente/inválida no ambiente das Cloud Functions. Configure o secret e faça o deploy.";
-        }
+        const classified = (0, analysisPolicy_1.classifyAnalysisError)(error);
+        const code = classified.code;
+        const message = classified.message;
         const telemetry = {
             durationMs: Date.now() - startedMs,
             totalBytes,
@@ -1299,25 +1286,16 @@ async function runAnaliseJob(params) {
             failedStage: lastStage,
             errorCode: code,
         };
-        await jobRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
+        await (0, analysisJobFinalizers_1.finalizeAnalysisJob)({
+            jobRef,
+            solicitacaoRef,
+            jobId: params.jobId,
             state: "failed",
             progress: 0,
-            stage: "prep",
             error: { code, message },
-            telemetry,
-            completedAt: firestore_1.FieldValue.serverTimestamp(),
-            updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        }));
-        await solicitacaoRef.update((0, firestoreSanitizer_1.sanitizeForFirestore)({
-            status: "pendente",
-            activeAnaliseJobId: null,
-            analiseJobStatus: "failed",
-            analiseJobProgress: 0,
-            analiseErroCodigo: code,
-            analiseErroMensagem: message,
-            analiseTelemetry: telemetry,
-            updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        }));
+            failure: classified,
+            resultFields: { analiseTelemetry: telemetry },
+        });
     }
 }
 //# sourceMappingURL=analiseJobProcessor.js.map
