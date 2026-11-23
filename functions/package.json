@@ -3,7 +3,7 @@
   "private": true,
   "main": "lib/index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "copy-assets": "node -e \"require('fs').cpSync('src/config','lib/config',{recursive:true})\"",
