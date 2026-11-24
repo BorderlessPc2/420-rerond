@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canContinueJob, classifyAnalysisError, getManualRetryDecision, isJobStale } from "./analysisPolicy";
+import { canContinueJob, classifyAnalysisError, getManualRetryDecision, isJobStale, resolveContinuationHalt } from "./analysisPolicy";
 
 describe("analysisPolicy", () => {
   it("não confunde texto comum com erro de crédito", () => {
@@ -58,5 +58,15 @@ describe("analysisPolicy", () => {
     expect(canContinueJob({ ...base, deadlineAtMs: 999 })).toBe(false);
     expect(canContinueJob({ ...base, retryable: false })).toBe(false);
     expect(canContinueJob({ ...base, providerCallCount: 24 })).toBe(false);
+  });
+
+  it("encerra continuação impossível como stale ou blocked", () => {
+    expect(resolveContinuationHalt({ stale: false, deadlineExceeded: false, canContinue: true })).toBeNull();
+    expect(resolveContinuationHalt({ stale: true, deadlineExceeded: false, canContinue: true })?.state).toBe("stale");
+    expect(resolveContinuationHalt({ stale: false, deadlineExceeded: true, canContinue: false })?.state).toBe("stale");
+    expect(resolveContinuationHalt({ stale: false, deadlineExceeded: false, canContinue: false })).toMatchObject({
+      state: "blocked",
+      code: "continuation_limit",
+    });
   });
 });

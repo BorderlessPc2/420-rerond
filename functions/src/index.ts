@@ -47,7 +47,7 @@ import {
 } from "./services/concessionariaPerfilService";
 import { runAnaliseJob } from "./services/analiseJobProcessor";
 import { finalizeAnalysisJob } from "./services/analysisJobFinalizers";
-import { JOB_LIMITS, canContinueJob, isJobStale, classifyAnalysisError } from "./services/analysisPolicy";
+import { JOB_LIMITS, canContinueJob, isJobStale, classifyAnalysisError, resolveContinuationHalt } from "./services/analysisPolicy";
 import { verificarEvidencias } from "./services/pipeline/evidenceVerifier";
 import { selectDocumentosPorPrioridade } from "./services/pipeline/documentPriority";
 import { sanitizeForFirestore } from "./services/firestoreSanitizer";
@@ -579,7 +579,7 @@ export const watchdogAnaliseJobs = onSchedule(
     let solicitationCursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
     let solicitationMore = true;
     while (solicitationMore) {
-      let query = firestore.collection(COLLECTION).orderBy("updatedAt").limit(pageSize) as Query;
+      let query = firestore.collection(COLLECTION).orderBy("__name__").limit(pageSize) as Query;
       if (solicitationCursor) query = query.startAfter(solicitationCursor);
       const snapshot = await query.get();
       solicitationMore = snapshot.size === pageSize;
@@ -624,19 +624,34 @@ export const continueAnaliseJob = onDocumentUpdated(
     if (after.state !== "continuation_waiting" && after.state !== "queued") return;
     const now = Date.now();
     const deadlineAt = after.deadlineAt?.toMillis?.() ?? 0;
-    if (isJobStale("continuation_waiting", after.updatedAt?.toMillis?.() ?? now, now) || !canContinueJob({
-      continuationCount: Number(after.continuationCount ?? 0),
-      maxContinuations: Number(after.maxContinuations ?? JOB_LIMITS.maxContinuations),
-      deadlineAtMs: deadlineAt || now,
-      providerCallCount: Number(after.providerCallCount ?? 0),
-      maxProviderCalls: Number(after.maxProviderCalls ?? JOB_LIMITS.maxProviderCalls),
-      retryable: after.retryable !== false,
-    })) return;
-
     const solicitacaoId = String(event.params.solicitacaoId ?? "");
     const jobId = String(event.params.jobId ?? "");
     if (!solicitacaoId || !jobId) return;
     const continuationRef = db.collection(COLLECTION).doc(solicitacaoId).collection("analiseJobs").doc(jobId);
+    const solicitacaoRef = db.collection(COLLECTION).doc(solicitacaoId);
+    const halt = resolveContinuationHalt({
+      stale: isJobStale("continuation_waiting", after.updatedAt?.toMillis?.() ?? now, now),
+      deadlineExceeded: Boolean(deadlineAt && deadlineAt <= now),
+      canContinue: canContinueJob({
+        continuationCount: Number(after.continuationCount ?? 0),
+        maxContinuations: Number(after.maxContinuations ?? JOB_LIMITS.maxContinuations),
+        deadlineAtMs: deadlineAt || now,
+        providerCallCount: Number(after.providerCallCount ?? 0),
+        maxProviderCalls: Number(after.maxProviderCalls ?? JOB_LIMITS.maxProviderCalls),
+        retryable: after.retryable !== false,
+      }),
+    });
+    if (halt) {
+      await finalizeAnalysisJob({
+        jobRef: continuationRef,
+        solicitacaoRef,
+        jobId,
+        state: halt.state,
+        progress: 0,
+        error: { code: halt.code, message: halt.message },
+      });
+      return;
+    }
     const claimId = `${jobId}:${Date.now()}`;
     let claimed = false;
     await db.runTransaction(async (transaction) => {

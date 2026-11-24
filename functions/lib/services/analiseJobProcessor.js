@@ -24,6 +24,7 @@ const evidenceVerifier_1 = require("./pipeline/evidenceVerifier");
 const firestoreSanitizer_1 = require("./firestoreSanitizer");
 const contextBudget_1 = require("./contextSelection/contextBudget");
 const analysisPolicy_1 = require("./analysisPolicy");
+const jobGuards_1 = require("./jobGuards");
 const analysisJobFinalizers_1 = require("./analysisJobFinalizers");
 const providerCall_1 = require("./providerCall");
 const MAX_PDFS_PROJETO = 18;
@@ -419,7 +420,12 @@ async function runAnaliseJob(params) {
             throw new Error("Job de análise não encontrado.");
         }
         const jobData = jobSnap.data();
-        if (jobData.state !== "queued") {
+        const continuation = jobData.continuation;
+        if (!(0, jobGuards_1.canStartAnaliseJob)({
+            state: typeof jobData.state === "string" ? jobData.state : undefined,
+            phase: typeof jobData.phase === "string" ? jobData.phase : undefined,
+            continuation,
+        })) {
             console.log(`Job ${params.jobId} ignorado (state=${jobData.state})`);
             return;
         }

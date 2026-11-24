@@ -48,6 +48,28 @@ export function isJobStale(state: string, heartbeatAtMs: number, nowMs = Date.no
   return Boolean(limits[state] && nowMs - heartbeatAtMs > limits[state]);
 }
 
+export function resolveContinuationHalt(params: {
+  stale: boolean
+  deadlineExceeded: boolean
+  canContinue: boolean
+}): { state: "stale" | "blocked"; code: string; message: string } | null {
+  if (params.stale || params.deadlineExceeded) {
+    return {
+      state: "stale",
+      code: "job_stale",
+      message: "A análise foi interrompida por falta de atualização dentro do prazo.",
+    }
+  }
+  if (!params.canContinue) {
+    return {
+      state: "blocked",
+      code: "continuation_limit",
+      message: "A análise não pôde continuar porque atingiu o limite de tempo ou de chamadas ao provedor.",
+    }
+  }
+  return null
+}
+
 export function canContinueJob(params: { continuationCount: number; maxContinuations: number; deadlineAtMs: number; nowMs?: number; providerCallCount: number; maxProviderCalls: number; retryable: boolean }): boolean {
   const now = params.nowMs ?? Date.now();
   return params.continuationCount < params.maxContinuations && params.deadlineAtMs > now && params.providerCallCount < params.maxProviderCalls && params.retryable;
