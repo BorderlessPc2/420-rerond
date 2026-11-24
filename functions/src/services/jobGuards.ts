@@ -29,3 +29,14 @@ export function shouldClaimContinuation(
 ): boolean {
   return Boolean(after?.requested && !before?.claimId && after.claimId)
 }
+
+export function canStartAnaliseJob(job: {
+  state?: string
+  phase?: string
+  continuation?: { claimId?: string } | null
+}): boolean {
+  if (job.state === "queued") return true
+  return job.state === "analyzing"
+    && job.phase === "continuation"
+    && Boolean(job.continuation?.claimId)
+}

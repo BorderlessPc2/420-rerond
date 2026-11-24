@@ -84,6 +84,7 @@ import { verificarEvidencias } from "./pipeline/evidenceVerifier";
 import { sanitizeForFirestore } from "./firestoreSanitizer";
 import { allocateContextBudget } from "./contextSelection/contextBudget";
 import { classifyAnalysisError } from "./analysisPolicy";
+import { canStartAnaliseJob } from "./jobGuards";
 import { finalizeAnalysisJob } from "./analysisJobFinalizers";
 import { providerCall } from "./providerCall";
 
@@ -587,7 +588,12 @@ export async function runAnaliseJob(params: {
       throw new Error("Job de análise não encontrado.");
     }
     const jobData = jobSnap.data()!;
-    if (jobData.state !== "queued") {
+    const continuation = jobData.continuation as { claimId?: string } | undefined;
+    if (!canStartAnaliseJob({
+      state: typeof jobData.state === "string" ? jobData.state : undefined,
+      phase: typeof jobData.phase === "string" ? jobData.phase : undefined,
+      continuation,
+    })) {
       console.log(`Job ${params.jobId} ignorado (state=${jobData.state})`);
       return;
     }

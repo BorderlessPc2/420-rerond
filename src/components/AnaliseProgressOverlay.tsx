@@ -315,7 +315,7 @@ export default function AnaliseProgressOverlay({
 
         <p className="apo-hint">
           {isFailed
-            ? jobState === 'blocked'
+            ? jobState === 'blocked' && /cr[eé]dito|billing|cota/i.test(errorMessage ?? '')
               ? 'Corrija créditos ou billing do provedor e tente novamente manualmente.'
               : jobState === 'stale'
                 ? 'A execução foi interrompida. Tente novamente manualmente.'

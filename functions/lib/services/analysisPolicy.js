@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.JOB_LIMITS = void 0;
 exports.classifyAnalysisError = classifyAnalysisError;
 exports.isJobStale = isJobStale;
+exports.resolveContinuationHalt = resolveContinuationHalt;
 exports.canContinueJob = canContinueJob;
 exports.canRetryAnalysis = canRetryAnalysis;
 exports.shouldSplitAnalysis = shouldSplitAnalysis;
@@ -53,6 +54,23 @@ function classifyAnalysisError(error) {
 function isJobStale(state, heartbeatAtMs, nowMs = Date.now()) {
     const limits = { uploaded: exports.JOB_LIMITS.uploadedMs, queued: exports.JOB_LIMITS.queuedMs, extracting: exports.JOB_LIMITS.extractingMs, analyzing: exports.JOB_LIMITS.analyzingMs, generating_report: exports.JOB_LIMITS.generatingReportMs, retry_waiting: exports.JOB_LIMITS.queuedMs, continuation_waiting: exports.JOB_LIMITS.queuedMs };
     return Boolean(limits[state] && nowMs - heartbeatAtMs > limits[state]);
+}
+function resolveContinuationHalt(params) {
+    if (params.stale || params.deadlineExceeded) {
+        return {
+            state: "stale",
+            code: "job_stale",
+            message: "A análise foi interrompida por falta de atualização dentro do prazo.",
+        };
+    }
+    if (!params.canContinue) {
+        return {
+            state: "blocked",
+            code: "continuation_limit",
+            message: "A análise não pôde continuar porque atingiu o limite de tempo ou de chamadas ao provedor.",
+        };
+    }
+    return null;
 }
 function canContinueJob(params) {
     const now = params.nowMs ?? Date.now();

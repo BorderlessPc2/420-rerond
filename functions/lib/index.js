@@ -435,7 +435,7 @@ exports.watchdogAnaliseJobs = (0, scheduler_1.onSchedule)({ schedule: "every 1 m
     let solicitationCursor;
     let solicitationMore = true;
     while (solicitationMore) {
-        let query = firestore.collection(COLLECTION).orderBy("updatedAt").limit(pageSize);
+        let query = firestore.collection(COLLECTION).orderBy("__name__").limit(pageSize);
         if (solicitationCursor)
             query = query.startAfter(solicitationCursor);
         const snapshot = await query.get();
@@ -483,20 +483,35 @@ exports.continueAnaliseJob = (0, firestore_2.onDocumentUpdated)({
         return;
     const now = Date.now();
     const deadlineAt = after.deadlineAt?.toMillis?.() ?? 0;
-    if ((0, analysisPolicy_1.isJobStale)("continuation_waiting", after.updatedAt?.toMillis?.() ?? now, now) || !(0, analysisPolicy_1.canContinueJob)({
-        continuationCount: Number(after.continuationCount ?? 0),
-        maxContinuations: Number(after.maxContinuations ?? analysisPolicy_1.JOB_LIMITS.maxContinuations),
-        deadlineAtMs: deadlineAt || now,
-        providerCallCount: Number(after.providerCallCount ?? 0),
-        maxProviderCalls: Number(after.maxProviderCalls ?? analysisPolicy_1.JOB_LIMITS.maxProviderCalls),
-        retryable: after.retryable !== false,
-    }))
-        return;
     const solicitacaoId = String(event.params.solicitacaoId ?? "");
     const jobId = String(event.params.jobId ?? "");
     if (!solicitacaoId || !jobId)
         return;
     const continuationRef = db.collection(COLLECTION).doc(solicitacaoId).collection("analiseJobs").doc(jobId);
+    const solicitacaoRef = db.collection(COLLECTION).doc(solicitacaoId);
+    const halt = (0, analysisPolicy_1.resolveContinuationHalt)({
+        stale: (0, analysisPolicy_1.isJobStale)("continuation_waiting", after.updatedAt?.toMillis?.() ?? now, now),
+        deadlineExceeded: Boolean(deadlineAt && deadlineAt <= now),
+        canContinue: (0, analysisPolicy_1.canContinueJob)({
+            continuationCount: Number(after.continuationCount ?? 0),
+            maxContinuations: Number(after.maxContinuations ?? analysisPolicy_1.JOB_LIMITS.maxContinuations),
+            deadlineAtMs: deadlineAt || now,
+            providerCallCount: Number(after.providerCallCount ?? 0),
+            maxProviderCalls: Number(after.maxProviderCalls ?? analysisPolicy_1.JOB_LIMITS.maxProviderCalls),
+            retryable: after.retryable !== false,
+        }),
+    });
+    if (halt) {
+        await (0, analysisJobFinalizers_1.finalizeAnalysisJob)({
+            jobRef: continuationRef,
+            solicitacaoRef,
+            jobId,
+            state: halt.state,
+            progress: 0,
+            error: { code: halt.code, message: halt.message },
+        });
+        return;
+    }
     const claimId = `${jobId}:${Date.now()}`;
     let claimed = false;
     await db.runTransaction(async (transaction) => {
