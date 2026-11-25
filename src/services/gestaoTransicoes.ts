@@ -1,4 +1,6 @@
 import type { Etapa, Ponto, Situacao } from './gestaoContratos'
+import { isFormatoStatusCustom, isStatusPadrao } from './gestaoStatusCatalogo'
+import type { StatusPersonalizado } from './gestaoStatusCatalogo'
 
 /** Ordem operacional das etapas — avanço permitido; retrocesso bloqueado em `validarTransicao`. */
 export const ETAPAS_ORDEM: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
@@ -18,22 +20,31 @@ export type IntencaoTransicao = 'correcao' | 'paralisacao' | 'avancar_etapa' | '
 export type DescricaoTransicao = {
   valido: boolean
   erro: string | null
-  de: { etapa: Etapa; status: Situacao }
-  para: { etapa: Etapa; status: Situacao }
+  de: { etapa: Etapa; status: Situacao | string }
+  para: { etapa: Etapa; status: Situacao | string }
   requerObservacao: boolean
   pontosSemResultado: number
 }
 
 export type SituacaoAlcancavel = {
-  situacao: Situacao
+  situacao: Situacao | string
   disponivel: boolean
   motivo: string | null
 }
 
-export function validarCombinacaoEtapaStatus(etapa: Etapa, status: Situacao): string | null {
+export function validarCombinacaoEtapaStatus(
+  etapa: Etapa,
+  status: Situacao | string,
+  _personalizados: StatusPersonalizado[] = [],
+): string | null {
+  if (isFormatoStatusCustom(status)) {
+    if (etapa === 'concluido') return 'Status personalizado não é permitido na etapa concluída.'
+    return null
+  }
   if (etapa === 'concluido' && status !== 'concluido') return 'Etapa concluída exige situação concluída.'
   if (status === 'concluido' && etapa !== 'concluido') return 'Situação concluída exige etapa concluída.'
   if (status === 'nao_iniciado' && etapa !== 'planejamento') return 'Situação não iniciada só combina com etapa planejamento.'
+  if (!isStatusPadrao(status)) return 'Situação inválida.'
   const permitidos = COMBINACOES_ETAPA_STATUS[etapa]
   if (!permitidos.includes(status)) return `Situação "${status}" não é permitida na etapa "${etapa}".`
   return null
@@ -49,11 +60,12 @@ export function validarConclusaoProtocolo(pontosVinculados: Pick<Ponto, 'resulta
 
 export function validarTransicao(
   etapaAtual: Etapa,
-  statusAtual: Situacao,
+  statusAtual: Situacao | string,
   etapaNova: Etapa,
-  statusNovo: Situacao,
+  statusNovo: Situacao | string,
   observacao: string,
   pontosVinculados: Pick<Ponto, 'resultado'>[] = [],
+  personalizados: StatusPersonalizado[] = [],
 ): string | null {
   if (['em_correcao', 'paralisado'].includes(statusNovo) && !observacao.trim()) {
     return 'Informe observação para correção ou paralisação.'
@@ -67,7 +79,7 @@ export function validarTransicao(
   if (etapaNova !== etapaAtual && ETAPAS_ORDEM.indexOf(etapaNova) < ETAPAS_ORDEM.indexOf(etapaAtual)) {
     return 'Não é possível retornar para uma etapa anterior.'
   }
-  const combinacao = validarCombinacaoEtapaStatus(etapaNova, statusNovo)
+  const combinacao = validarCombinacaoEtapaStatus(etapaNova, statusNovo, personalizados)
   if (combinacao) return combinacao
   if (etapaNova === 'concluido' && statusNovo === 'concluido') {
     return validarConclusaoProtocolo(pontosVinculados)
@@ -83,38 +95,60 @@ export function listarEtapasPermitidas(etapaAtual: Etapa): Etapa[] {
 
 export function listarSituacoesAlcancaveis(
   etapaAtual: Etapa,
-  statusAtual: Situacao,
+  statusAtual: Situacao | string,
   etapaAlvo: Etapa,
   observacao: string,
   pontosVinculados: Pick<Ponto, 'resultado'>[] = [],
+  personalizados: StatusPersonalizado[] = [],
 ): SituacaoAlcancavel[] {
-  return COMBINACOES_ETAPA_STATUS[etapaAlvo].map((situacao) => ({
+  const padrao = COMBINACOES_ETAPA_STATUS[etapaAlvo].map((situacao) => ({
     situacao,
-    disponivel: !validarTransicao(etapaAtual, statusAtual, etapaAlvo, situacao, observacao, pontosVinculados),
-    motivo: validarTransicao(etapaAtual, statusAtual, etapaAlvo, situacao, observacao, pontosVinculados),
+    disponivel: !validarTransicao(etapaAtual, statusAtual, etapaAlvo, situacao, observacao, pontosVinculados, personalizados),
+    motivo: validarTransicao(etapaAtual, statusAtual, etapaAlvo, situacao, observacao, pontosVinculados, personalizados),
   }))
+  if (etapaAlvo === 'concluido') return padrao
+  const customs = personalizados.map((item) => ({
+    situacao: item.id,
+    disponivel: !validarTransicao(etapaAtual, statusAtual, etapaAlvo, item.id, observacao, pontosVinculados, personalizados),
+    motivo: validarTransicao(etapaAtual, statusAtual, etapaAlvo, item.id, observacao, pontosVinculados, personalizados),
+  }))
+  const merged = [...padrao, ...customs]
+  if (
+    isFormatoStatusCustom(statusAtual) &&
+    !merged.some((item) => item.situacao === statusAtual)
+  ) {
+    const motivo = validarTransicao(etapaAtual, statusAtual, etapaAlvo, statusAtual, observacao, pontosVinculados, personalizados)
+    merged.push({
+      situacao: statusAtual,
+      disponivel: !motivo,
+      motivo,
+    })
+  }
+  return merged
 }
 
 export function motivoTransicaoIndisponivel(
   etapaAtual: Etapa,
-  statusAtual: Situacao,
+  statusAtual: Situacao | string,
   etapaNova: Etapa,
-  statusNovo: Situacao,
+  statusNovo: Situacao | string,
   observacao: string,
   pontosVinculados: Pick<Ponto, 'resultado'>[] = [],
+  personalizados: StatusPersonalizado[] = [],
 ): string | null {
-  return validarTransicao(etapaAtual, statusAtual, etapaNova, statusNovo, observacao, pontosVinculados)
+  return validarTransicao(etapaAtual, statusAtual, etapaNova, statusNovo, observacao, pontosVinculados, personalizados)
 }
 
 export function descreverTransicao(
   etapaAtual: Etapa,
-  statusAtual: Situacao,
+  statusAtual: Situacao | string,
   etapaNova: Etapa,
-  statusNovo: Situacao,
+  statusNovo: Situacao | string,
   observacao: string,
   pontosVinculados: Pick<Ponto, 'resultado'>[] = [],
+  personalizados: StatusPersonalizado[] = [],
 ): DescricaoTransicao {
-  const erro = validarTransicao(etapaAtual, statusAtual, etapaNova, statusNovo, observacao, pontosVinculados)
+  const erro = validarTransicao(etapaAtual, statusAtual, etapaNova, statusNovo, observacao, pontosVinculados, personalizados)
   return {
     valido: !erro,
     erro,
@@ -128,8 +162,8 @@ export function descreverTransicao(
 export function aplicarIntencaoTransicao(
   intencao: IntencaoTransicao,
   etapaAtual: Etapa,
-  statusAtual: Situacao,
-): { etapa: Etapa; status: Situacao } {
+  statusAtual: Situacao | string,
+): { etapa: Etapa; status: Situacao | string } {
   switch (intencao) {
     case 'correcao':
       return { etapa: etapaAtual, status: 'em_correcao' }

@@ -4,11 +4,11 @@ import { nomeGestao } from '../../views/gestaoUi'
 
 type GestaoEtapaStepperProps = {
   etapa: Etapa
-  status: Situacao
+  status: Situacao | string
   pulse?: boolean
 }
 
-const situacaoRingClass = (status: Situacao) => {
+const situacaoRingClass = (status: Situacao | string) => {
   if (status === 'concluido' || status === 'aprovado_concessionaria') return 'gestao-stepper-ring-success'
   if (status === 'em_correcao' || status === 'paralisado') return 'gestao-stepper-ring-danger'
   if (status === 'em_analise' || status === 'aguardando_terceiros') return 'gestao-stepper-ring-warning'

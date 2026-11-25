@@ -6,6 +6,9 @@ import { getContrato, listPontos, listProtocolos, filtrarGestao, indicadoresGest
 import { calcularDashboardGestao } from '../services/gestaoDashboard'
 import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
 import GestaoDashboardCharts from '../components/gestao/GestaoDashboardCharts'
+import GestaoDashboardPersonalizarModal from '../components/gestao/GestaoDashboardPersonalizarModal'
+import { mesclarDashboardConfig, rotuloStatusDashboard } from '../services/gestaoDashboardConfig'
+import { listarStatusContrato } from '../services/gestaoStatusCatalogo'
 import SelectDropdown from '../components/ui/selectDropdown'
 import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import MapaLeaflet from '../components/gestao/MapaLeaflet'
@@ -31,6 +34,7 @@ export default function GestaoContratoDetalhe() {
   const [exportando, setExportando] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
   const [protocoloNoMapa, setProtocoloNoMapa] = useState<string | null>(null)
+  const [personalizarDashboard, setPersonalizarDashboard] = useState(false)
   const filtro = useMemo(() => gestaoFiltroFromSearchParams(searchParams), [searchParams])
   const { estado, concessionaria, rodovia, status, tipo, etapa, inicio, fim, busca } = filtro
   const [buscaDraft, setBuscaDraft] = useState(busca ?? '')
@@ -78,7 +82,14 @@ export default function GestaoContratoDetalhe() {
   const pontosDoProtocoloMapa = protocoloMapa ? filtrado.pontos.filter((ponto) => ponto.protocoloId === protocoloMapa.id) : []
   const abrirProtocoloNoMapa = useCallback((protocolo: Protocolo) => setProtocoloNoMapa(protocolo.id), [])
   const totals = indicadoresGestao(filtrado.protocolos, filtrado.pontos)
-  const dashboard = useMemo(() => calcularDashboardGestao(protocolos, pontos, filtro), [protocolos, pontos, filtro])
+  const dashboardConfig = useMemo(
+    () => mesclarDashboardConfig(contrato?.dashboardConfig, contrato?.statusPersonalizados),
+    [contrato?.dashboardConfig, contrato?.statusPersonalizados],
+  )
+  const dashboard = useMemo(
+    () => calcularDashboardGestao(protocolos, pontos, filtro, contrato?.dashboardConfig, contrato?.statusPersonalizados),
+    [protocolos, pontos, filtro, contrato?.dashboardConfig, contrato?.statusPersonalizados],
+  )
   const exportarRecorte = async () => {
     if (!contrato) return
     setExportando(true)
@@ -92,7 +103,13 @@ export default function GestaoContratoDetalhe() {
       setExportando(false)
     }
   }
-  const statusOpcoes = useMemo(() => [...new Set(protocolos.map((item) => item.status))].sort(), [protocolos])
+  const statusOpcoes = useMemo(() => {
+    const ids = new Set([
+      ...listarStatusContrato(contrato?.statusPersonalizados),
+      ...protocolos.map((item) => item.status),
+    ])
+    return [...ids].sort()
+  }, [protocolos, contrato?.statusPersonalizados])
   const prioridades = resumirPrioridades(filtrado.protocolos)
   const situacao = situacaoOperacional(totals)
   const percentualNoPrazo = totals.protocolos ? Math.max(0, Math.round(((totals.protocolos - totals.atrasados) / totals.protocolos) * 100)) : 0
@@ -132,7 +149,7 @@ export default function GestaoContratoDetalhe() {
         <fieldset>
           <legend>Operação</legend>
           <div className="gestao-overview-fields">
-            <SelectDropdown id="gestao-dashboard-status" label="Status" value={status ?? ''} onChange={(value) => setDashboardParam('status', value)} options={[{ value: '', label: 'Todos' }, ...statusOpcoes.map((item) => ({ value: item, label: nomeGestao(item) }))]} />
+            <SelectDropdown id="gestao-dashboard-status" label="Status" value={status ?? ''} onChange={(value) => setDashboardParam('status', value)} options={[{ value: '', label: 'Todos' }, ...statusOpcoes.map((item) => ({ value: item, label: rotuloStatusDashboard(item, dashboardConfig, contrato.statusPersonalizados) }))]} />
             <SelectDropdown id="gestao-dashboard-tipo" label="Tipo de ponto" value={tipo ?? ''} onChange={(value) => setDashboardParam('tipo', value)} options={[{ value: '', label: 'Todos' }, { value: 'nova_implantacao', label: 'Nova implantação' }, { value: 'regularizacao', label: 'Regularização' }]} />
             <SelectDropdown id="gestao-dashboard-etapa" label="Etapa" value={etapa ?? ''} onChange={(value) => setDashboardParam('etapa', value)} options={[{ value: '', label: 'Todas' }, ...etapasFiltro.map((item) => ({ value: item, label: nomeGestao(item) }))]} />
           </div>
@@ -159,7 +176,7 @@ export default function GestaoContratoDetalhe() {
           <div className="gestao-health-stats">
             <div className="gestao-health-stat"><span>Protocolos</span><strong>{totals.protocolos}</strong><small>{totals.paralisados} {totals.paralisados === 1 ? 'paralisado' : 'paralisados'}</small></div>
             <div className="gestao-health-stat"><span>Pontos</span><strong>{totals.pontos}</strong><small>{totals.realizados} realizados</small></div>
-            <div className="gestao-health-stat gestao-health-stat-success"><span>Entregas</span><strong>{totals.realizados}</strong><small>{totals.previstos} previstas</small></div>
+            <div className="gestao-health-stat gestao-health-stat-success"><span>Entregas</span><strong>{dashboard.previstoRealizado.realizado}</strong><small>{dashboard.previstoRealizado.previsto} previstas</small></div>
           </div>
         </div>
         <div className="gestao-attention">
@@ -174,7 +191,25 @@ export default function GestaoContratoDetalhe() {
         </div>
       </div>
     </section>
-    <GestaoDashboardCharts data={dashboard} />
+    <section className="gestao-dashboard-tools">
+      <div className="gestao-section-head">
+        <div>
+          <span className="gestao-eyebrow">Indicadores</span>
+          <h2>Gráficos do recorte</h2>
+          <p>Distribuição por status e Previsto x realizado seguem a personalização deste contrato.</p>
+        </div>
+        <button type="button" className="gestao-button-secondary" onClick={() => setPersonalizarDashboard(true)}>Personalizar status</button>
+      </div>
+      <GestaoDashboardCharts data={dashboard} previstoRealizadoBase={dashboardConfig.previstoRealizadoBase} />
+    </section>
+    <GestaoDashboardPersonalizarModal
+      open={personalizarDashboard}
+      contratoId={contratoId}
+      value={contrato.dashboardConfig}
+      statusPersonalizados={contrato.statusPersonalizados}
+      onClose={() => setPersonalizarDashboard(false)}
+      onSaved={() => void refresh()}
+    />
 <section className="gestao-dashboard-map"><div className="gestao-section-head"><div><span className="gestao-eyebrow">Visão territorial</span><h2>Mapa operacional</h2><p>{protocoloMapa ? `Pontos de ${protocoloMapa.titulo}.` : 'Clique em um protocolo para ver os pontos dele.'}</p></div><div className="gestao-actions">{protocoloMapa && <button type="button" className="gestao-button-secondary" onClick={() => setProtocoloNoMapa(null)}>Voltar aos protocolos</button>}<Link className="gestao-button-secondary" to={{ pathname: `${base}/mapa`, search: searchParams.toString() }}>Abrir mapa completo ↗</Link></div></div><div className="gestao-map-preview">{protocoloMapa ? <MapaLeaflet pontos={pontosDoProtocoloMapa} protocolos={[protocoloMapa]} onSelectPoint={(ponto) => { const next = new URLSearchParams(searchParams); next.set('ponto', ponto.id); navigate({ pathname: `${base}/mapa`, search: next.toString() }) }} height={380} fitBoundsOnChange /> : <MapaLeaflet pontos={filtrado.pontos} protocolos={filtrado.protocolos} camada="protocolos" onSelectPoint={() => undefined} onSelectProtocolo={abrirProtocoloNoMapa} height={380} fitBoundsOnChange />}</div>{protocoloMapa && <p className="gestao-map-note" role="status">{pontosDoProtocoloMapa.length} {pontosDoProtocoloMapa.length === 1 ? 'ponto' : 'pontos'} em {protocoloMapa.titulo}. <Link to={`/gestao-contratos/${contratoId}/protocolos/${protocoloMapa.id}`}>Abrir protocolo ↗</Link></p>}</section>
     </>}
     <Outlet context={{ contrato, protocolos: filtrado.protocolos, pontos: filtrado.pontos, loading, refresh } satisfies GestaoContext} />

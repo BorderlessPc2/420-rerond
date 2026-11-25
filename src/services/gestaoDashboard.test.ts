@@ -76,6 +76,22 @@ describe('gestaoDashboard', () => {
     expect(segments[1].offset).toBe(25)
   })
 
+  it('aplica personalização de status e previsto x realizado', () => {
+    const pontosComPrevisao: Ponto[] = [
+      { ...pontos[0], previsao: '2025-06-01' },
+      pontos[1],
+      pontos[2],
+    ]
+    const data = calcularDashboardGestao(protocolos, pontosComPrevisao, '', {
+      statusVisiveis: ['em_correcao'],
+      previstoStatus: ['em_correcao'],
+      realizadoStatus: ['em_correcao'],
+      rotulosStatus: { em_correcao: 'Ajustes pendentes' },
+    })
+    expect(data.status).toEqual([expect.objectContaining({ status: 'em_correcao', label: 'Ajustes pendentes' })])
+    expect(data.previstoRealizado).toEqual({ previsto: 1, realizado: 0 })
+  })
+
   it('filtra por rodovia mantendo pontos sem protocolo no recorte', () => {
     const data = calcularDashboardGestao(protocolos, pontos, { rodovia: 'BR-153' })
     expect(data.totalPontos).toBe(2)

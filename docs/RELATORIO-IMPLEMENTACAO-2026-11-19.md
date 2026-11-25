@@ -1,6 +1,6 @@
 # Relatório de implementação — Gestão de Contratos
 
-**Data:** 19/11/2026  
+**Data base:** 19/11/2026 · **Atualização:** 25/11/2026  
 **Projeto:** 420-rerond  
 **Branch:** `fix/avaliacao-ia-cliente`  
 **Aplicação:** https://rerond-c747b.web.app  
@@ -8,7 +8,9 @@
 
 ## Resumo
 
-Um protocolo passa a reunir vários pontos, inclusive de rodovias e concessionárias diferentes. Dá para vincular vários pontos de uma vez, excluir protocolo e excluir movimentação. O mapa da visão geral abre pelos protocolos e só mostra os pontos depois do clique. As regras do Firestore e do Storage e o aplicativo foram publicados em produção.
+Um protocolo passa a reunir vários pontos, inclusive de rodovias e concessionárias diferentes. Dá para vincular vários pontos de uma vez, excluir protocolo e excluir movimentação. O mapa da visão geral abre pelos protocolos e só mostra os pontos depois do clique.
+
+**Atualização 25/11/2026 (este commit):** personalização do dashboard por contrato, **status personalizados** (`custom_*`), overlay global de análise IA com opção de ocultar, cards de contratos padronizados e endurecimento do fluxo de transições (incluindo status custom removidos do catálogo). Regras Firestore atualizadas no repositório — **publicação em produção das rules ainda pendente** após `npm run firebase:deploy:rules`.
 
 ## Vínculo entre rodovias diferentes
 
@@ -97,6 +99,48 @@ Estas alterações já estavam na cópia local, foram para o Hosting neste deplo
 - Contraste da faixa de pontos no mapa.
 - Foco do dropdown sem rolar a página (`preventScroll`).
 - Atualização do relatório de 11/11/2026 para registrar essa entrega anterior.
+
+## Atualização 25/11/2026 — Dashboard, status e análise IA
+
+### Personalização do dashboard
+
+- Preferências por contrato em `dashboardConfig` (status visíveis, rótulos, previsto × realizado por status).
+- Modal **Personalizar indicadores** na visão geral do contrato.
+- Gráficos e filtros respeitam a configuração mesclada com o catálogo do contrato.
+
+### Status personalizados
+
+- Criação por contrato (nome + cor) no mesmo modal; IDs `custom_*` gravados em `statusPersonalizados`.
+- Uso em movimentações, lista/detalhe de protocolos, filtros e indicadores.
+- Validação de transição e regras Firestore (`validStatus`) alinhadas ao formato `custom_[a-z0-9_]+`.
+- Status custom **órfão** (removido do catálogo, ainda no protocolo): continua válido nas etapas operacionais; o composer não troca a situação sozinho ao abrir o modal.
+
+### Análise IA global
+
+- `AnaliseJobProvider` em `App.tsx`: overlay de progresso em qualquer rota durante análise.
+- **Ocultar** overlay (análise segue); chip **Exibir** para reabrir.
+
+### UX contratos
+
+- Cards na lista com altura uniforme e CTA fixo **Abrir visão geral**.
+
+### Validação (25/11/2026)
+
+- `npm test`: **199** testes (inclui `gestaoStatusCatalogo`, `gestaoStatusFluxo`, `gestaoDashboardConfig`, transições com custom).
+- `npm run build`: passou (warnings de CSS legado e bundle > 500 kB permanecem).
+
+### Arquivos adicionais desta entrega
+
+- `src/services/gestaoDashboardConfig.ts` (+ testes)
+- `src/services/gestaoStatusCatalogo.ts` (+ testes)
+- `src/services/gestaoStatusFluxo.test.ts`
+- `src/components/gestao/GestaoDashboardPersonalizarModal.tsx`
+- `src/context/AnaliseJobProvider.tsx`
+- `src/components/gestao/GestaoTransicaoComposer.tsx`, `GestaoDashboardCharts.tsx`, `GestaoEtapaStepper.tsx`
+- `src/views/GestaoContratoDetalhe.tsx`, `GestaoContratos.tsx`, `GestaoProtocolos.tsx`
+- `src/components/AnaliseProgressOverlay.tsx` (+ CSS)
+- `src/views/Solicitacoes.tsx`, `src/App.tsx`
+- `firestore.rules` (`dashboardConfig`, `statusPersonalizados`, `validStatus` estendido)
 
 ## Fora deste commit
 
