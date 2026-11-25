@@ -242,13 +242,19 @@
   border-top: 1px solid #e8f0fb;
 }
 
+.apo-running-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .apo-minimize-cta {
   display: flex;
-  width: 100%;
+  flex: 1 1 180px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 12px;
   padding: 9px 12px;
   border: 1px solid #9bb8e8;
   border-radius: 10px;
@@ -261,6 +267,26 @@
 
 .apo-minimize-cta:hover {
   background: #e2ecff;
+}
+
+.apo-hide-cta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid #c5d4eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #4b5f7c;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apo-hide-cta:hover {
+  background: #f5f8fd;
 }
 
 .apo-failed-actions {
@@ -384,6 +410,81 @@
 
 .apo-minimized-expand:hover {
   background: #1a3f8f;
+}
+
+.apo-minimized-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  border: 1px solid #c5d4eb;
+  border-radius: 14px;
+  background: #fff;
+  color: #4b5f7c;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(15, 47, 115, 0.12);
+}
+
+.apo-minimized-hide:hover {
+  background: #f5f8fd;
+}
+
+.apo-hidden-chip {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 11900;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 8px 10px 8px 12px;
+  border: 1px solid #b8d0f5;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 47, 115, 0.18);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  animation: apo-slide-up 220ms ease-out;
+}
+
+.apo-hidden-chip-icon {
+  flex-shrink: 0;
+  color: #2357c4;
+}
+
+.apo-hidden-chip-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.apo-hidden-chip-copy strong {
+  font-size: 0.78rem;
+  color: #0f2f73;
+}
+
+.apo-hidden-chip-copy span {
+  font-size: 0.7rem;
+  color: #5d708e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.apo-hidden-chip-action {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #0f2f73;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.apo-hidden-chip:hover .apo-hidden-chip-action {
+  background: #e2ecff;
 }
 
 @keyframes apo-fade-in {

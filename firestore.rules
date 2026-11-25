@@ -19,16 +19,28 @@ service cloud.firestore {
     }
 
     function validStatus(value) {
-      return value in ['nao_iniciado', 'em_andamento', 'em_analise', 'em_correcao', 'aguardando_terceiros', 'paralisado', 'aprovado_concessionaria', 'concluido'];
+      return value in ['nao_iniciado', 'em_andamento', 'em_analise', 'em_correcao', 'aguardando_terceiros', 'paralisado', 'aprovado_concessionaria', 'concluido']
+        || (value.matches('^custom_[a-z0-9_]+$') && value.size() <= 64);
     }
 
     function validSituacaoContrato(value) {
       return value in ['ativo', 'suspenso', 'encerrado'];
     }
 
+    function validDashboardConfig(data) {
+      return !('dashboardConfig' in data) || data.dashboardConfig is map;
+    }
+
+    function validStatusPersonalizados(data) {
+      return !('statusPersonalizados' in data)
+        || (data.statusPersonalizados is list && data.statusPersonalizados.size() <= 24);
+    }
+
     function validContrato(data) {
       return data.keys().hasAll(['nome', 'createdAt', 'situacao'])
-        && data.keys().hasOnly(['nome', 'clienteId', 'numero', 'objeto', 'vigenciaInicio', 'vigenciaFim', 'situacao', 'observacoes', 'createdAt'])
+        && data.keys().hasOnly(['nome', 'clienteId', 'numero', 'objeto', 'vigenciaInicio', 'vigenciaFim', 'situacao', 'observacoes', 'createdAt', 'dashboardConfig', 'statusPersonalizados'])
+        && validDashboardConfig(data)
+        && validStatusPersonalizados(data)
         && shortText(data.nome, 160)
         && optionalText(data, 'clienteId', 128)
         && optionalText(data, 'numero', 80)

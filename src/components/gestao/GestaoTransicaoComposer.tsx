@@ -7,25 +7,28 @@ import {
   type IntencaoTransicao,
 } from '../../services/gestaoTransicoes'
 import type { Etapa, Ponto, Situacao } from '../../services/gestaoContratos'
+import type { StatusPersonalizado } from '../../services/gestaoStatusCatalogo'
+import { isFormatoStatusCustom, rotuloStatusProtocolo } from '../../services/gestaoStatusCatalogo'
 import { nomeGestao } from '../../views/gestaoUi'
 
 const etapasLabels: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
 
 type GestaoTransicaoComposerProps = {
   etapaAtual: Etapa
-  statusAtual: Situacao
+  statusAtual: Situacao | string
   etapa: Etapa
-  status: Situacao
+  status: Situacao | string
   observacao: string
   pontosVinculados: Pick<Ponto, 'id' | 'codigo' | 'resultado'>[]
+  statusPersonalizados?: StatusPersonalizado[]
   onEtapaChange: (etapa: Etapa) => void
-  onStatusChange: (status: Situacao) => void
+  onStatusChange: (status: Situacao | string) => void
   onIntencao?: (intencao: IntencaoTransicao) => void
   pontosPendentesHref?: string
   observacaoInputId?: string
 }
 
-const intencoes: { id: IntencaoTransicao; label: string; hidden?: (etapa: Etapa, status: Situacao) => boolean }[] = [
+const intencoes: { id: IntencaoTransicao; label: string; hidden?: (etapa: Etapa, status: Situacao | string) => boolean }[] = [
   { id: 'retomar_andamento', label: 'Retomar andamento', hidden: (_, status) => status === 'em_andamento' || status === 'concluido' },
   { id: 'correcao', label: 'Correção', hidden: (_, status) => status === 'em_correcao' },
   { id: 'paralisacao', label: 'Paralisar', hidden: (_, status) => status === 'paralisado' || status === 'concluido' },
@@ -40,28 +43,35 @@ export default function GestaoTransicaoComposer({
   status,
   observacao,
   pontosVinculados,
+  statusPersonalizados,
   onEtapaChange,
   onStatusChange,
   onIntencao,
   pontosPendentesHref,
   observacaoInputId = 'gestao-movimentacao-observacao',
 }: GestaoTransicaoComposerProps) {
+  const rotulo = (valor: string) => rotuloStatusProtocolo(valor, statusPersonalizados)
+  const classeStatus = (valor: string) =>
+    isFormatoStatusCustom(valor) ? 'gestao-status gestao-status-custom' : `gestao-status gestao-status-${valor}`
+
   const descricao = useMemo(
-    () => descreverTransicao(etapaAtual, statusAtual, etapa, status, observacao, pontosVinculados),
-    [etapa, etapaAtual, observacao, pontosVinculados, status, statusAtual],
+    () => descreverTransicao(etapaAtual, statusAtual, etapa, status, observacao, pontosVinculados, statusPersonalizados ?? []),
+    [etapa, etapaAtual, observacao, pontosVinculados, status, statusAtual, statusPersonalizados],
   )
   const etapasPermitidas = useMemo(() => listarEtapasPermitidas(etapaAtual), [etapaAtual])
   const situacoesAlcancaveis = useMemo(
-    () => listarSituacoesAlcancaveis(etapaAtual, statusAtual, etapa, observacao, pontosVinculados),
-    [etapa, etapaAtual, observacao, pontosVinculados, statusAtual],
+    () => listarSituacoesAlcancaveis(etapaAtual, statusAtual, etapa, observacao, pontosVinculados, statusPersonalizados ?? []),
+    [etapa, etapaAtual, observacao, pontosVinculados, statusAtual, statusPersonalizados],
   )
 
   useEffect(() => {
+    const presente = situacoesAlcancaveis.some((item) => item.situacao === status)
+    if (status === statusAtual && presente) return
     const atual = situacoesAlcancaveis.find((item) => item.situacao === status && item.disponivel)
     if (atual) return
     const fallback = situacoesAlcancaveis.find((item) => item.disponivel) ?? situacoesAlcancaveis[0]
     if (fallback && fallback.situacao !== status) onStatusChange(fallback.situacao)
-  }, [etapa, onStatusChange, situacoesAlcancaveis, status])
+  }, [etapa, onStatusChange, situacoesAlcancaveis, status, statusAtual])
 
   useEffect(() => {
     if (descricao.requerObservacao && !observacao.trim()) {
@@ -93,7 +103,7 @@ export default function GestaoTransicaoComposer({
       <div className="gestao-transicao-diff" aria-live="polite">
         <div>
           <span className="gestao-eyebrow">De</span>
-          <span className={`gestao-status gestao-status-${descricao.de.status}`}>{nomeGestao(descricao.de.status)}</span>
+          <span className={classeStatus(descricao.de.status)}>{rotulo(descricao.de.status)}</span>
           <small>{nomeGestao(descricao.de.etapa)}</small>
         </div>
         <span className="gestao-transicao-arrow" aria-hidden="true">
@@ -101,7 +111,7 @@ export default function GestaoTransicaoComposer({
         </span>
         <div>
           <span className="gestao-eyebrow">Para</span>
-          <span className={`gestao-status gestao-status-${descricao.para.status}`}>{nomeGestao(descricao.para.status)}</span>
+          <span className={classeStatus(descricao.para.status)}>{rotulo(descricao.para.status)}</span>
           <small>{nomeGestao(descricao.para.etapa)}</small>
         </div>
       </div>
@@ -120,10 +130,10 @@ export default function GestaoTransicaoComposer({
         </label>
         <label>
           Situação
-          <select name="status" value={status} onChange={(event) => onStatusChange(event.target.value as Situacao)}>
+          <select name="status" value={status} onChange={(event) => onStatusChange(event.target.value)}>
             {situacoesAlcancaveis.map((entry) => (
               <option value={entry.situacao} key={entry.situacao} disabled={!entry.disponivel} title={entry.motivo ?? undefined}>
-                {nomeGestao(entry.situacao)}
+                {rotulo(entry.situacao)}
               </option>
             ))}
           </select>

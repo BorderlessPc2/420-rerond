@@ -22,6 +22,7 @@ import ConfiguracoesModulares from './views/ConfiguracoesModulares'
 import EnsinarIA from './views/EnsinarIA'
 import MetricasIA from './views/MetricasIA'
 import { HomeScreen, LoginScreen, RegisterScreen } from './screens'
+import AnaliseJobProvider from './context/AnaliseJobProvider'
 import './App.css'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         <Route path="/ui/register" element={<RegisterScreen />} />
         <Route path="/ui/home" element={<HomeScreen />} />
         <Route element={<ProtectedRoute />}>
+          <Route element={<AnaliseJobProvider />}>
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
@@ -58,6 +60,7 @@ function App() {
             <Route path="metricas-ia" element={<MetricasIA />} />
             <Route path="concessionarias/nova" element={<NovaConcessionaria />} />
             <Route path="solicitacao-registrada" element={<SolicitacaoRegistrada />} />
+          </Route>
           </Route>
         </Route>
       </Routes>

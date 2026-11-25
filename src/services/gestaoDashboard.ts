@@ -1,4 +1,13 @@
 import { filtrarGestao, indicadoresGestao, type Ponto, type Protocolo, type Situacao } from './gestaoContratos'
+import {
+  calcularPrevistoRealizado,
+  corStatusDashboard,
+  mesclarDashboardConfig,
+  rotuloStatusDashboard,
+  statusPermitido,
+  type GestaoDashboardConfig,
+} from './gestaoDashboardConfig'
+import type { StatusPersonalizado } from './gestaoStatusCatalogo'
 
 export type DashboardFiltro = {
   estado?: string
@@ -20,7 +29,7 @@ export type DashboardStatusPonto = {
 }
 
 export type DashboardStatusSlice = {
-  status: Situacao
+  status: string
   total: number
   color: string
   label: string
@@ -61,10 +70,6 @@ export const STATUS_CHART_COLORS: Record<Situacao, string> = {
   concluido: '#15803d',
 }
 
-const statusLabel = (status: Situacao) => {
-  const texto = status.replaceAll('_', ' ')
-  return texto ? texto[0].toUpperCase() + texto.slice(1) : status
-}
 
 export type DonutSegment = {
   color: string
@@ -103,7 +108,10 @@ export function calcularDashboardGestao(
   protocolos: Protocolo[],
   pontos: Ponto[],
   filtro: string | DashboardFiltro = '',
+  dashboardConfig?: GestaoDashboardConfig | null,
+  statusPersonalizados?: StatusPersonalizado[],
 ): GestaoDashboardData {
+  const config = mesclarDashboardConfig(dashboardConfig, statusPersonalizados)
   const normalized = normalizeFiltro(filtro)
   const recorte = filtrarGestao(protocolos, pontos, {
     estado: normalized.estado ?? '',
@@ -122,7 +130,7 @@ export function calcularDashboardGestao(
   const concessionarias = [...new Set([...pontos, ...protocolos].map((item) => item.concessionaria).filter(Boolean))].sort()
   const rodovias = [...new Set([...pontos, ...protocolos].map((item) => item.rodovia).filter(Boolean))].sort()
   const statusByProtocolo = new Map(recorte.protocolos.map((protocolo) => [protocolo.id, protocolo.status]))
-  const pontosPorStatus = new Map<Situacao, DashboardStatusPonto[]>()
+  const pontosPorStatus = new Map<string, DashboardStatusPonto[]>()
   recorte.pontos.forEach((ponto) => {
     if (!ponto.protocoloId) return
     const status = statusByProtocolo.get(ponto.protocoloId)
@@ -132,13 +140,16 @@ export function calcularDashboardGestao(
     pontosPorStatus.set(status, lista)
   })
   pontosPorStatus.forEach((lista) => lista.sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true })))
-  const statusTotals = [...new Set(recorte.protocolos.map((protocolo) => protocolo.status))].map((status) => ({
-    status,
-    total: recorte.protocolos.filter((protocolo) => protocolo.status === status).length,
-    color: STATUS_CHART_COLORS[status],
-    label: statusLabel(status),
-    pontos: pontosPorStatus.get(status) ?? [],
-  })).filter((item) => item.total > 0)
+  const statusTotals = [...new Set(recorte.protocolos.map((protocolo) => protocolo.status))]
+    .filter((status) => statusPermitido(status, config.statusVisiveis))
+    .map((status) => ({
+      status,
+      total: recorte.protocolos.filter((protocolo) => protocolo.status === status).length,
+      color: corStatusDashboard(status, statusPersonalizados),
+      label: rotuloStatusDashboard(status, config, statusPersonalizados),
+      pontos: pontosPorStatus.get(status) ?? [],
+    }))
+    .filter((item) => item.total > 0)
   const indicadores = indicadoresGestao(recorte.protocolos, recorte.pontos)
   const concluidos = indicadores.regularizados + indicadores.aprovadosImplantacao
   return {
@@ -151,6 +162,6 @@ export function calcularDashboardGestao(
     pontosSemProtocolo: recorte.pontos.filter((ponto) => ponto.protocoloId == null).length,
     indicadores,
     percentualPontosConcluidos: recorte.pontos.length ? Math.round((concluidos / recorte.pontos.length) * 100) : 0,
-    previstoRealizado: { previsto: indicadores.previstos, realizado: indicadores.realizados },
+    previstoRealizado: calcularPrevistoRealizado(recorte.protocolos, recorte.pontos, config),
   }
 }

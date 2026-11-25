@@ -62,4 +62,13 @@ describe('gestaoTransicoes', () => {
     expect(aplicarIntencaoTransicao('correcao', 'fase_1', 'em_andamento')).toEqual({ etapa: 'fase_1', status: 'em_correcao' })
     expect(aplicarIntencaoTransicao('avancar_etapa', 'fase_1', 'em_andamento')).toEqual({ etapa: 'fase_2', status: 'em_andamento' })
   })
+
+  it('aceita status personalizado na etapa operacional', () => {
+    const personalizados = [{ id: 'custom_em_vistoria', label: 'Em vistoria' }]
+    expect(validarCombinacaoEtapaStatus('fase_1', 'custom_em_vistoria', personalizados)).toBeNull()
+    expect(validarCombinacaoEtapaStatus('concluido', 'custom_em_vistoria', personalizados)).toMatch(/personalizado/)
+    const opcoes = listarSituacoesAlcancaveis('fase_1', 'em_andamento', 'fase_1', '', [], personalizados)
+    const custom = opcoes.find((item) => item.situacao === 'custom_em_vistoria')
+    expect(custom?.disponivel).toBe(true)
+  })
 })

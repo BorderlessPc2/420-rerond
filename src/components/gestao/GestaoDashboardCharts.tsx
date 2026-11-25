@@ -1,7 +1,6 @@
 import { useState, type KeyboardEvent, type SyntheticEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { fatiarPontosStatus, STATUS_PONTOS_PAGE_SIZE, toDonutSegments, type DashboardStatusSlice, type GestaoDashboardData } from '../../services/gestaoDashboard'
-import { nomeGestao } from '../../views/gestaoUi'
 import './GestaoDashboardCharts.css'
 
 function conterEvento(event: SyntheticEvent) {
@@ -10,12 +9,13 @@ function conterEvento(event: SyntheticEvent) {
 
 type GestaoDashboardChartsProps = {
   data: GestaoDashboardData
+  previstoRealizadoBase?: 'ponto' | 'protocolo'
 }
 
 const DONUT_RADIUS = 40
 const DONUT_C = 2 * Math.PI * DONUT_RADIUS
 
-export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsProps) {
+export default function GestaoDashboardCharts({ data, previstoRealizadoBase = 'ponto' }: GestaoDashboardChartsProps) {
   const { contratoId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const [abertos, setAbertos] = useState<string[]>([])
@@ -102,6 +102,9 @@ export default function GestaoDashboardCharts({ data }: GestaoDashboardChartsPro
 
         <div className="gestao-chart-side-block" role="img" aria-label={`Entregas previstas: ${data.previstoRealizado.previsto}. Realizadas: ${data.previstoRealizado.realizado}.`}>
           <div><span className="gestao-eyebrow">Entregas</span><h3>Previsto x realizado</h3></div>
+          <p className="gestao-chart-meta">
+            Comparação por {previstoRealizadoBase === 'protocolo' ? 'protocolos' : 'pontos'}, conforme os status que você escolheu nas preferências.
+          </p>
           <div className="gestao-bars gestao-bars-compact">
             <div className="gestao-bar-row">
               <span>Previstas</span>
@@ -151,7 +154,7 @@ function StatusLegendItem({ item, totalProtocolos, aberto, visivel, onToggle, on
     <li className={aberto ? 'is-open' : undefined} onClick={conterEvento}>
       <button type="button" className="gestao-status-toggle" aria-expanded={aberto} aria-controls={painelId} onClick={onToggleClick} onPointerDown={conterEvento}>
         <i style={{ background: item.color }} aria-hidden="true" />
-        <span>{nomeGestao(item.status)}</span>
+        <span>{item.label}</span>
         <strong>{item.total}</strong>
         <small>{totalProtocolos ? Math.round((item.total / totalProtocolos) * 100) : 0}%</small>
         <b className="gestao-status-chevron" aria-hidden="true" />

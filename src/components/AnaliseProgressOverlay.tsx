@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Minimize2,
   Maximize2,
+  EyeOff,
   X,
 } from 'lucide-react'
 import {
@@ -29,6 +30,10 @@ export type AnaliseProgressOverlayProps = {
   /** Reabre análise na mesma solicitação após falha. */
   onRetry?: () => void
   retryCooldownSeconds?: number
+  /** Painel totalmente oculto; a análise segue em segundo plano. */
+  uiHidden?: boolean
+  onHide?: () => void
+  onShow?: () => void
 }
 
 type Stage = {
@@ -114,6 +119,9 @@ export default function AnaliseProgressOverlay({
   onDismiss,
   onRetry,
   retryCooldownSeconds = 0,
+  uiHidden = false,
+  onHide,
+  onShow,
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
@@ -186,6 +194,25 @@ export default function AnaliseProgressOverlay({
 
   if (!active) return null
 
+  if (uiHidden && !isFailed && onShow) {
+    return (
+      <button
+        type="button"
+        className="apo-hidden-chip"
+        onClick={onShow}
+        aria-live="polite"
+        title="Exibir progresso da análise"
+      >
+        <Sparkles size={15} className="apo-hidden-chip-icon" aria-hidden />
+        <span className="apo-hidden-chip-copy">
+          <strong>Análise em andamento</strong>
+          <span>{displayPercent}% · {jobState ? JOB_STATE_LABELS[jobState] : current.label}</span>
+        </span>
+        <span className="apo-hidden-chip-action">Exibir</span>
+      </button>
+    )
+  }
+
   const currentLabel = jobState ? JOB_STATE_LABELS[jobState] : current.label
   const currentDetail = isFailed
     ? errorMessage ?? 'Ocorreu um erro durante o processamento.'
@@ -221,6 +248,17 @@ export default function AnaliseProgressOverlay({
         >
           <Maximize2 size={16} />
         </button>
+        {onHide && (
+          <button
+            type="button"
+            className="apo-minimized-hide"
+            onClick={onHide}
+            aria-label="Ocultar indicador de análise"
+            title="Ocultar"
+          >
+            <EyeOff size={16} />
+          </button>
+        )}
       </div>
     )
   }
@@ -233,15 +271,28 @@ export default function AnaliseProgressOverlay({
           <div className="apo-brand-actions">
             <span className="apo-brand-badge">Análise por IA</span>
             {!isFailed && (
-              <button
-                type="button"
-                className="apo-icon-btn"
-                onClick={() => setMinimized(true)}
-                aria-label="Minimizar e continuar navegando"
-                title="Minimizar"
-              >
-                <Minimize2 size={16} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="apo-icon-btn"
+                  onClick={() => setMinimized(true)}
+                  aria-label="Minimizar e continuar navegando"
+                  title="Minimizar"
+                >
+                  <Minimize2 size={16} />
+                </button>
+                {onHide && (
+                  <button
+                    type="button"
+                    className="apo-icon-btn"
+                    onClick={onHide}
+                    aria-label="Ocultar análise em andamento"
+                    title="Ocultar"
+                  >
+                    <EyeOff size={16} />
+                  </button>
+                )}
+              </>
             )}
             {isFailed && onDismiss && (
               <button
@@ -320,14 +371,22 @@ export default function AnaliseProgressOverlay({
               : jobState === 'stale'
                 ? 'A execução foi interrompida. Tente novamente manualmente.'
                 : 'Edite a solicitação para ajustar PDFs se necessário e use Tentar novamente na mesma ficha — não é preciso abrir um processo novo.'
-            : 'Minimize para navegar pelo sistema. A análise continua em segundo plano.'}
+            : 'Minimize ou oculte para navegar livremente. A análise continua em segundo plano.'}
         </p>
 
         {!isFailed && (
-          <button type="button" className="apo-minimize-cta" onClick={() => setMinimized(true)}>
-            <Minimize2 size={15} />
-            Minimizar e continuar navegando
-          </button>
+          <div className="apo-running-actions">
+            <button type="button" className="apo-minimize-cta" onClick={() => setMinimized(true)}>
+              <Minimize2 size={15} />
+              Minimizar e continuar navegando
+            </button>
+            {onHide && (
+              <button type="button" className="apo-hide-cta" onClick={onHide}>
+                <EyeOff size={15} />
+                Ocultar
+              </button>
+            )}
+          </div>
         )}
 
         {isFailed && (onRetry || onDismiss) && (

@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, FileText, MapPin, Calendar, AlertCircle, Sparkles, Eye, CheckCircle, XCircle, Pencil } from 'lucide-react'
 import { getAllSolicitacoes, getSolicitacaoById, iniciarAnaliseSolicitacao, updateSolicitacao } from '../services/solicitacao/solicitacaoService'
-import { subscribeAnaliseJob } from '../services/solicitacao/analiseJobService'
-import { isActiveJobState, type AnaliseJob } from '../models/AnaliseJob'
+import { isActiveJobState } from '../models/AnaliseJob'
 import type { EscopoAnalise, SolicitacaoWithFiles, TipoRelatorio } from '../models/Solicitacao.js'
 import RelatorioViewer from '../components/RelatorioViewer'
 import ModalReanalise from '../components/ModalReanalise'
-import AnaliseProgressOverlay from '../components/AnaliseProgressOverlay'
+import { useAnaliseJob } from '../context/AnaliseJobProvider'
 import { humanizeAnaliseErrorMessage } from '../utils/analiseErrorMessage'
 import './Solicitacoes.css'
 
@@ -50,84 +49,60 @@ export default function Solicitacoes() {
     conferenciaInputs?: SolicitacaoWithFiles['conferenciaInputs']
   } | null>(null)
   const [modalReanaliseAberto, setModalReanaliseAberto] = useState<SolicitacaoWithFiles | null>(null)
-  const [analisandoId, setAnalisandoId] = useState<string | null>(null)
-  const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [activeJob, setActiveJob] = useState<AnaliseJob | null>(null)
-  const [jobError, setJobError] = useState<string | null>(null)
   const [aprovandoId, setAprovandoId] = useState<string | null>(null)
   const [rejeitandoId, setRejeitandoId] = useState<string | null>(null)
-  const [retryCooldownUntil, setRetryCooldownUntil] = useState<number | null>(null)
-  const [retryCooldownSeconds, setRetryCooldownSeconds] = useState(0)
+  const [localJobError, setLocalJobError] = useState<string | null>(null)
+  const {
+    analisandoId,
+    jobError,
+    overlayActive,
+    beginJob,
+    attachActiveJob,
+    clearJobError,
+    setRetryCooldownUntil,
+    registerOnJobCompleted,
+    registerOnJobUpdate,
+  } = useAnaliseJob()
 
   useEffect(() => {
     loadSolicitacoes()
   }, [])
 
   useEffect(() => {
-    if (!analisandoId || !activeJobId) return
+    return registerOnJobCompleted(async (solicitacaoId) => {
+      const resultado = await getSolicitacaoById(solicitacaoId)
+      if (!resultado) return
+      setSolicitacoes((prev) => prev.map((s) => (s.id === resultado.id ? resultado : s)))
+      if (resultado.relatorioIA || resultado.parecerTecnico || resultado.checklistConformidade) {
+        setRelatorioAberto(buildRelatorioAberto(resultado))
+      }
+    })
+  }, [registerOnJobCompleted])
 
-    const unsubscribe = subscribeAnaliseJob(
-      analisandoId,
-      activeJobId,
-      async (job) => {
-        setActiveJob(job)
-        setJobError(
-          job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
-            ? humanizeAnaliseErrorMessage(job.error?.message ?? 'Falha na análise.')
-            : null,
-        )
-
-        setSolicitacoes((prev) =>
-          prev.map((item) =>
-            item.id === analisandoId
-              ? {
-                  ...item,
-                  analiseJobStatus: job.state,
-                  analiseJobProgress: job.progress,
-                  activeAnaliseJobId: job.state === 'completed' || job.state === 'failed' || job.state === 'blocked' || job.state === 'stale' ? null : job.id,
-                  analiseRetryBlockedUntil: job.retryBlockedUntil,
-                  analiseErroMensagem:
-                    job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
-                      ? humanizeAnaliseErrorMessage(job.error?.message ?? 'Falha na análise.')
-                      : item.analiseErroMensagem,
-                }
-              : item,
-          ),
-        )
-
-        if (job.state === 'completed') {
-          const resultado = await getSolicitacaoById(analisandoId)
-          if (resultado) {
-            setSolicitacoes((prev) =>
-              prev.map((s) => (s.id === resultado.id ? resultado : s)),
-            )
-            if (
-              resultado.relatorioIA ||
-              resultado.parecerTecnico ||
-              resultado.checklistConformidade
-            ) {
-              setRelatorioAberto(buildRelatorioAberto(resultado))
-            }
-          }
-          setAnalisandoId(null)
-          setActiveJobId(null)
-          setActiveJob(null)
-        }
-
-        // Em falha: mantém overlay até o usuário dispensar (P9).
-      },
-      (error) => {
-        setJobError(humanizeAnaliseErrorMessage(error.message))
-        setActiveJob((prev) =>
-          prev
-            ? { ...prev, state: 'failed', progress: 0 }
-            : prev,
-        )
-      },
-    )
-
-    return unsubscribe
-  }, [analisandoId, activeJobId])
+  useEffect(() => {
+    return registerOnJobUpdate((solicitacaoId, job) => {
+      setSolicitacoes((prev) =>
+        prev.map((item) =>
+          item.id === solicitacaoId
+            ? {
+                ...item,
+                analiseJobStatus: job.state,
+                analiseJobProgress: job.progress,
+                activeAnaliseJobId:
+                  job.state === 'completed' || job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
+                    ? null
+                    : job.id,
+                analiseRetryBlockedUntil: job.retryBlockedUntil,
+                analiseErroMensagem:
+                  job.state === 'failed' || job.state === 'blocked' || job.state === 'stale'
+                    ? humanizeAnaliseErrorMessage(job.error?.message ?? 'Falha na análise.')
+                    : item.analiseErroMensagem,
+              }
+            : item,
+        ),
+      )
+    })
+  }, [registerOnJobUpdate])
 
   const locationState = location.state as { abrirAnaliseId?: string; filtroStatus?: string } | null
   const abrirAnaliseId = locationState?.abrirAnaliseId
@@ -153,8 +128,7 @@ export default function Solicitacoes() {
         (item) => item.id && item.activeAnaliseJobId && isActiveJobState(item.analiseJobStatus),
       )
       if (emProcessamento?.id && emProcessamento.activeAnaliseJobId) {
-        setAnalisandoId(emProcessamento.id)
-        setActiveJobId(emProcessamento.activeAnaliseJobId)
+        attachActiveJob(emProcessamento)
       }
     } catch (err: any) {
       console.error('Erro ao carregar solicitações:', err)
@@ -263,8 +237,9 @@ export default function Solicitacoes() {
   ) => {
     if (!modalReanaliseAberto?.id) return
 
-    const solicitacaoId = modalReanaliseAberto.id
-    setJobError(null)
+    const solicitacao = modalReanaliseAberto
+    const solicitacaoId = solicitacao.id!
+    clearJobError()
 
     try {
       const { jobId } = await iniciarAnaliseSolicitacao(
@@ -276,9 +251,13 @@ export default function Solicitacoes() {
       )
 
       setModalReanaliseAberto(null)
-      setAnalisandoId(solicitacaoId)
-      setActiveJobId(jobId)
-      setActiveJob({
+      beginJob(solicitacaoId, jobId, {
+        titulo: solicitacao.titulo,
+        nomeConcessionaria: solicitacao.nomeConcessionaria,
+        concessionariaId: solicitacao.concessionariaId,
+        analiseJobStatus: 'queued',
+        analiseJobProgress: 12,
+      }, {
         id: jobId,
         solicitacaoId,
         state: 'queued',
@@ -304,7 +283,7 @@ export default function Solicitacoes() {
       const message = humanizeAnaliseErrorMessage(
         error instanceof Error ? error.message : 'Erro ao iniciar análise.',
       )
-      setJobError(message)
+      setLocalJobError(message)
       setSolicitacoes((prev) =>
         prev.map((item) =>
           item.id === solicitacaoId
@@ -318,38 +297,6 @@ export default function Solicitacoes() {
       )
       throw new Error(message)
     }
-  }
-
-  const dismissAnaliseOverlay = () => {
-    setAnalisandoId(null)
-    setActiveJobId(null)
-    setActiveJob(null)
-  }
-
-  useEffect(() => {
-    if (!retryCooldownUntil) {
-      setRetryCooldownSeconds(0)
-      return
-    }
-    const update = () => {
-      const seconds = Math.max(0, Math.ceil((retryCooldownUntil - Date.now()) / 1000))
-      setRetryCooldownSeconds(seconds)
-      if (seconds === 0) setRetryCooldownUntil(null)
-    }
-    update()
-    const timer = window.setInterval(update, 1000)
-    return () => window.clearInterval(timer)
-  }, [retryCooldownUntil])
-
-  const retryFailedAnalysis = () => {
-    if (!solicitacaoEmAnalise) return
-    const blockedUntil = activeJob?.retryBlockedUntil?.getTime() ?? solicitacaoEmAnalise.analiseRetryBlockedUntil?.getTime() ?? 0
-    if (blockedUntil > Date.now()) {
-      setRetryCooldownUntil(blockedUntil)
-      return
-    }
-    setModalReanaliseAberto(solicitacaoEmAnalise)
-    dismissAnaliseOverlay()
   }
 
   const handleAprovar = async (solicitacao: SolicitacaoWithFiles) => {
@@ -405,34 +352,10 @@ export default function Solicitacoes() {
     )
   }
 
-  const solicitacaoEmAnalise = analisandoId
-    ? solicitacoes.find((s) => s.id === analisandoId) ?? null
-    : null
-
-  const overlayActive = Boolean(analisandoId && activeJobId)
+  const erroAnaliseBanner = localJobError ?? (!overlayActive ? jobError : null)
 
   return (
     <div className="solicitacoes-container">
-      <AnaliseProgressOverlay
-        active={overlayActive}
-        titulo={solicitacaoEmAnalise?.titulo}
-        nomeConcessionaria={solicitacaoEmAnalise?.nomeConcessionaria}
-        concessionariaId={solicitacaoEmAnalise?.concessionariaId}
-        jobState={activeJob?.state ?? solicitacaoEmAnalise?.analiseJobStatus ?? null}
-        progress={activeJob?.progress ?? solicitacaoEmAnalise?.analiseJobProgress ?? null}
-        errorMessage={jobError}
-        onDismiss={
-          activeJob?.state === 'failed' || activeJob?.state === 'blocked' || activeJob?.state === 'stale' || solicitacaoEmAnalise?.analiseJobStatus === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'blocked' || solicitacaoEmAnalise?.analiseJobStatus === 'stale'
-            ? dismissAnaliseOverlay
-            : undefined
-        }
-        onRetry={
-          activeJob?.state === 'failed' || activeJob?.state === 'blocked' || activeJob?.state === 'stale' || solicitacaoEmAnalise?.analiseJobStatus === 'failed' || solicitacaoEmAnalise?.analiseJobStatus === 'blocked' || solicitacaoEmAnalise?.analiseJobStatus === 'stale'
-            ? retryFailedAnalysis
-            : undefined
-        }
-        retryCooldownSeconds={retryCooldownSeconds}
-      />
       <div className="solicitacoes-header">
         <h1>Solicitações</h1>
         <button
@@ -454,11 +377,18 @@ export default function Solicitacoes() {
         </div>
       )}
 
-      {jobError && !overlayActive && (
+      {erroAnaliseBanner && (
         <div className="error-message" role="alert">
           <AlertCircle size={20} />
-          <span>{jobError}</span>
-          <button type="button" onClick={() => setJobError(null)} className="btn-retry">
+          <span>{erroAnaliseBanner}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setLocalJobError(null)
+              clearJobError()
+            }}
+            className="btn-retry"
+          >
             Dispensar
           </button>
         </div>

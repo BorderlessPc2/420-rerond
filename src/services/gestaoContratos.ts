@@ -3,8 +3,11 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage
 import { auth, db, storage } from '../lib/firebase'
 import { validarInputPonto, validarInputProtocolo, validarInputContrato, type ContratoInput, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 import { validarTransicao } from './gestaoTransicoes'
+import type { GestaoDashboardConfig } from './gestaoDashboardConfig'
+import type { StatusPersonalizado } from './gestaoStatusCatalogo'
 
 export type SituacaoContrato = 'ativo' | 'suspenso' | 'encerrado'
+
 export type Contrato = {
   id: string
   nome: string
@@ -15,13 +18,15 @@ export type Contrato = {
   vigenciaFim?: string
   situacao?: SituacaoContrato
   observacoes?: string
+  dashboardConfig?: GestaoDashboardConfig
+  statusPersonalizados?: StatusPersonalizado[]
   createdAt?: unknown
 }
 export type Etapa = 'planejamento' | 'elaboracao' | 'fase_1' | 'fase_2' | 'homologacao' | 'concluido'
 export type Situacao = 'nao_iniciado' | 'em_andamento' | 'em_analise' | 'em_correcao' | 'aguardando_terceiros' | 'paralisado' | 'aprovado_concessionaria' | 'concluido'
 export type Protocolo = {
   id: string; contratoId: string; titulo: string; concessionaria: string; rodovia: string
-  numero?: string; etapa: Etapa; status: Situacao; previsao?: string; realizadoEm?: string
+  numero?: string; etapa: Etapa; status: Situacao | string; previsao?: string; realizadoEm?: string
   processoAnaliseId?: string; createdAt?: unknown
 }
 export type Ponto = {
@@ -32,7 +37,7 @@ export type Ponto = {
 }
 export type Movimento = {
   id: string; tipo: string; em: string; autor: string; observacao: string
-  etapa: Etapa; status: Situacao; anexos: { nome: string; url: string }[]
+  etapa: Etapa; status: Situacao | string; anexos: { nome: string; url: string }[]
 }
 export type { ContratoInput, PontoInput, ProtocoloInput } from './gestaoValidacao'
 
@@ -99,6 +104,23 @@ export const atualizarContrato = async (id: string, input: ContratoInput) => {
   if (error) throw new Error(error)
   if (!(await getContrato(id))) throw new Error('Contrato não encontrado.')
   await updateDoc(doc(db, 'gestaoContratos', id), normalizeContratoPayload(input))
+}
+
+export const atualizarDashboardContrato = async (id: string, dashboardConfig: GestaoDashboardConfig) => {
+  if (!(await getContrato(id))) throw new Error('Contrato não encontrado.')
+  await updateDoc(doc(db, 'gestaoContratos', id), { dashboardConfig })
+}
+
+export const atualizarPreferenciasIndicadoresContrato = async (
+  id: string,
+  preferencias: { dashboardConfig?: GestaoDashboardConfig; statusPersonalizados?: StatusPersonalizado[] },
+) => {
+  if (!(await getContrato(id))) throw new Error('Contrato não encontrado.')
+  const payload: Record<string, unknown> = {}
+  if (preferencias.dashboardConfig) payload.dashboardConfig = preferencias.dashboardConfig
+  if (preferencias.statusPersonalizados) payload.statusPersonalizados = preferencias.statusPersonalizados
+  if (!Object.keys(payload).length) return
+  await updateDoc(doc(db, 'gestaoContratos', id), payload)
 }
 
 export const excluirContrato = async (id: string) => {
@@ -348,7 +370,16 @@ export const registrarMovimento = async (contratoId: string, protocoloId: string
   const protocolo = await getProtocolo(contratoId, protocoloId)
   if (!protocolo) throw new Error('Protocolo não encontrado neste contrato.')
   const pontosVinculados = (await getDocs(query(collection(db, 'gestaoPontos'), where('contratoId', '==', contratoId), where('protocoloId', '==', protocoloId)))).docs.map((item) => item.data() as Ponto)
-  const transitionError = validarTransicao(protocolo.etapa, protocolo.status, input.etapa, input.status, input.observacao, pontosVinculados)
+  const contrato = await getContrato(contratoId)
+  const transitionError = validarTransicao(
+    protocolo.etapa,
+    protocolo.status,
+    input.etapa,
+    input.status,
+    input.observacao,
+    pontosVinculados,
+    contrato?.statusPersonalizados ?? [],
+  )
   if (transitionError) throw new Error(transitionError)
   const files = input.files ?? []
   if (files.some((file) => file.size > 20 * 1024 * 1024)) throw new Error('Cada anexo deve ter até 20 MB.')
