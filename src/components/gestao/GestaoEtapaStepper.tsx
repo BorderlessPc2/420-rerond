@@ -1,11 +1,13 @@
 import { progressoEtapa, type Etapa, type Situacao } from '../../services/gestaoContratos'
+import { rotuloEtapaDashboard } from '../../services/gestaoDashboardConfig'
+import type { GestaoDashboardConfig } from '../../services/gestaoDashboardConfig'
 import { ETAPAS_ORDEM } from '../../services/gestaoTransicoes'
-import { nomeGestao } from '../../views/gestaoUi'
 
 type GestaoEtapaStepperProps = {
   etapa: Etapa
   status: Situacao | string
   pulse?: boolean
+  dashboardConfig?: GestaoDashboardConfig | null
 }
 
 const situacaoRingClass = (status: Situacao | string) => {
@@ -15,10 +17,11 @@ const situacaoRingClass = (status: Situacao | string) => {
   return 'gestao-stepper-ring-progress'
 }
 
-export default function GestaoEtapaStepper({ etapa, status, pulse }: GestaoEtapaStepperProps) {
+export default function GestaoEtapaStepper({ etapa, status, pulse, dashboardConfig }: GestaoEtapaStepperProps) {
   const progresso = progressoEtapa(etapa)
+  const rotuloEtapa = (valor: Etapa) => rotuloEtapaDashboard(valor, dashboardConfig)
   return (
-    <div className={`gestao-etapa-stepper ${pulse ? 'is-pulse' : ''}`} aria-label={`Etapa ${nomeGestao(etapa)} de ${ETAPAS_ORDEM.length}`}>
+    <div className={`gestao-etapa-stepper ${pulse ? 'is-pulse' : ''}`} aria-label={`Etapa ${rotuloEtapa(etapa)} de ${ETAPAS_ORDEM.length}`}>
       <div className="gestao-stage-track">
         <span style={{ inlineSize: `${((progresso.indice + 0.5) / progresso.total) * 100}%` }} />
       </div>
@@ -29,7 +32,7 @@ export default function GestaoEtapaStepper({ etapa, status, pulse }: GestaoEtapa
           return (
             <li key={item} className={`gestao-stepper-node ${done ? 'is-done' : ''} ${current ? 'is-current' : ''}`}>
               <span className={`gestao-stepper-dot ${current ? situacaoRingClass(status) : ''}`} aria-hidden="true" />
-              <span className="gestao-stepper-label">{nomeGestao(item)}</span>
+              <span className="gestao-stepper-label">{rotuloEtapa(item)}</span>
             </li>
           )
         })}

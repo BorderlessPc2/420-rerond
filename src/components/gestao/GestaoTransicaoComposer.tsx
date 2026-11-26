@@ -9,7 +9,7 @@ import {
 import type { Etapa, Ponto, Situacao } from '../../services/gestaoContratos'
 import type { StatusPersonalizado } from '../../services/gestaoStatusCatalogo'
 import { isFormatoStatusCustom, rotuloStatusProtocolo } from '../../services/gestaoStatusCatalogo'
-import { nomeGestao } from '../../views/gestaoUi'
+import { rotuloEtapaDashboard, type GestaoDashboardConfig } from '../../services/gestaoDashboardConfig'
 
 const etapasLabels: Etapa[] = ['planejamento', 'elaboracao', 'fase_1', 'fase_2', 'homologacao', 'concluido']
 
@@ -21,6 +21,7 @@ type GestaoTransicaoComposerProps = {
   observacao: string
   pontosVinculados: Pick<Ponto, 'id' | 'codigo' | 'resultado'>[]
   statusPersonalizados?: StatusPersonalizado[]
+  dashboardConfig?: GestaoDashboardConfig | null
   onEtapaChange: (etapa: Etapa) => void
   onStatusChange: (status: Situacao | string) => void
   onIntencao?: (intencao: IntencaoTransicao) => void
@@ -44,6 +45,7 @@ export default function GestaoTransicaoComposer({
   observacao,
   pontosVinculados,
   statusPersonalizados,
+  dashboardConfig,
   onEtapaChange,
   onStatusChange,
   onIntencao,
@@ -51,6 +53,7 @@ export default function GestaoTransicaoComposer({
   observacaoInputId = 'gestao-movimentacao-observacao',
 }: GestaoTransicaoComposerProps) {
   const rotulo = (valor: string) => rotuloStatusProtocolo(valor, statusPersonalizados)
+  const rotuloEtapa = (valor: Etapa) => rotuloEtapaDashboard(valor, dashboardConfig)
   const classeStatus = (valor: string) =>
     isFormatoStatusCustom(valor) ? 'gestao-status gestao-status-custom' : `gestao-status gestao-status-${valor}`
 
@@ -104,7 +107,7 @@ export default function GestaoTransicaoComposer({
         <div>
           <span className="gestao-eyebrow">De</span>
           <span className={classeStatus(descricao.de.status)}>{rotulo(descricao.de.status)}</span>
-          <small>{nomeGestao(descricao.de.etapa)}</small>
+          <small>{rotuloEtapa(descricao.de.etapa)}</small>
         </div>
         <span className="gestao-transicao-arrow" aria-hidden="true">
           →
@@ -112,7 +115,7 @@ export default function GestaoTransicaoComposer({
         <div>
           <span className="gestao-eyebrow">Para</span>
           <span className={classeStatus(descricao.para.status)}>{rotulo(descricao.para.status)}</span>
-          <small>{nomeGestao(descricao.para.etapa)}</small>
+          <small>{rotuloEtapa(descricao.para.etapa)}</small>
         </div>
       </div>
       <div className="gestao-transicao-fields">
@@ -123,7 +126,7 @@ export default function GestaoTransicaoComposer({
               .filter((item) => etapasPermitidas.includes(item))
               .map((item) => (
                 <option value={item} key={item}>
-                  {nomeGestao(item)}
+                  {rotuloEtapa(item)}
                 </option>
               ))}
           </select>

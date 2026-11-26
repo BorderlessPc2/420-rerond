@@ -438,6 +438,9 @@
 .gestao-map-legend .gestao-legend-attention { background: var(--gestao-map-attention); }
 .gestao-map-legend .gestao-legend-progress { background: var(--gestao-map-progress); }
 .gestao-map-legend .gestao-legend-neutral { background: var(--gestao-map-neutral); }
+.gestao-map-legend .gestao-legend-dot { display: inline-block; inline-size: 10px; block-size: 10px; margin-inline-end: 6px; border-radius: 50%; vertical-align: -1px; border: 1px solid rgb(0 0 0 / 10%); }
+.gestao-timeline-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; margin-block-end: 8px; }
+.gestao-timeline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 @media (max-width: 800px) {
   .gestao-page { padding: 22px 16px 48px; }

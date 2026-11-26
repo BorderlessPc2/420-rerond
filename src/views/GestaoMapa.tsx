@@ -6,15 +6,21 @@ import PontoIconBar from '../components/gestao/PontoIconBar'
 import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
 import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
+import GestaoMapLegenda from '../components/gestao/GestaoMapLegenda'
 import { filtrarPontosMapa, getPontoColor, getSelectedPointId } from '../components/gestao/mapaUtils'
 import { nomeGestao } from './gestaoUi'
+import { mesclarDashboardConfig } from '../services/gestaoDashboardConfig'
 import { getPontoDetailSummary, removerPontoSelecionado } from './gestaoMapaHelpers'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import SelectDropdown from '../components/ui/selectDropdown'
 
 export default function GestaoMapa() {
   const { contratoId = '' } = useParams()
-  const { pontos, protocolos, loading, refresh } = useOutletContext<GestaoContext>()
+  const { contrato, pontos, protocolos, loading, refresh } = useOutletContext<GestaoContext>()
+  const dashboardConfig = useMemo(
+    () => mesclarDashboardConfig(contrato.dashboardConfig, contrato.statusPersonalizados),
+    [contrato.dashboardConfig, contrato.statusPersonalizados],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedPointId, setSelectedPointId] = useState<string | null>(() => getSelectedPointId(searchParams.toString(), pontos))
   const [viewMode, setViewMode] = useState<'selected' | 'all'>(() => getSelectedPointId(searchParams.toString(), pontos) ? 'selected' : 'all')
@@ -122,7 +128,7 @@ export default function GestaoMapa() {
       </aside>
     </div>
     <p className="gestao-map-note">A faixa lista o recorte na ordem do código. Anterior e Próximo, ou as setas do teclado, percorrem os pontos. Ver todos enquadra o mapa. Clique no mapa e use a roda para ampliar. O anel vazio no pino indica coordenada aproximada.</p>
-    <div className="gestao-map-legend"><strong>Legenda</strong><span><i className="gestao-legend-dot gestao-legend-success" /> Concluído</span><span><i className="gestao-legend-dot gestao-legend-attention" /> Atenção</span><span><i className="gestao-legend-dot gestao-legend-progress" /> Em andamento</span><span><i className="gestao-legend-dot gestao-legend-neutral" /> Não iniciado</span></div>
+    <GestaoMapLegenda config={dashboardConfig} />
     <h3>Coordenadas pendentes <span className="gestao-count">{pending.length}</span></h3>{pending.length ? <ul className="gestao-simple-list">{pending.map((ponto) => <li key={ponto.id}><button type="button" className="gestao-button-link" onClick={() => selectPoint(ponto)}>{ponto.codigo} · {ponto.rodovia} km {ponto.km} — registrar coordenadas</button></li>)}</ul> : <p className="gestao-empty">Nenhum ponto sem coordenadas neste recorte.</p>}
   </section>
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDashboardGestao, criarProtocoloComPontos, excluirMovimento, excluirProtocolo, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, situacaoAposExcluirMovimento, validarEdicaoPonto, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
+import { atualizarMovimento, calcularDashboardGestao, criarProtocoloComPontos, excluirMovimento, excluirProtocolo, filtrarGestao, getContratoCascadeCollections, indicadoresGestao, pontoStatus, progressoEtapa, situacaoAposExcluirMovimento, validarEdicaoPonto, validarPontoInput, validarTransicao, vincularPontoProtocolo, type Ponto, type Protocolo } from './gestaoContratos'
 import { getMapBounds, getMapPoints, getPontoColor } from '../components/gestao/mapaUtils'
 import { validarInputContrato, validarInputPonto, validarInputProtocolo, type PontoInput, type ProtocoloInput } from './gestaoValidacao'
 
@@ -101,6 +101,7 @@ describe('validação de gestão', () => {
     expect(situacaoAposExcluirMovimento([])).toEqual({ etapa: 'planejamento', status: 'nao_iniciado' })
     expect(excluirProtocolo).toBeTypeOf('function')
     expect(excluirMovimento).toBeTypeOf('function')
+    expect(atualizarMovimento).toBeTypeOf('function')
   })
   it('rejeita transição para correção sem observação', () => {
     expect(validarTransicao('fase_1', 'em_andamento', 'fase_1', 'em_correcao', '')).toBe('Informe observação para correção ou paralisação.')

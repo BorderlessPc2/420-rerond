@@ -1,4 +1,7 @@
 import type { Ponto, Protocolo } from './gestaoContratos'
+import { ETAPAS_ORDEM } from './gestaoTransicoes'
+import { nomeGestao } from '../views/gestaoUi'
+import { LEGENDA_MAPA_GESTAO } from '../components/gestao/mapaLegendaCatalog'
 import type { Situacao } from './gestaoContratos'
 import {
   corStatusProtocolo,
@@ -23,10 +26,14 @@ const CORES_STATUS_PADRAO: Record<Situacao, string> = {
 export type GestaoDashboardConfig = {
   statusVisiveis?: string[]
   rotulosStatus?: Record<string, string>
+  rotulosEtapa?: Record<string, string>
+  rotulosMapa?: Record<string, string>
   previstoStatus?: string[]
   realizadoStatus?: string[]
   previstoRealizadoBase?: 'ponto' | 'protocolo'
 }
+
+export const ROTULO_ETAPA_PADRAO = (etapa: string) => nomeGestao(etapa)
 
 export const TODAS_SITUACOES_PROTOCOLO = SITUACOES_PADRAO
 
@@ -35,6 +42,8 @@ export const dashboardConfigPadrao = (personalizados?: StatusPersonalizado[]): G
   return {
     statusVisiveis: [...todos],
     rotulosStatus: {},
+    rotulosEtapa: {},
+    rotulosMapa: {},
     previstoStatus: [...todos],
     realizadoStatus: [...todos],
     previstoRealizadoBase: 'ponto',
@@ -50,6 +59,8 @@ export const mesclarDashboardConfig = (
   return {
     statusVisiveis: parcial.statusVisiveis?.length ? [...parcial.statusVisiveis] : padrao.statusVisiveis,
     rotulosStatus: { ...padrao.rotulosStatus, ...parcial.rotulosStatus },
+    rotulosEtapa: { ...padrao.rotulosEtapa, ...parcial.rotulosEtapa },
+    rotulosMapa: { ...padrao.rotulosMapa, ...parcial.rotulosMapa },
     previstoStatus: parcial.previstoStatus?.length ? [...parcial.previstoStatus] : padrao.previstoStatus,
     realizadoStatus: parcial.realizadoStatus?.length ? [...parcial.realizadoStatus] : padrao.realizadoStatus,
     previstoRealizadoBase: parcial.previstoRealizadoBase ?? padrao.previstoRealizadoBase,
@@ -67,6 +78,23 @@ export const rotuloStatusDashboard = (
   const custom = config.rotulosStatus?.[status]?.trim()
   if (custom) return custom
   return rotuloStatusProtocolo(status, personalizados)
+}
+
+export const rotuloEtapaDashboard = (etapa: string, config?: GestaoDashboardConfig | null) => {
+  const custom = config?.rotulosEtapa?.[etapa]?.trim()
+  if (custom) return custom
+  return ROTULO_ETAPA_PADRAO(etapa)
+}
+
+export const rotuloLegendaMapaDashboard = (
+  id: string,
+  config?: GestaoDashboardConfig | null,
+  fallback?: string,
+) => {
+  const custom = config?.rotulosMapa?.[id]?.trim()
+  if (custom) return custom
+  const padrao = LEGENDA_MAPA_GESTAO.find((item) => item.id === id)?.label
+  return padrao ?? fallback ?? id
 }
 
 export const corStatusDashboard = (status: string, personalizados?: StatusPersonalizado[]) => {
@@ -117,9 +145,23 @@ export const sanitizarDashboardConfig = (
     const texto = label.trim()
     if (texto && permitidos.has(status)) rotulos[status] = texto.slice(0, 80)
   })
+  const rotulosEtapa: Record<string, string> = {}
+  const etapasPermitidas = new Set<string>(ETAPAS_ORDEM)
+  Object.entries(input.rotulosEtapa ?? {}).forEach(([etapa, label]) => {
+    const texto = label.trim()
+    if (texto && etapasPermitidas.has(etapa)) rotulosEtapa[etapa] = texto.slice(0, 80)
+  })
+  const rotulosMapa: Record<string, string> = {}
+  const mapaIds = new Set(LEGENDA_MAPA_GESTAO.map((item) => item.id))
+  Object.entries(input.rotulosMapa ?? {}).forEach(([id, label]) => {
+    const texto = label.trim()
+    if (texto && mapaIds.has(id)) rotulosMapa[id] = texto.slice(0, 80)
+  })
   return {
     statusVisiveis: filtra(input.statusVisiveis),
     rotulosStatus: rotulos,
+    rotulosEtapa,
+    rotulosMapa,
     previstoStatus: filtra(input.previstoStatus),
     realizadoStatus: filtra(input.realizadoStatus),
     previstoRealizadoBase: input.previstoRealizadoBase === 'protocolo' ? 'protocolo' : 'ponto',

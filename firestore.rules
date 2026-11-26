@@ -191,13 +191,14 @@ service cloud.firestore {
       allow update: if request.auth != null && validMovimento(request.resource.data, movimentoId)
         && resource.data.contratoId == request.resource.data.contratoId
         && resource.data.protocoloId == request.resource.data.protocoloId
-        && resource.data.tipo == request.resource.data.tipo
-        && resource.data.em == request.resource.data.em
         && resource.data.etapa == request.resource.data.etapa
         && resource.data.status == request.resource.data.status
         && resource.data.autor == request.resource.data.autor
-        && resource.data.observacao == request.resource.data.observacao
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['anexos']);
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['anexos'])
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tipo', 'observacao', 'em'])
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tipo', 'observacao', 'em', 'anexos'])
+        );
       allow delete: if request.auth != null;
     }
 

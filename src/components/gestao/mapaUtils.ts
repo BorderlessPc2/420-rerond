@@ -83,7 +83,15 @@ export const getPontoColor = (ponto: Ponto, protocolo?: Protocolo) => {
   if (protocolo?.status === 'em_correcao') return '#c43d4b'
   if (protocolo?.status === 'aguardando_terceiros') return '#b97912'
   if (protocolo?.status === 'em_analise') return '#7656a8'
+  if (protocolo?.status === 'aprovado_concessionaria') return '#147d8a'
   if (protocolo?.status === 'em_andamento') return '#236da8'
   if (protocolo?.status === 'concluido') return '#1f8f5f'
+  const statusProtocolo = protocolo?.status as string | undefined
+  if (statusProtocolo?.startsWith('custom_')) return '#5b6ee1'
   return '#6b7280'
 }
+
+export { LEGENDA_MAPA_GESTAO } from './mapaLegendaCatalog'
+
+/** @deprecated Use LEGENDA_MAPA_GESTAO */
+export { LEGENDA_MAPA_GESTAO as legendaCoresMapaGestao } from './mapaLegendaCatalog'

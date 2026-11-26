@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId, marcadoresDeProtocolo, separarPontosSobrepostos } from './mapaUtils'
+import { getMapBounds, getMapPoints, getPontoColor, getSelectedPointId, LEGENDA_MAPA_GESTAO, marcadoresDeProtocolo, separarPontosSobrepostos } from './mapaUtils'
 import type { Ponto, Protocolo } from '../../services/gestaoContratos'
 
 const protocolo: Protocolo = { id: 'protocolo', contratoId: 'contrato', titulo: 'Protocolo', concessionaria: 'Eco', rodovia: 'BR-101', etapa: 'fase_1', status: 'em_andamento' }
@@ -13,6 +13,11 @@ describe('utilitários do mapa de gestão', () => {
   })
   it('classifica ponto concluído com cor operacional', () => {
     expect(getPontoColor(ponto, protocolo)).toBe('#1f8f5f')
+  })
+  it('usa roxo para em análise e expõe legenda sincronizada', () => {
+  const emAnalise = { ...protocolo, status: 'em_analise' as const }
+    expect(getPontoColor(ponto, emAnalise)).toBe('#7656a8')
+    expect(LEGENDA_MAPA_GESTAO.find((item) => item.id === 'em_analise')?.color).toBe('#7656a8')
   })
   it('separa pontos sobrepostos sem alterar o ponto original', () => {
     const vizinho = { ...ponto, id: 'ponto-2', codigo: 'P-02' }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { calcularPrevistoRealizado } from './gestaoDashboardConfig'
-import { dashboardConfigPadrao } from './gestaoDashboardConfig'
+import {
+  calcularPrevistoRealizado,
+  dashboardConfigPadrao,
+  rotuloEtapaDashboard,
+  rotuloLegendaMapaDashboard,
+  sanitizarDashboardConfig,
+} from './gestaoDashboardConfig'
 import type { Ponto, Protocolo } from './gestaoContratos'
 
 const protocolos: Protocolo[] = [
@@ -21,5 +26,15 @@ describe('gestaoDashboardConfig', () => {
       realizadoStatus: ['em_correcao' as const],
     }
     expect(calcularPrevistoRealizado(protocolos, pontos, config)).toEqual({ previsto: 1, realizado: 1 })
+  })
+
+  it('usa rótulos personalizados de etapa e mapa', () => {
+    const config = sanitizarDashboardConfig({
+      ...dashboardConfigPadrao(),
+      rotulosEtapa: { fase_1: 'Fase contratual' },
+      rotulosMapa: { em_analise: 'Análise ANTT' },
+    })
+    expect(rotuloEtapaDashboard('fase_1', config)).toBe('Fase contratual')
+    expect(rotuloLegendaMapaDashboard('em_analise', config)).toBe('Análise ANTT')
   })
 })

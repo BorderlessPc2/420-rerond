@@ -7,7 +7,7 @@ import { calcularDashboardGestao } from '../services/gestaoDashboard'
 import { exportarRecorteGestao, gestaoFiltroFromSearchParams } from '../services/gestaoExportacao'
 import GestaoDashboardCharts from '../components/gestao/GestaoDashboardCharts'
 import GestaoDashboardPersonalizarModal from '../components/gestao/GestaoDashboardPersonalizarModal'
-import { mesclarDashboardConfig, rotuloStatusDashboard } from '../services/gestaoDashboardConfig'
+import { mesclarDashboardConfig, rotuloEtapaDashboard, rotuloStatusDashboard } from '../services/gestaoDashboardConfig'
 import { listarStatusContrato } from '../services/gestaoStatusCatalogo'
 import SelectDropdown from '../components/ui/selectDropdown'
 import GestaoLoadingSkeleton from '../components/gestao/GestaoLoadingSkeleton'
@@ -151,7 +151,7 @@ export default function GestaoContratoDetalhe() {
           <div className="gestao-overview-fields">
             <SelectDropdown id="gestao-dashboard-status" label="Status" value={status ?? ''} onChange={(value) => setDashboardParam('status', value)} options={[{ value: '', label: 'Todos' }, ...statusOpcoes.map((item) => ({ value: item, label: rotuloStatusDashboard(item, dashboardConfig, contrato.statusPersonalizados) }))]} />
             <SelectDropdown id="gestao-dashboard-tipo" label="Tipo de ponto" value={tipo ?? ''} onChange={(value) => setDashboardParam('tipo', value)} options={[{ value: '', label: 'Todos' }, { value: 'nova_implantacao', label: 'Nova implantação' }, { value: 'regularizacao', label: 'Regularização' }]} />
-            <SelectDropdown id="gestao-dashboard-etapa" label="Etapa" value={etapa ?? ''} onChange={(value) => setDashboardParam('etapa', value)} options={[{ value: '', label: 'Todas' }, ...etapasFiltro.map((item) => ({ value: item, label: nomeGestao(item) }))]} />
+            <SelectDropdown id="gestao-dashboard-etapa" label="Etapa" value={etapa ?? ''} onChange={(value) => setDashboardParam('etapa', value)} options={[{ value: '', label: 'Todas' }, ...etapasFiltro.map((item) => ({ value: item, label: rotuloEtapaDashboard(item, dashboardConfig) }))]} />
           </div>
         </fieldset>
         <fieldset className="gestao-overview-period">
@@ -198,7 +198,7 @@ export default function GestaoContratoDetalhe() {
           <h2>Gráficos do recorte</h2>
           <p>Distribuição por status e Previsto x realizado seguem a personalização deste contrato.</p>
         </div>
-        <button type="button" className="gestao-button-secondary" onClick={() => setPersonalizarDashboard(true)}>Personalizar status</button>
+        <button type="button" className="gestao-button-secondary" onClick={() => setPersonalizarDashboard(true)}>Personalizar indicadores e rótulos</button>
       </div>
       <GestaoDashboardCharts data={dashboard} previstoRealizadoBase={dashboardConfig.previstoRealizadoBase} />
     </section>

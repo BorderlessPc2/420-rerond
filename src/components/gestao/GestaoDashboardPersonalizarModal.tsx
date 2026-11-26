@@ -13,7 +13,13 @@ import {
   sanitizarStatusPersonalizados,
   type StatusPersonalizado,
 } from '../../services/gestaoStatusCatalogo'
-import { rotuloStatusDashboard } from '../../services/gestaoDashboardConfig'
+import {
+  rotuloEtapaDashboard,
+  rotuloLegendaMapaDashboard,
+  rotuloStatusDashboard,
+} from '../../services/gestaoDashboardConfig'
+import { ETAPAS_ORDEM } from '../../services/gestaoTransicoes'
+import { LEGENDA_MAPA_GESTAO } from './mapaUtils'
 
 type Props = {
   open: boolean
@@ -68,6 +74,20 @@ export default function GestaoDashboardPersonalizarModal({
     setDraft((atual) => ({
       ...atual,
       rotulosStatus: { ...atual.rotulosStatus, [status]: rotulo },
+    }))
+  }
+
+  const atualizarRotuloEtapa = (etapa: string, rotulo: string) => {
+    setDraft((atual) => ({
+      ...atual,
+      rotulosEtapa: { ...atual.rotulosEtapa, [etapa]: rotulo },
+    }))
+  }
+
+  const atualizarRotuloMapa = (id: string, rotulo: string) => {
+    setDraft((atual) => ({
+      ...atual,
+      rotulosMapa: { ...atual.rotulosMapa, [id]: rotulo },
     }))
   }
 
@@ -166,8 +186,8 @@ export default function GestaoDashboardPersonalizarModal({
   return (
     <ModalGestao
       open={open}
-      title="Personalizar indicadores"
-      description="Crie status sob medida para este contrato e escolha o que entra no gráfico e no Previsto x realizado."
+      title="Personalizar indicadores e rótulos"
+      description="Ajuste status, etapas, legendas do mapa e o que entra no gráfico e no Previsto x realizado."
       labelledBy="gestao-dashboard-pref-title"
       onClose={onClose}
     >
@@ -208,6 +228,49 @@ export default function GestaoDashboardPersonalizarModal({
             {todosStatus.map((status) =>
               linhaStatus(status, draft.statusVisiveis ?? [], (next) => setDraft((atual) => ({ ...atual, statusVisiveis: next })), true),
             )}
+          </ul>
+        </section>
+
+        <section className="gestao-dash-pref-section">
+          <h3>Nomes das etapas</h3>
+          <p>Renomeie as fases do fluxo (stepper, filtros e movimentações). Deixe em branco para o padrão do sistema.</p>
+          <ul className="gestao-dash-pref-list">
+            {ETAPAS_ORDEM.map((etapa) => (
+              <li key={etapa} className="gestao-dash-pref-row">
+                <span className="gestao-dash-pref-etapa-default">{rotuloEtapaDashboard(etapa, null)}</span>
+                <input
+                  type="text"
+                  className="gestao-dash-pref-label"
+                  placeholder={rotuloEtapaDashboard(etapa, null)}
+                  value={draft.rotulosEtapa?.[etapa] ?? ''}
+                  onChange={(event) => atualizarRotuloEtapa(etapa, event.target.value)}
+                  maxLength={80}
+                  aria-label={`Rótulo personalizado para etapa ${etapa}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="gestao-dash-pref-section">
+          <h3>Legenda do mapa</h3>
+          <p>Personalize os rótulos exibidos ao lado das cores no mapa.</p>
+          <ul className="gestao-dash-pref-list">
+            {LEGENDA_MAPA_GESTAO.map((item) => (
+              <li key={item.id} className="gestao-dash-pref-row gestao-dash-pref-mapa-row">
+                <span className="gestao-dash-pref-swatch" style={{ background: item.color }} aria-hidden />
+                <input
+                  type="text"
+                  className="gestao-dash-pref-label"
+                  placeholder={item.label}
+                  value={draft.rotulosMapa?.[item.id] ?? ''}
+                  onChange={(event) => atualizarRotuloMapa(item.id, event.target.value)}
+                  maxLength={80}
+                  aria-label={`Rótulo da legenda ${item.label}`}
+                />
+                <small>{rotuloLegendaMapaDashboard(item.id, draft, item.label)}</small>
+              </li>
+            ))}
           </ul>
         </section>
 

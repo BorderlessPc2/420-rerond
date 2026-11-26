@@ -5,6 +5,7 @@ import { validarInputPonto, validarInputProtocolo, validarInputContrato, type Co
 import { validarTransicao } from './gestaoTransicoes'
 import type { GestaoDashboardConfig } from './gestaoDashboardConfig'
 import type { StatusPersonalizado } from './gestaoStatusCatalogo'
+import { anexoGestaoPermitido, mimeAnexoGestao } from './gestaoAnexos'
 
 export type SituacaoContrato = 'ativo' | 'suspenso' | 'encerrado'
 
@@ -348,6 +349,44 @@ export const listMovimentos = async (contratoId: string, protocoloId: string) =>
     .filter((item) => item.contratoId === contratoId)
     .sort((a, b) => a.em.localeCompare(b.em))
 }
+export const atualizarMovimento = async (
+  contratoId: string,
+  protocoloId: string,
+  movimentoId: string,
+  input: Pick<Movimento, 'tipo' | 'observacao' | 'em'> & { files?: File[] },
+) => {
+  if (!input.tipo.trim() || !input.em || !Number.isFinite(Date.parse(input.em))) throw new Error('Informe tipo e data válida.')
+  const movimentos = await listMovimentos(contratoId, protocoloId)
+  const atual = movimentos.find((item) => item.id === movimentoId)
+  if (!atual) throw new Error('Movimentação não encontrada neste protocolo.')
+  const files = input.files ?? []
+  if (files.some((file) => file.size > 20 * 1024 * 1024)) throw new Error('Cada anexo deve ter até 20 MB.')
+  if (files.some((file) => !anexoGestaoPermitido(file))) throw new Error('Anexe apenas PDF, Word, TXT, PNG ou JPEG.')
+  const anexos = [...(atual.anexos ?? [])]
+  const enviados: string[] = []
+  try {
+    for (const file of files) {
+      const path = `gestaoContratos/${contratoId}/${protocoloId}/${movimentoId}/${crypto.randomUUID()}/${file.name}`
+      const uploaded = await uploadBytes(ref(storage, path), file, { contentType: mimeAnexoGestao(file) })
+      enviados.push(path)
+      anexos.push({ nome: file.name, url: await getDownloadURL(uploaded.ref) })
+    }
+    await updateDoc(doc(db, 'gestaoMovimentos', movimentoId), {
+      tipo: input.tipo.trim(),
+      observacao: input.observacao.trim(),
+      em: input.em,
+      anexos,
+    })
+  } catch (err) {
+    await Promise.all(
+      enviados.map((path) =>
+        deleteObject(ref(storage, path)).catch(() => undefined),
+      ),
+    )
+    throw err
+  }
+}
+
 export const excluirMovimento = async (contratoId: string, protocoloId: string, movimentoId: string) => {
   const movimentos = await listMovimentos(contratoId, protocoloId)
   const alvoIndex = movimentos.findIndex((item) => item.id === movimentoId)
@@ -383,18 +422,14 @@ export const registrarMovimento = async (contratoId: string, protocoloId: string
   if (transitionError) throw new Error(transitionError)
   const files = input.files ?? []
   if (files.some((file) => file.size > 20 * 1024 * 1024)) throw new Error('Cada anexo deve ter até 20 MB.')
-  const anexoPermitido = (file: File) => {
-    const tipos = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
-    return tipos.includes(file.type) || ((!file.type || file.type === 'application/octet-stream') && /\.(pdf|png|jpe?g|docx?|txt)$/i.test(file.name))
-  }
-  if (files.some((file) => !anexoPermitido(file))) throw new Error('Anexe apenas PDF, Word, TXT, PNG ou JPEG.')
+  if (files.some((file) => !anexoGestaoPermitido(file))) throw new Error('Anexe apenas PDF, Word, TXT, PNG ou JPEG.')
   const movementRef = doc(collection(db, 'gestaoMovimentos'))
   const anexos: Movimento['anexos'] = []
   const enviados: string[] = []
   try {
     for (const file of files) {
       const path = `gestaoContratos/${contratoId}/${protocoloId}/${movementRef.id}/${crypto.randomUUID()}/${file.name}`
-      const uploaded = await uploadBytes(ref(storage, path), file)
+      const uploaded = await uploadBytes(ref(storage, path), file, { contentType: mimeAnexoGestao(file) })
       enviados.push(path)
       anexos.push({ nome: file.name, url: await getDownloadURL(uploaded.ref) })
     }
