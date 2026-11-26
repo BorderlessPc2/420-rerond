@@ -152,7 +152,7 @@ export const sanitizarDashboardConfig = (
     if (texto && etapasPermitidas.has(etapa)) rotulosEtapa[etapa] = texto.slice(0, 80)
   })
   const rotulosMapa: Record<string, string> = {}
-  const mapaIds = new Set(LEGENDA_MAPA_GESTAO.map((item) => item.id))
+  const mapaIds = new Set<string>(LEGENDA_MAPA_GESTAO.map((item) => item.id))
   Object.entries(input.rotulosMapa ?? {}).forEach(([id, label]) => {
     const texto = label.trim()
     if (texto && mapaIds.has(id)) rotulosMapa[id] = texto.slice(0, 80)

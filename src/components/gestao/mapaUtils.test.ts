@@ -15,8 +15,9 @@ describe('utilitários do mapa de gestão', () => {
     expect(getPontoColor(ponto, protocolo)).toBe('#1f8f5f')
   })
   it('usa roxo para em análise e expõe legenda sincronizada', () => {
-  const emAnalise = { ...protocolo, status: 'em_analise' as const }
-    expect(getPontoColor(ponto, emAnalise)).toBe('#7656a8')
+    const semResultado = { ...ponto, resultado: undefined }
+    const emAnalise = { ...protocolo, status: 'em_analise' as const }
+    expect(getPontoColor(semResultado, emAnalise)).toBe('#7656a8')
     expect(LEGENDA_MAPA_GESTAO.find((item) => item.id === 'em_analise')?.color).toBe('#7656a8')
   })
   it('separa pontos sobrepostos sem alterar o ponto original', () => {

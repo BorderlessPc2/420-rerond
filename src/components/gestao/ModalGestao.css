@@ -66,7 +66,7 @@
 .gestao-modal-close:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .gestao-modal-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; min-inline-size: 0; max-inline-size: 100%; padding: 28px 32px 32px; }
 .gestao-modal-body > * { min-inline-size: 0; max-inline-size: 100%; }
-.gestao-modal-body .gestao-form:not(.gestao-form-grid):not(.gestao-contract-edit-form) { display: grid; gap: 16px; }
+.gestao-modal-body .gestao-form:not(.gestao-form-grid):not(.gestao-contract-edit-form):not(.gestao-dash-pref-form) { display: grid; gap: 16px; }
 .gestao-modal-body .gestao-form:not(.gestao-form-grid):not(.gestao-contract-edit-form) > label { min-inline-size: 0; flex: none; }
 .gestao-modal-body .gestao-form-grid,
 .gestao-modal-body .gestao-contract-edit-form { gap: 24px; }

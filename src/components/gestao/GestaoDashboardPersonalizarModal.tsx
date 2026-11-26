@@ -160,13 +160,14 @@ export default function GestaoDashboardPersonalizarModal({
     onLista: (next: string[]) => void,
     mostrarRotulo = false,
   ) => (
-    <li key={status} className="gestao-dash-pref-row">
-      <label className="gestao-dash-pref-check">
+    <li key={status} className={`gestao-dash-pref-row${mostrarRotulo ? ' gestao-dash-pref-row--status' : ''}`}>
+      <label className="gestao-dash-pref-check gestao-point-check">
         <input
           type="checkbox"
           checked={lista.includes(status)}
           onChange={() => onLista(toggleLista(lista, status))}
         />
+        <span className="gestao-checkbox-icon" aria-hidden />
         <span>{rotuloStatusDashboard(status, draft, statusDraft)}</span>
       </label>
       {mostrarRotulo && (

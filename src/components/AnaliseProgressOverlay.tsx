@@ -201,14 +201,15 @@ export default function AnaliseProgressOverlay({
         className="apo-hidden-chip"
         onClick={onShow}
         aria-live="polite"
+        aria-label={`Análise em andamento, ${displayPercent} por cento. Passe o mouse para detalhes ou clique para exibir.`}
         title="Exibir progresso da análise"
       >
-        <Sparkles size={15} className="apo-hidden-chip-icon" aria-hidden />
-        <span className="apo-hidden-chip-copy">
+        <Sparkles size={16} className="apo-hidden-chip-icon" aria-hidden />
+        <span className="apo-hidden-chip-copy" aria-hidden>
           <strong>Análise em andamento</strong>
           <span>{displayPercent}% · {jobState ? JOB_STATE_LABELS[jobState] : current.label}</span>
         </span>
-        <span className="apo-hidden-chip-action">Exibir</span>
+        <span className="apo-hidden-chip-action" aria-hidden>Exibir</span>
       </button>
     )
   }

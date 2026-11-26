@@ -52,7 +52,8 @@
 .gestao-page :is(button, a, input, select, textarea):focus-visible,
 .gestao-modal-host :is(button, a, input, select, textarea):focus-visible { outline: 3px solid var(--color-primary-600); outline-offset: 3px; }
 
-.gestao-nav { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-inline: contain; padding-block: 0 12px; margin-block-end: 18px; border-bottom: 1px solid var(--color-border); scrollbar-width: thin; mask-image: linear-gradient(90deg, transparent, #000 18px calc(100% - 28px), transparent); }
+.gestao-nav { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-inline: contain; padding-block: 0 12px; margin-block-end: 18px; border-bottom: 1px solid var(--color-border); scrollbar-width: thin; }
+.gestao-nav a.active:focus-visible { outline-color: color-mix(in srgb, var(--color-accent-500) 85%, white); }
 .gestao-nav a { position: relative; flex: 0 0 auto; white-space: nowrap; padding: 10px 13px; border-radius: var(--radius-md); font-size: .91rem; font-weight: 600; text-decoration: none; transition: background-color var(--gestao-duration-fast) var(--gestao-ease-out), color var(--gestao-duration-fast) var(--gestao-ease-out); }
 .gestao-nav a:hover { background: var(--color-primary-50); }
 .gestao-nav a.active { background: var(--color-primary-800); color: white; }
@@ -62,7 +63,9 @@
 .gestao-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; padding: 18px; margin-block: 8px 16px; background: var(--color-primary-50); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .gestao-filtros label, .gestao-form label, .gestao-point-actions label { display: flex; flex-direction: column; gap: 6px; font-size: .83rem; font-weight: 600; color: var(--color-text-soft); }
 .gestao-page input, .gestao-page select, .gestao-page textarea,
-.gestao-modal-host input, .gestao-modal-host select, .gestao-modal-host textarea { box-sizing: border-box; min-block-size: 42px; inline-size: 100%; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 1rem; }
+.gestao-modal-host input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']),
+.gestao-modal-host select,
+.gestao-modal-host textarea { box-sizing: border-box; min-block-size: 42px; inline-size: 100%; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 1rem; }
 .gestao-page textarea,
 .gestao-modal-host textarea { min-block-size: 88px; resize: vertical; }
 .gestao-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 0; }
@@ -198,14 +201,15 @@
 .gestao-overview-head h2 { margin: 4px 0 6px; font-size: 1.28rem; letter-spacing: -.03em; }
 .gestao-overview-head p { margin: 0; max-inline-size: 52ch; font-size: .9rem; }
 .gestao-overview-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 14px; }
-.gestao-overview-filters { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(220px, .9fr); gap: 18px 28px; }
+.gestao-overview-filters { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px 28px; }
 .gestao-overview-filters fieldset { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
 .gestao-overview-filters legend { margin-block-end: 10px; padding: 0; color: var(--color-text-soft); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .gestao-overview-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); gap: 10px; }
-.gestao-overview-period .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gestao-overview-period .gestao-overview-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
 .gestao-overview-search { grid-column: 1 / -1; }
 .gestao-overview-panel label { display: grid; gap: 5px; min-inline-size: 0; color: var(--color-text-soft); font-size: .74rem; font-weight: 600; }
-.gestao-overview-panel :is(input, select) { min-block-size: 38px; padding: 7px 10px; font-size: .9rem; background: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-surface)); }
+.gestao-overview-panel :is(input, select) { min-block-size: 38px; min-inline-size: 0; max-inline-size: 100%; inline-size: 100%; padding: 7px 10px; font-size: .9rem; background: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-surface)); box-sizing: border-box; }
+.gestao-overview-panel input[type='date'] { padding-inline: 8px; }
 .gestao-overview-live { margin: 0; padding-block-start: 2px; color: var(--color-text-soft); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .gestao-point-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-block: 8px 10px; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
 .gestao-point-filter-head > div { display: grid; gap: 4px; min-inline-size: 0; }
@@ -269,8 +273,9 @@
 .gestao-simple-list li span { color: var(--color-text-soft); }
 .gestao-point-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px 20px; min-inline-size: 0; padding: 18px 20px; }
 .gestao-point-row.is-selected { background: color-mix(in srgb, var(--color-primary-50) 80%, white); }
-.gestao-point-check { display: flex; align-items: center; gap: 8px; font-size: .86rem; }
-.gestao-point-check input { inline-size: 18px; block-size: 18px; }
+.gestao-point-check:not(:has(.gestao-checkbox-icon)) { display: flex; align-items: center; gap: 8px; font-size: .86rem; }
+.gestao-point-check:not(:has(.gestao-checkbox-icon)) input { inline-size: 18px; block-size: 18px; }
+.gestao-dash-pref-check.gestao-point-check input { position: absolute !important; inline-size: 1px !important; block-size: 1px !important; opacity: 0; margin: 0; padding: 0; border: 0; min-block-size: 0 !important; }
 .gestao-bulk-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-primary-50); }
 .gestao-bulk-bar label { display: grid; gap: 4px; min-inline-size: 220px; font-size: .78rem; font-weight: 700; }
 .gestao-bulk-bar select { min-block-size: 40px; }
@@ -517,18 +522,27 @@
 @media (max-width: 380px) { .gestao-attention-items { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .gestao-health, .gestao-dashboard-map, .gestao-quicklinks .gestao-card { animation: none; } .gestao-save-button-success, .gestao-save-button-error { animation: none; } .gestao-metrics > div:hover { transform: none; } }
 .gestao-dashboard-tools { margin-block: 8px 20px; }
-.gestao-dash-pref-form { display: grid; gap: 18px; max-block-size: min(72vh, 680px); overflow: auto; padding-inline-end: 4px; }
+.gestao-dash-pref-form { display: grid; gap: 18px; min-block-size: 0; }
 .gestao-dash-pref-section { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-primary-50); }
 .gestao-dash-pref-section h3, .gestao-dash-pref-section h4 { margin: 0; font-size: .95rem; }
 .gestao-dash-pref-section > p { margin: 0; color: var(--color-text-soft); font-size: .84rem; }
 .gestao-dash-pref-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .gestao-dash-pref-list-compact .gestao-dash-pref-label { display: none; }
 .gestao-dash-pref-row { display: grid; gap: 6px; }
-.gestao-dash-pref-check { display: flex; align-items: center; gap: 8px; font-size: .86rem; font-weight: 600; cursor: pointer; }
+.gestao-dash-pref-row--status { padding: 8px 10px; border-radius: 10px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.gestao-dash-pref-check { position: relative; display: inline-flex; align-items: center; gap: 10px; min-inline-size: 0; font-size: .86rem; font-weight: 600; cursor: pointer; }
+.gestao-dash-pref-check input { position: absolute; inline-size: 1px; block-size: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.gestao-dash-pref-check .gestao-checkbox-icon { flex-shrink: 0; }
+.gestao-dash-pref-check span:not(.gestao-checkbox-icon) { flex: 1; min-inline-size: 0; }
+.gestao-dash-pref-mapa-row { grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+.gestao-dash-pref-mapa-row .gestao-dash-pref-label { grid-column: 2; }
+.gestao-dash-pref-mapa-row small { grid-column: 2; color: var(--color-text-soft); font-size: .72rem; }
+.gestao-dash-pref-etapa-default { min-inline-size: 9.5rem; color: var(--color-text); font-size: .86rem; font-weight: 600; }
 .gestao-dash-pref-label { inline-size: 100%; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; font-size: .84rem; }
 .gestao-dash-pref-base { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
 .gestao-dash-pref-base legend { margin-block-end: 4px; font-size: .82rem; font-weight: 700; }
 .gestao-dash-pref-base label { display: flex; align-items: center; gap: 8px; font-size: .84rem; }
+.gestao-dash-pref-base input[type='radio'] { inline-size: 16px !important; block-size: 16px !important; min-block-size: 0 !important; flex-shrink: 0; margin: 0; accent-color: var(--color-primary-700); cursor: pointer; }
 .gestao-dash-pref-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 .gestao-dash-pref-footer { justify-content: flex-end; }
 .gestao-dash-pref-add { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: end; }
