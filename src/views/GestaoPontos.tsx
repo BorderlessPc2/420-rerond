@@ -152,23 +152,54 @@ export default function GestaoPontos() {
           Novo ponto
         </button>
       </div>
-      <div className="gestao-point-filter-head">
-        <div>
-          <span className="gestao-eyebrow">Localizar pontos</span>
-          <strong>{busca ? `Resultados para “${busca}”` : 'Use busca e ordenação para encontrar um ponto'}</strong>
+      <div className="gestao-point-locate">
+        <div className="gestao-point-filter-head gestao-point-locate-head">
+          <div className="gestao-point-locate-copy">
+            <span className="gestao-eyebrow">Localizar pontos</span>
+            <p className="gestao-point-locate-status">
+              {busca.trim()
+                ? `${pontosLista.length} ${pontosLista.length === 1 ? 'resultado' : 'resultados'} para “${busca.trim()}”`
+                : `${pontosLista.length} ${pontosLista.length === 1 ? 'ponto' : 'pontos'} no recorte · busque sem abrir filtros`}
+            </p>
+          </div>
+          <div className="gestao-point-locate-toolbar">
+            <label className="gestao-point-search-field" htmlFor="gestao-pontos-busca">
+              <span className="gestao-point-search-label">Buscar</span>
+              <input
+                id="gestao-pontos-busca"
+                type="search"
+                value={busca}
+                placeholder="Código, estado, rodovia, km…"
+                onChange={(event) => setBusca(event.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <button
+              type="button"
+              className="gestao-button-secondary gestao-filter-toggle"
+              aria-expanded={filtrosAbertos}
+              aria-controls="gestao-pontos-filtros"
+              onClick={() => setFiltrosAbertos((aberto) => !aberto)}
+            >
+              {filtrosAbertos ? 'Ocultar' : 'Ordenar'}
+              <span aria-hidden="true">{filtrosAbertos ? '⌃' : '⌄'}</span>
+            </button>
+          </div>
         </div>
-        <button type="button" className="gestao-button-secondary gestao-filter-toggle" aria-expanded={filtrosAbertos} aria-controls="gestao-pontos-filtros" onClick={() => setFiltrosAbertos((aberto) => !aberto)}>
-          {filtrosAbertos ? 'Ocultar filtros' : 'Abrir filtros'}
-          <span aria-hidden="true">{filtrosAbertos ? '⌃' : '⌄'}</span>
-        </button>
-      </div>
-      <div id="gestao-pontos-filtros" className={`gestao-point-filters${filtrosAbertos ? ' is-open' : ''}`} aria-hidden={!filtrosAbertos}>
-        <div className="gestao-list-controls">
-          <label>
-            Busca
-            <input type="search" value={busca} placeholder="Código, estado, rodovia…" onChange={(event) => setBusca(event.target.value)} tabIndex={filtrosAbertos ? 0 : -1} />
-          </label>
-          <SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemPonto)} options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]} />
+        <div
+          id="gestao-pontos-filtros"
+          className={`gestao-point-filters gestao-point-advanced${filtrosAbertos ? ' is-open' : ''}`}
+          aria-hidden={!filtrosAbertos}
+        >
+          <div className="gestao-point-advanced-panel">
+            <SelectDropdown
+              id="gestao-pontos-ordem"
+              label="Ordenar por"
+              value={ordem}
+              onChange={(value) => setOrdem(value as GestaoOrdemPonto)}
+              options={[{ value: 'codigo', label: 'Código' }, { value: 'km', label: 'Quilômetro' }]}
+            />
+          </div>
         </div>
       </div>
       {selecionados.length > 0 && (

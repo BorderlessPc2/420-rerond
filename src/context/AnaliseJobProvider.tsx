@@ -46,6 +46,65 @@ type AnaliseJobContextValue = {
 
 const AnaliseJobContext = createContext<AnaliseJobContextValue | null>(null)
 
+const OVERLAY_UI_STORAGE_KEY = 'rerond-analise-overlay-ui'
+
+type OverlayUiPrefs = {
+  oculto: boolean
+  minimizado: boolean
+  chipIndicadorOculto: boolean
+}
+
+function overlayUiStorageKey(solicitacaoId: string, jobId: string) {
+  return `${solicitacaoId}:${jobId}`
+}
+
+function readOverlayUiPrefs(solicitacaoId: string, jobId: string): OverlayUiPrefs | null {
+  try {
+    const raw = sessionStorage.getItem(OVERLAY_UI_STORAGE_KEY)
+    if (!raw) return null
+    const all = JSON.parse(raw) as Record<string, OverlayUiPrefs>
+    return all[overlayUiStorageKey(solicitacaoId, jobId)] ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeOverlayUiPrefs(solicitacaoId: string, jobId: string, prefs: OverlayUiPrefs) {
+  try {
+    const raw = sessionStorage.getItem(OVERLAY_UI_STORAGE_KEY)
+    const all: Record<string, OverlayUiPrefs> = raw ? JSON.parse(raw) : {}
+    all[overlayUiStorageKey(solicitacaoId, jobId)] = prefs
+    sessionStorage.setItem(OVERLAY_UI_STORAGE_KEY, JSON.stringify(all))
+  } catch {
+    /* sessionStorage indisponível */
+  }
+}
+
+function clearOverlayUiPrefs(solicitacaoId: string, jobId: string) {
+  try {
+    const raw = sessionStorage.getItem(OVERLAY_UI_STORAGE_KEY)
+    if (!raw) return
+    const all = JSON.parse(raw) as Record<string, OverlayUiPrefs>
+    delete all[overlayUiStorageKey(solicitacaoId, jobId)]
+    sessionStorage.setItem(OVERLAY_UI_STORAGE_KEY, JSON.stringify(all))
+  } catch {
+    /* sessionStorage indisponível */
+  }
+}
+
+function applyOverlayUiPrefs(
+  prefs: OverlayUiPrefs,
+  setters: {
+    setOverlayOculto: (v: boolean) => void
+    setOverlayMinimizado: (v: boolean) => void
+    setChipIndicadorOculto: (v: boolean) => void
+  },
+) {
+  setters.setOverlayOculto(prefs.oculto)
+  setters.setOverlayMinimizado(prefs.minimizado)
+  setters.setChipIndicadorOculto(prefs.chipIndicadorOculto)
+}
+
 export function useAnaliseJob() {
   const ctx = useContext(AnaliseJobContext)
   if (!ctx) throw new Error('useAnaliseJob deve ser usado dentro de AnaliseJobProvider')
@@ -62,16 +121,27 @@ export default function AnaliseJobProvider() {
   const [retryCooldownUntil, setRetryCooldownUntil] = useState<number | null>(null)
   const [retryCooldownSeconds, setRetryCooldownSeconds] = useState(0)
   const [overlayOculto, setOverlayOculto] = useState(false)
+  const [overlayMinimizado, setOverlayMinimizado] = useState(false)
+  const [chipIndicadorOculto, setChipIndicadorOculto] = useState(false)
+  const trackingRef = useRef<{ solicitacaoId: string | null; jobId: string | null }>({
+    solicitacaoId: null,
+    jobId: null,
+  })
   const onJobCompletedRef = useRef<((solicitacaoId: string) => void | Promise<void>) | null>(null)
   const onJobUpdateRef = useRef<((solicitacaoId: string, job: AnaliseJob) => void) | null>(null)
   const syncedOnMountRef = useRef(false)
 
   const dismissOverlay = useCallback(() => {
+    const { solicitacaoId, jobId } = trackingRef.current
+    if (solicitacaoId && jobId) clearOverlayUiPrefs(solicitacaoId, jobId)
     setAnalisandoId(null)
     setActiveJobId(null)
     setActiveJob(null)
     setJobError(null)
     setOverlayOculto(false)
+    setOverlayMinimizado(false)
+    setChipIndicadorOculto(false)
+    trackingRef.current = { solicitacaoId: null, jobId: null }
   }, [])
 
   const beginJob = useCallback((
@@ -83,6 +153,14 @@ export default function AnaliseJobProvider() {
     setJobError(null)
     setMeta(nextMeta)
     setOverlayOculto(false)
+    setOverlayMinimizado(false)
+    setChipIndicadorOculto(false)
+    writeOverlayUiPrefs(solicitacaoId, jobId, {
+      oculto: false,
+      minimizado: false,
+      chipIndicadorOculto: false,
+    })
+    trackingRef.current = { solicitacaoId, jobId }
     setAnalisandoId(solicitacaoId)
     setActiveJobId(jobId)
     setActiveJob(initialJob ?? {
@@ -96,6 +174,13 @@ export default function AnaliseJobProvider() {
   const attachActiveJob = useCallback((solicitacao: SolicitacaoOverlayMeta & { id?: string; activeAnaliseJobId?: string | null }) => {
     if (!solicitacao.id || !solicitacao.activeAnaliseJobId) return
     if (!isActiveJobState(solicitacao.analiseJobStatus)) return
+
+    const solicitacaoId = solicitacao.id
+    const jobId = solicitacao.activeAnaliseJobId
+    const jaRastreando =
+      (trackingRef.current.solicitacaoId === solicitacaoId && trackingRef.current.jobId === jobId)
+      || (analisandoId === solicitacaoId && activeJobId === jobId)
+
     setMeta({
       titulo: solicitacao.titulo,
       nomeConcessionaria: solicitacao.nomeConcessionaria,
@@ -104,11 +189,38 @@ export default function AnaliseJobProvider() {
       analiseJobProgress: solicitacao.analiseJobProgress,
       analiseRetryBlockedUntil: solicitacao.analiseRetryBlockedUntil ?? null,
     })
-    setOverlayOculto(false)
-    setAnalisandoId(solicitacao.id)
-    setActiveJobId(solicitacao.activeAnaliseJobId)
+
+    if (jaRastreando) {
+      const saved = readOverlayUiPrefs(solicitacaoId, jobId)
+      if (saved) {
+        applyOverlayUiPrefs(saved, {
+          setOverlayOculto,
+          setOverlayMinimizado,
+          setChipIndicadorOculto,
+        })
+      }
+      trackingRef.current = { solicitacaoId, jobId }
+      return
+    }
+
+    const saved = readOverlayUiPrefs(solicitacaoId, jobId)
+    if (saved) {
+      applyOverlayUiPrefs(saved, {
+        setOverlayOculto,
+        setOverlayMinimizado,
+        setChipIndicadorOculto,
+      })
+    } else {
+      setOverlayOculto(false)
+      setOverlayMinimizado(false)
+      setChipIndicadorOculto(false)
+    }
+
+    trackingRef.current = { solicitacaoId, jobId }
+    setAnalisandoId(solicitacaoId)
+    setActiveJobId(jobId)
     setJobError(null)
-  }, [])
+  }, [analisandoId, activeJobId])
 
   const registerOnJobCompleted = useCallback((handler: (solicitacaoId: string) => void | Promise<void>) => {
     onJobCompletedRef.current = handler
@@ -163,6 +275,8 @@ export default function AnaliseJobProvider() {
         )
         if (job.state === 'failed' || job.state === 'blocked' || job.state === 'stale') {
           setOverlayOculto(false)
+          setOverlayMinimizado(false)
+          setChipIndicadorOculto(false)
         }
 
         if (job.state === 'completed') {
@@ -199,6 +313,17 @@ export default function AnaliseJobProvider() {
     const timer = window.setInterval(update, 1000)
     return () => window.clearInterval(timer)
   }, [retryCooldownUntil])
+
+  useEffect(() => {
+    const solicitacaoId = trackingRef.current.solicitacaoId
+    const jobId = trackingRef.current.jobId
+    if (!solicitacaoId || !jobId) return
+    writeOverlayUiPrefs(solicitacaoId, jobId, {
+      oculto: overlayOculto,
+      minimizado: overlayMinimizado,
+      chipIndicadorOculto,
+    })
+  }, [overlayOculto, overlayMinimizado, chipIndicadorOculto])
 
   const overlayActive = Boolean(analisandoId && activeJobId)
   const jobState = activeJob?.state ?? meta.analiseJobStatus ?? null
@@ -241,7 +366,7 @@ export default function AnaliseJobProvider() {
     <AnaliseJobContext.Provider value={value}>
       <Outlet />
       <AnaliseProgressOverlay
-        active={overlayActive}
+        active={overlayActive && !(overlayOculto && chipIndicadorOculto)}
         titulo={meta.titulo}
         nomeConcessionaria={meta.nomeConcessionaria}
         concessionariaId={meta.concessionariaId}
@@ -251,9 +376,24 @@ export default function AnaliseJobProvider() {
         onDismiss={isFailed ? dismissOverlay : undefined}
         onRetry={isFailed ? retryFailedAnalysis : undefined}
         retryCooldownSeconds={retryCooldownSeconds}
-        uiHidden={overlayOculto}
-        onHide={() => setOverlayOculto(true)}
-        onShow={() => setOverlayOculto(false)}
+        minimized={overlayMinimizado}
+        uiHidden={overlayOculto && !chipIndicadorOculto}
+        onMinimize={() => {
+          setOverlayMinimizado(true)
+          setOverlayOculto(false)
+        }}
+        onExpand={() => setOverlayMinimizado(false)}
+        onHide={() => {
+          setOverlayOculto(true)
+          setOverlayMinimizado(false)
+          setChipIndicadorOculto(false)
+        }}
+        onShow={() => {
+          setOverlayOculto(false)
+          setOverlayMinimizado(false)
+          setChipIndicadorOculto(false)
+        }}
+        onDismissChip={() => setChipIndicadorOculto(true)}
       />
     </AnaliseJobContext.Provider>
   )

@@ -429,7 +429,7 @@
   background: #f5f8fd;
 }
 
-.apo-hidden-chip {
+.apo-hidden-chip-shell {
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -447,9 +447,7 @@
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 10px 28px rgba(15, 47, 115, 0.18);
-  cursor: pointer;
   font-family: inherit;
-  text-align: left;
   animation: apo-slide-up 220ms ease-out;
   transition:
     inline-size 280ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -458,23 +456,115 @@
     box-shadow 220ms ease;
 }
 
-.apo-hidden-chip:hover,
-.apo-hidden-chip:focus-visible {
-  inline-size: min(320px, calc(100vw - 32px));
-  gap: 10px;
-  padding: 8px 10px 8px 14px;
+.apo-hidden-chip-shell:not(:hover):not(:focus-within) {
+  justify-content: center;
+  align-items: center;
+}
+
+.apo-hidden-chip-shell:not(:hover):not(:focus-within) .apo-hidden-chip {
+  flex: 0 0 100%;
+  inline-size: 100%;
+  block-size: 100%;
+  justify-content: center;
+  align-items: center;
+}
+
+.apo-hidden-chip-shell:not(:hover):not(:focus-within) .apo-hidden-chip-copy,
+.apo-hidden-chip-shell:not(:hover):not(:focus-within) .apo-hidden-chip-action {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.apo-hidden-chip-shell:not(:hover):not(:focus-within) .apo-hidden-chip-icon {
+  margin: 0;
+  display: block;
+}
+
+.apo-hidden-chip-shell:hover,
+.apo-hidden-chip-shell:focus-within {
+  inline-size: min(340px, calc(100vw - 32px));
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
   box-shadow: 0 14px 32px rgba(15, 47, 115, 0.22);
+}
+
+.apo-hidden-chip {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  overflow: hidden;
+  transition: gap 220ms ease;
+}
+
+.apo-hidden-chip-shell:hover .apo-hidden-chip,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip {
+  gap: 10px;
+}
+
+.apo-hidden-chip-dismiss {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: 0;
+  block-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f5f8fd;
+  color: #4b5f7c;
+  cursor: pointer;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    inline-size 220ms ease,
+    block-size 220ms ease,
+    background 160ms ease;
+}
+
+.apo-hidden-chip-shell:hover .apo-hidden-chip-dismiss,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip-dismiss {
+  inline-size: 30px;
+  block-size: 30px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.apo-hidden-chip-dismiss:hover {
+  background: #eaf1fb;
+  color: #0f2f73;
 }
 
 .apo-hidden-chip-icon {
   flex-shrink: 0;
   color: #2357c4;
-  margin-inline: auto;
   transition: margin 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.apo-hidden-chip:hover .apo-hidden-chip-icon,
-.apo-hidden-chip:focus-visible .apo-hidden-chip-icon {
+.apo-hidden-chip-shell:hover .apo-hidden-chip-icon,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip-icon {
   margin-inline: 0;
 }
 
@@ -490,8 +580,8 @@
   transition: opacity 200ms ease, max-inline-size 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.apo-hidden-chip:hover .apo-hidden-chip-copy,
-.apo-hidden-chip:focus-visible .apo-hidden-chip-copy {
+.apo-hidden-chip-shell:hover .apo-hidden-chip-copy,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip-copy {
   opacity: 1;
   max-inline-size: 200px;
 }
@@ -523,23 +613,25 @@
   transition: opacity 200ms ease, max-inline-size 280ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms ease;
 }
 
-.apo-hidden-chip:hover .apo-hidden-chip-action,
-.apo-hidden-chip:focus-visible .apo-hidden-chip-action {
+.apo-hidden-chip-shell:hover .apo-hidden-chip-action,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip-action {
   opacity: 1;
   max-inline-size: 80px;
   background: #eef4ff;
 }
 
-.apo-hidden-chip:hover .apo-hidden-chip-action:hover,
-.apo-hidden-chip:focus-visible .apo-hidden-chip-action {
+.apo-hidden-chip-shell:hover .apo-hidden-chip-action:hover,
+.apo-hidden-chip-shell:focus-within .apo-hidden-chip-action {
   background: #e2ecff;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .apo-hidden-chip-shell,
   .apo-hidden-chip,
   .apo-hidden-chip-copy,
   .apo-hidden-chip-action,
-  .apo-hidden-chip-icon {
+  .apo-hidden-chip-icon,
+  .apo-hidden-chip-dismiss {
     transition: none;
   }
 }

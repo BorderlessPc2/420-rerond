@@ -26,6 +26,11 @@
   --gestao-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 }
 .gestao-modal-host .gestao-modal-header p { max-width: none; color: var(--color-text-soft); }
+.gestao-modal.gestao-modal--dashboard-pref {
+  inline-size: min(520px, calc(100vw - 32px));
+  block-size: min(640px, calc(100dvh - 32px));
+  max-block-size: min(640px, calc(100dvh - 32px));
+}
 .gestao-modal {
   position: relative;
   z-index: 1;
@@ -66,6 +71,7 @@
 .gestao-modal-close:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .gestao-modal-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; min-inline-size: 0; max-inline-size: 100%; padding: 28px 32px 32px; }
 .gestao-modal-body > * { min-inline-size: 0; max-inline-size: 100%; }
+.gestao-modal--dashboard-pref .gestao-modal-body { padding: 22px 24px 26px; }
 .gestao-modal-body .gestao-form:not(.gestao-form-grid):not(.gestao-contract-edit-form):not(.gestao-dash-pref-form) { display: grid; gap: 16px; }
 .gestao-modal-body .gestao-form:not(.gestao-form-grid):not(.gestao-contract-edit-form) > label { min-inline-size: 0; flex: none; }
 .gestao-modal-body .gestao-form-grid,

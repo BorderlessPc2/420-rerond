@@ -32,8 +32,13 @@ export type AnaliseProgressOverlayProps = {
   retryCooldownSeconds?: number
   /** Painel totalmente oculto; a análise segue em segundo plano. */
   uiHidden?: boolean
+  minimized?: boolean
+  onMinimize?: () => void
+  onExpand?: () => void
   onHide?: () => void
   onShow?: () => void
+  /** Remove o chip flutuante da tela (análise continua). */
+  onDismissChip?: () => void
 }
 
 type Stage = {
@@ -120,12 +125,15 @@ export default function AnaliseProgressOverlay({
   onRetry,
   retryCooldownSeconds = 0,
   uiHidden = false,
+  minimized = false,
+  onMinimize,
+  onExpand,
   onHide,
   onShow,
+  onDismissChip,
 }: AnaliseProgressOverlayProps) {
   const [simulatedPercent, setSimulatedPercent] = useState(0)
   const [simulatedStageIndex, setSimulatedStageIndex] = useState(0)
-  const [minimized, setMinimized] = useState(false)
   const usesRealJob = Boolean(jobState)
   const isFailed = jobState === 'failed' || jobState === 'blocked' || jobState === 'stale'
 
@@ -155,13 +163,12 @@ export default function AnaliseProgressOverlay({
 
   useEffect(() => {
     if (!active) {
-      setMinimized(false)
       setSimulatedPercent(0)
       setSimulatedStageIndex(0)
       return
     }
-    if (isFailed) setMinimized(false)
-  }, [active, isFailed])
+    if (isFailed) onExpand?.()
+  }, [active, isFailed, onExpand])
 
   useEffect(() => {
     if (!active || usesRealJob) {
@@ -196,21 +203,41 @@ export default function AnaliseProgressOverlay({
 
   if (uiHidden && !isFailed && onShow) {
     return (
-      <button
-        type="button"
-        className="apo-hidden-chip"
-        onClick={onShow}
+      <div
+        className="apo-hidden-chip-shell"
         aria-live="polite"
-        aria-label={`Análise em andamento, ${displayPercent} por cento. Passe o mouse para detalhes ou clique para exibir.`}
-        title="Exibir progresso da análise"
+        role="group"
+        aria-label="Indicador de análise em andamento"
       >
-        <Sparkles size={16} className="apo-hidden-chip-icon" aria-hidden />
-        <span className="apo-hidden-chip-copy" aria-hidden>
-          <strong>Análise em andamento</strong>
-          <span>{displayPercent}% · {jobState ? JOB_STATE_LABELS[jobState] : current.label}</span>
-        </span>
-        <span className="apo-hidden-chip-action" aria-hidden>Exibir</span>
-      </button>
+        <button
+          type="button"
+          className="apo-hidden-chip"
+          onClick={onShow}
+          aria-label={`Análise em andamento, ${displayPercent} por cento. Passe o mouse para detalhes ou clique para exibir.`}
+          title="Exibir progresso da análise"
+        >
+          <Sparkles size={16} className="apo-hidden-chip-icon" aria-hidden />
+          <span className="apo-hidden-chip-copy">
+            <strong>Análise em andamento</strong>
+            <span>{displayPercent}% · {jobState ? JOB_STATE_LABELS[jobState] : current.label}</span>
+          </span>
+          <span className="apo-hidden-chip-action">Exibir</span>
+        </button>
+        {onDismissChip && (
+          <button
+            type="button"
+            className="apo-hidden-chip-dismiss"
+            onClick={(event) => {
+              event.stopPropagation()
+              onDismissChip()
+            }}
+            aria-label="Fechar indicador de análise"
+            title="Fechar indicador"
+          >
+            <X size={15} aria-hidden />
+          </button>
+        )}
+      </div>
     )
   }
 
@@ -227,7 +254,7 @@ export default function AnaliseProgressOverlay({
         <button
           type="button"
           className="apo-minimized-main"
-          onClick={() => setMinimized(false)}
+          onClick={() => onExpand?.()}
           title="Expandir progresso da análise"
         >
           <Sparkles size={16} className="apo-minimized-icon" />
@@ -244,7 +271,7 @@ export default function AnaliseProgressOverlay({
         <button
           type="button"
           className="apo-minimized-expand"
-          onClick={() => setMinimized(false)}
+          onClick={() => onExpand?.()}
           aria-label="Expandir modal de progresso"
         >
           <Maximize2 size={16} />
@@ -276,7 +303,7 @@ export default function AnaliseProgressOverlay({
                 <button
                   type="button"
                   className="apo-icon-btn"
-                  onClick={() => setMinimized(true)}
+                  onClick={() => onMinimize?.()}
                   aria-label="Minimizar e continuar navegando"
                   title="Minimizar"
                 >
@@ -377,7 +404,7 @@ export default function AnaliseProgressOverlay({
 
         {!isFailed && (
           <div className="apo-running-actions">
-            <button type="button" className="apo-minimize-cta" onClick={() => setMinimized(true)}>
+            <button type="button" className="apo-minimize-cta" onClick={() => onMinimize?.()}>
               <Minimize2 size={15} />
               Minimizar e continuar navegando
             </button>

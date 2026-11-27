@@ -31,6 +31,8 @@ type ModalGestaoProps = {
   labelledBy?: string
   describedBy?: string
   initialFocus?: 'close' | 'content'
+  /** Classe extra no painel (ex.: largura compacta). */
+  modalClassName?: string
 }
 
 const focusFirstField = (content: HTMLDivElement | null, closeButton: HTMLButtonElement | null, initialFocus: 'close' | 'content') => {
@@ -43,7 +45,17 @@ const focusFirstField = (content: HTMLDivElement | null, closeButton: HTMLButton
   content?.querySelector<HTMLElement>('input, select, textarea, button:not(.gestao-modal-close), a[href]')?.focus()
 }
 
-export default function ModalGestao({ open, title, description, onClose, children, labelledBy, describedBy, initialFocus = 'content' }: ModalGestaoProps) {
+export default function ModalGestao({
+  open,
+  title,
+  description,
+  onClose,
+  children,
+  labelledBy,
+  describedBy,
+  initialFocus = 'content',
+  modalClassName,
+}: ModalGestaoProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -98,7 +110,7 @@ export default function ModalGestao({ open, title, description, onClose, childre
     <div className="gestao-modal-root">
       <button type="button" className="gestao-modal-backdrop" aria-label="Fechar janela" onClick={() => onCloseRef.current()} />
       <div
-        className="gestao-modal gestao-modal-host"
+        className={['gestao-modal', 'gestao-modal-host', modalClassName].filter(Boolean).join(' ')}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}

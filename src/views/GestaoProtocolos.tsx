@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { atualizarMovimento, atualizarProtocolo, criarProtocoloComPontos, descreverTransicao, excluirMovimento, excluirProtocolo, getProtocolo, listMovimentos, pontoStatus, registrarMovimento, type Etapa, type Movimento, type Ponto, type Protocolo } from '../services/gestaoContratos'
 import GestaoMapLegenda from '../components/gestao/GestaoMapLegenda'
 import { mesclarDashboardConfig, rotuloEtapaDashboard } from '../services/gestaoDashboardConfig'
@@ -9,7 +9,9 @@ import PontoPainelModal from '../components/gestao/PontoPainelModal'
 import type { PontoPainelTab } from '../components/gestao/pontoPainelTypes'
 import GestaoEtapaStepper from '../components/gestao/GestaoEtapaStepper'
 import GestaoTransicaoComposer from '../components/gestao/GestaoTransicaoComposer'
-import { baixarModeloPlanilha, baixarModeloPlanilhaPontos, enriquecerPreviewImportacao, exportarRelatorioErrosImportacao, extrairPontosRascunho, importarProtocolosEPontos, labelCampoPlanilha, mesclarPontosRascunho, parsePlanilha, parsePlanilhaParaRascunhoProtocolo, type ImportPreview, type ResultadoPlanilhaRascunho } from '../services/gestaoImportacao'
+import { baixarModeloPlanilha, enriquecerPreviewImportacao, exportarRelatorioErrosImportacao, importarProtocolosEPontos, parsePlanilha, type ImportPreview } from '../services/gestaoImportacao'
+import GestaoImportacaoPontosPlanilha from '../components/gestao/GestaoImportacaoPontosPlanilha'
+import GestaoPontosRascunhoLista from '../components/gestao/GestaoPontosRascunhoLista'
 import type { PontoInput } from '../services/gestaoValidacao'
 import type { GestaoContext } from './GestaoContratoDetalhe'
 import { classificarPrazo } from '../utils/gestaoPrioridades'
@@ -22,6 +24,8 @@ import { classeBadgeStatus, rotuloStatusProtocolo } from '../services/gestaoStat
 
 export function GestaoProtocolos() {
   const { contratoId = '' } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { contrato, protocolos, pontos, loading, refresh } = useOutletContext<GestaoContext>()
   const dashboardConfig = useMemo(
@@ -40,13 +44,16 @@ export function GestaoProtocolos() {
     else next.delete('q')
     setSearchParams(next)
   }
-  const vazio: PontoInput = { codigo: '', estado: '', km: '', tipo: 'nova_implantacao', concessionaria: '', rodovia: '' }
   const [titulo, setTitulo] = useState(''), [concessionaria, setConcessionaria] = useState(''), [rodovia, setRodovia] = useState(''), [numero, setNumero] = useState(''), [processoAnaliseId, setProcessoAnaliseId] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [deleting, setDeleting] = useState<Protocolo | null>(null)
   const [creating, setCreating] = useState(false), [saving, setSaving] = useState(false), [points, setPoints] = useState<PontoInput[]>([]), [preview, setPreview] = useState<ImportPreview | null>(null), [parsing, setParsing] = useState(false), [importing, setImporting] = useState(false), [importResult, setImportResult] = useState(''), [importValidateOnly, setImportValidateOnly] = useState(false)
-  const [draftPlanilha, setDraftPlanilha] = useState<ResultadoPlanilhaRascunho | null>(null), [draftParsing, setDraftParsing] = useState(false), [draftMessage, setDraftMessage] = useState('')
   const importEnriquecido = useMemo(() => (preview ? enriquecerPreviewImportacao(preview, protocolos, pontos) : null), [preview, protocolos, pontos])
-  const updatePoint = (index: number, patch: Partial<PontoInput>) => setPoints((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch, concessionaria, rodovia } : item))
+  useEffect(() => {
+    const incoming = (location.state as { notice?: string } | null)?.notice
+    if (!incoming) return
+    setNotice(incoming)
+    navigate(location.pathname + location.search, { replace: true, state: {} })
+  }, [location.pathname, location.search, location.state, navigate])
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true)
     try { await criarProtocoloComPontos(contratoId, { titulo, concessionaria, rodovia, numero, processoAnaliseId }, points.map((point) => ({ ...point, concessionaria, rodovia }))); setNotice(`Protocolo ${titulo} criado.`); setTitulo(''); setConcessionaria(''); setRodovia(''); setNumero(''); setProcessoAnaliseId(''); setPoints([]); closeCreating(); await refresh(); setError('') } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao criar protocolo.') } finally { setSaving(false) }
@@ -102,57 +109,34 @@ export function GestaoProtocolos() {
   }
   const closeCreating = () => {
     setCreating(false)
-    setDraftPlanilha(null)
-    setDraftMessage('')
-  }
-  const readDraftSheet = async (file: File) => {
-    setDraftParsing(true)
-    setDraftMessage('')
-    try {
-      setDraftPlanilha(await parsePlanilhaParaRascunhoProtocolo(file, { titulo, concessionaria, rodovia, numero }))
-      setError('')
-    } catch (err) {
-      setDraftPlanilha(null)
-      setError(err instanceof Error ? err.message : 'Erro ao ler planilha de pontos.')
-    } finally {
-      setDraftParsing(false)
-    }
-  }
-  const applyDraftSheet = () => {
-    if (!draftPlanilha) return
-    const sugestao = draftPlanilha.sugestaoProtocolo
-    const nextConcessionaria = concessionaria.trim() || sugestao?.concessionaria || ''
-    const nextRodovia = rodovia.trim() || sugestao?.rodovia || ''
-    if (draftPlanilha.analise.perfil === 'somente_pontos' && (!nextConcessionaria || !nextRodovia)) {
-      setError('Informe concessionária e rodovia antes de aplicar a planilha de pontos.')
-      return
-    }
-    let pontosImportados = draftPlanilha.pontos
-    let linhasInvalidas = draftPlanilha.linhasInvalidas
-    if (draftPlanilha.analise.perfil === 'somente_pontos' && !pontosImportados.length) {
-      const extraido = extrairPontosRascunho(draftPlanilha.linhas, nextConcessionaria, nextRodovia)
-      pontosImportados = extraido.pontos
-      linhasInvalidas = extraido.linhasInvalidas
-    }
-    if (!pontosImportados.length) {
-      setError('Nenhum ponto válido para aplicar. Revise a planilha e os campos do protocolo.')
-      return
-    }
-    if (sugestao) {
-      if (!titulo.trim() && sugestao.titulo) setTitulo(sugestao.titulo)
-      if (!concessionaria.trim() && sugestao.concessionaria) setConcessionaria(sugestao.concessionaria)
-      if (!rodovia.trim() && sugestao.rodovia) setRodovia(sugestao.rodovia)
-      if (!numero.trim() && sugestao.numero) setNumero(sugestao.numero)
-    }
-    const merged = mesclarPontosRascunho(points, pontosImportados.map((point) => ({ ...point, concessionaria: nextConcessionaria, rodovia: nextRodovia })))
-    setPoints(merged.pontos)
-    setDraftMessage(`${pontosImportados.length} linha(s) importada(s) · ${merged.pontos.length} ponto(s) no rascunho${merged.duplicadosIgnorados ? ` · ${merged.duplicadosIgnorados} código(s) atualizado(s)` : ''}${linhasInvalidas.length ? ` · ${linhasInvalidas.length} linha(s) ignorada(s) por erro` : ''}.`)
-    setDraftPlanilha(null)
-    setError('')
   }
   if (loading) return <GestaoLoadingSkeleton variant="lista" label="Carregando protocolos" />
-  return <section><div className="gestao-section-head"><div><h2>Protocolos</h2><p>{protocolos.length} {protocolos.length === 1 ? 'protocolo no recorte' : 'protocolos no recorte'}</p></div><div className="gestao-actions"><button type="button" className="gestao-button-secondary" onClick={baixarModeloPlanilha}>Baixar modelo</button><button type="button" className="gestao-button-secondary" onClick={() => pickImportFile(true)}>Validar planilha</button><button type="button" className="gestao-button-secondary" onClick={() => pickImportFile(false)}>Importar planilha</button><input id="gestao-validar-planilha" hidden type="file" accept=".xlsx,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, true); event.target.value = '' }} /><input id="gestao-importar-planilha" hidden type="file" accept=".xlsx,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, false); event.target.value = '' }} /><button type="button" aria-haspopup="dialog" onClick={() => { setDraftPlanilha(null); setDraftMessage(''); setCreating(true) }}>Novo protocolo</button></div></div><div className="gestao-list-controls"><label>Busca<input type="search" value={busca} placeholder="Título, rodovia, concessionária…" onChange={(event) => setBusca(event.target.value)} /></label><SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemProtocolo)} options={[{ value: 'prazo', label: 'Prazo' }, { value: 'titulo', label: 'Título' }]} /></div>{error && <p className="gestao-error" role="alert">{error}</p>}
-    <ModalGestao open={creating} title="Novo protocolo" description="Cadastre o protocolo e os pontos que já fazem parte dele. Pontos de outras rodovias podem ser vinculados depois." labelledBy="gestao-novo-protocolo-title" onClose={closeCreating}><form className="gestao-form gestao-form-grid" onSubmit={(event) => void save(event)}><label>Título<input name="titulo" required value={titulo} onChange={(e) => setTitulo(e.target.value)} /></label><label>Concessionária<input name="concessionaria" required value={concessionaria} onChange={(e) => setConcessionaria(e.target.value)} /></label><label>Rodovia<input name="rodovia" required value={rodovia} onChange={(e) => setRodovia(e.target.value)} /></label><label>Número do protocolo<input name="numero" value={numero} onChange={(e) => setNumero(e.target.value)} /></label><label>ID do processo de análise IA (opcional)<input name="processoAnaliseId" value={processoAnaliseId} onChange={(e) => setProcessoAnaliseId(e.target.value)} /></label><div className="gestao-sheet-import gestao-pontos-draft"><div className="gestao-draft-heading"><div><strong>Importar pontos da planilha</strong><small>O sistema detecta se a planilha traz só pontos ou protocolo completo antes de aplicar ao rascunho.</small></div></div><div className="gestao-sheet-actions"><button type="button" className="gestao-button-secondary" onClick={baixarModeloPlanilhaPontos}>Modelo só pontos</button><button type="button" className="gestao-button-secondary" onClick={() => document.getElementById('gestao-draft-planilha')?.click()} disabled={draftParsing}>{draftParsing ? 'Analisando…' : 'Escolher planilha'}</button><input id="gestao-draft-planilha" hidden type="file" accept=".xlsx,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readDraftSheet(file); event.target.value = '' }} /></div>{draftPlanilha && <div className="gestao-sheet-detect" role="status"><p><strong>{draftPlanilha.analise.descricaoPerfil}</strong></p><p>{draftPlanilha.nomeArquivo} · {draftPlanilha.analise.totalLinhas} linha(s) · {draftPlanilha.pontos.length} ponto(s) válido(s){draftPlanilha.linhasInvalidas.length ? ` · ${draftPlanilha.linhasInvalidas.length} linha(s) com erro` : ''}</p><ul className="gestao-sheet-fields">{draftPlanilha.analise.camposDetectados.map((item) => <li key={item.campo}><span>{labelCampoPlanilha(item.campo)}</span><small>{item.coluna}</small></li>)}</ul>{draftPlanilha.analise.colunasNaoMapeadas.length > 0 && <p className="gestao-import-limit-hint">Colunas ignoradas: {draftPlanilha.analise.colunasNaoMapeadas.join(', ')}</p>}{draftPlanilha.analise.perfil === 'somente_pontos' && (!concessionaria.trim() || !rodovia.trim()) && <p className="gestao-error" role="alert">Preencha concessionária e rodovia acima antes de aplicar pontos.</p>}{draftPlanilha.avisos.map((item) => <p className="gestao-import-limit-hint" key={item}>{item}</p>)}{draftPlanilha.linhasInvalidas.slice(0, 5).map((item) => <p className="gestao-error" key={item.linha}>Linha {item.linha}: {item.erros.join(' ')}</p>)}{draftPlanilha.linhasInvalidas.length > 5 && <p className="gestao-import-limit-hint">… e mais {draftPlanilha.linhasInvalidas.length - 5} linha(s) com erro.</p>}<div className="gestao-form-footer"><button type="button" className="gestao-button-secondary" onClick={() => setDraftPlanilha(null)}>Descartar análise</button><button type="button" onClick={applyDraftSheet} disabled={!draftPlanilha.pontos.length && !(draftPlanilha.analise.perfil === 'somente_pontos' && draftPlanilha.linhas.length > 0)}>Aplicar ao rascunho</button></div></div>}{draftMessage && <p className="gestao-success" role="status">{draftMessage}</p>}</div><div className="gestao-pontos-draft"><div className="gestao-draft-heading"><div><strong>Pontos deste protocolo</strong><small>Cadastre os pontos que já fazem parte deste protocolo.</small></div><span>{points.length} {points.length === 1 ? 'ponto' : 'pontos'}</span></div>{points.map((point, index) => <div className="gestao-point-draft" key={index}><span className="gestao-point-index">{String(index + 1).padStart(2, '0')}</span><input aria-label={`Código do ponto ${index + 1}`} placeholder="Código" required value={point.codigo} onChange={(e) => updatePoint(index, { codigo: e.target.value })} /><input aria-label={`Estado do ponto ${index + 1}`} placeholder="Estado" required value={point.estado} onChange={(e) => updatePoint(index, { estado: e.target.value })} /><input aria-label={`Km do ponto ${index + 1}`} placeholder="Km" required value={point.km} onChange={(e) => updatePoint(index, { km: e.target.value })} /><input aria-label={`Latitude do ponto ${index + 1}`} placeholder="Latitude (opcional)" type="number" step="any" value={point.latitude ?? ''} onChange={(e) => updatePoint(index, { latitude: e.target.value ? Number(e.target.value) : undefined })} /><input aria-label={`Longitude do ponto ${index + 1}`} placeholder="Longitude (opcional)" type="number" step="any" value={point.longitude ?? ''} onChange={(e) => updatePoint(index, { longitude: e.target.value ? Number(e.target.value) : undefined })} /><select aria-label={`Classificação do ponto ${index + 1}`} value={point.tipo} onChange={(e) => updatePoint(index, { tipo: e.target.value as Ponto['tipo'] })}><option value="nova_implantacao">Nova implantação</option><option value="regularizacao">Regularização</option></select><button type="button" className="gestao-button-secondary" onClick={() => setPoints((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Remover</button></div>)}<button type="button" className="gestao-button-secondary" onClick={() => setPoints((items) => [...items, { ...vazio, concessionaria, rodovia }])}>Adicionar ponto</button></div><button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar protocolo'}</button></form></ModalGestao>
+  return <section><div className="gestao-section-head"><div><h2>Protocolos</h2><p>{protocolos.length} {protocolos.length === 1 ? 'protocolo no recorte' : 'protocolos no recorte'}</p></div><div className="gestao-actions"><button type="button" className="gestao-button-secondary" onClick={baixarModeloPlanilha}>Baixar modelo</button><button type="button" className="gestao-button-secondary" onClick={() => pickImportFile(true)}>Validar planilha</button><button type="button" className="gestao-button-secondary" onClick={() => pickImportFile(false)}>Importar planilha</button><input id="gestao-validar-planilha" hidden type="file" accept=".xlsx,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, true); event.target.value = '' }} /><input id="gestao-importar-planilha" hidden type="file" accept=".xlsx,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, false); event.target.value = '' }} /><button type="button" aria-haspopup="dialog" onClick={() => setCreating(true)}>Novo protocolo</button></div></div><div className="gestao-list-controls"><label>Busca<input type="search" value={busca} placeholder="Título, rodovia, concessionária…" onChange={(event) => setBusca(event.target.value)} /></label><SelectDropdown label="Ordenar por" value={ordem} onChange={(value) => setOrdem(value as GestaoOrdemProtocolo)} options={[{ value: 'prazo', label: 'Prazo' }, { value: 'titulo', label: 'Título' }]} /></div>{error && <p className="gestao-error" role="alert">{error}</p>}
+    <ModalGestao open={creating} title="Novo protocolo" description="Cadastre o protocolo e os pontos que já fazem parte dele. Pontos de outras rodovias podem ser vinculados depois." labelledBy="gestao-novo-protocolo-title" onClose={closeCreating}>
+      <form className="gestao-form gestao-form-grid" onSubmit={(event) => void save(event)}>
+        <label>Título<input name="titulo" required value={titulo} onChange={(e) => setTitulo(e.target.value)} /></label>
+        <label>Concessionária<input name="concessionaria" required value={concessionaria} onChange={(e) => setConcessionaria(e.target.value)} /></label>
+        <label>Rodovia<input name="rodovia" required value={rodovia} onChange={(e) => setRodovia(e.target.value)} /></label>
+        <label>Número do protocolo<input name="numero" value={numero} onChange={(e) => setNumero(e.target.value)} /></label>
+        <label>ID do processo de análise IA (opcional)<input name="processoAnaliseId" value={processoAnaliseId} onChange={(e) => setProcessoAnaliseId(e.target.value)} /></label>
+        <GestaoImportacaoPontosPlanilha
+          idPrefix="gestao-protocolo"
+          contexto={{ titulo, concessionaria, rodovia, numero }}
+          points={points}
+          onPointsChange={setPoints}
+          onSugestaoProtocolo={(patch) => {
+            if (patch.titulo && !titulo.trim()) setTitulo(patch.titulo)
+            if (patch.concessionaria && !concessionaria.trim()) setConcessionaria(patch.concessionaria)
+            if (patch.rodovia && !rodovia.trim()) setRodovia(patch.rodovia)
+            if (patch.numero && !numero.trim()) setNumero(patch.numero)
+          }}
+          onError={setError}
+          onClearError={() => setError('')}
+        />
+        <GestaoPontosRascunhoLista points={points} onChange={setPoints} concessionaria={concessionaria} rodovia={rodovia} />
+        <button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar protocolo'}</button>
+      </form>
+    </ModalGestao>
     {notice && <p className="gestao-success" role="status">{notice}</p>}{parsing && <p aria-live="polite">Processando planilha…</p>}{importResult && <p className="gestao-success" role="status">{importResult}</p>}{importEnriquecido && <section className="gestao-panel"><h3>{importValidateOnly ? 'Resultado da validação' : 'Prévia da importação'}</h3><p>{importEnriquecido.totais.protocolos} protocolos · {importEnriquecido.totais.pontos} pontos na planilha · {importEnriquecido.totais.protocolosNovos} novos · {importEnriquecido.totais.protocolosExistentes} existentes · {importEnriquecido.totais.pontosIgnorados} códigos já cadastrados · {importEnriquecido.totais.linhasInvalidas} linhas com erro</p><p className="gestao-import-limit-hint">Limites por gravação: até 499 pontos em protocolo novo e 500 pontos novos em protocolo existente. Divida a planilha se exceder.</p>{importValidateOnly && <p className="gestao-success" role="status">Nenhum dado foi gravado nesta validação.</p>}{importEnriquecido.grupos.map((group) => <div className="gestao-import-group" key={group.key}><strong>{group.input.titulo}</strong><span>{group.input.concessionaria} · {group.input.rodovia} · {group.pontos.length} pontos na planilha · {group.pontosNovos} novos</span><small>{group.protocoloExistente ? 'Protocolo existente — pontos serão adicionados' : 'Protocolo novo'}{group.codigosIgnorados.length ? ` · Ignorados: ${group.codigosIgnorados.join(', ')}` : ''}{group.excedeLimite ? ` · Excede limite de ${group.limitePontos} pontos por gravação` : ''}</small></div>)}{importEnriquecido.linhasInvalidas.map((item) => <p className="gestao-error" key={item.linha}>Linha {item.linha}: {item.erros.join(' ')}</p>)}<div className="gestao-form-footer">{importEnriquecido.linhasInvalidas.length > 0 && <button type="button" className="gestao-button-secondary" onClick={() => exportarRelatorioErrosImportacao(importEnriquecido.linhasInvalidas)}>Exportar erros (XLSX)</button>}{importValidateOnly ? <><button type="button" className="gestao-button-secondary" onClick={() => { setPreview(null); setImportValidateOnly(false) }}>Fechar</button><button type="button" onClick={() => setImportValidateOnly(false)} disabled={importing || !importEnriquecido.grupos.some((group) => group.pontosNovos > 0 && !group.excedeLimite)}>Importar dados validados</button></> : <><button type="button" className="gestao-button-secondary" onClick={() => { setPreview(null); setImportValidateOnly(false) }}>Cancelar</button><button type="button" onClick={() => void confirmImport()} disabled={importing || !importEnriquecido.grupos.some((group) => (group.pontosNovos > 0 || !group.protocoloExistente) && !group.excedeLimite)}>{importing ? 'Importando…' : importEnriquecido.linhasInvalidas.length ? 'Importar linhas válidas' : 'Confirmar importação'}</button></>}</div></section>}
     {protocolosLista.length ? <ul className="gestao-list">{protocolosLista.map((p) => <li className="gestao-list-row" key={p.id}><Link className="gestao-list-link" to={`/gestao-contratos/${contratoId}/protocolos/${p.id}`}><span className="gestao-list-main"><strong>{p.titulo}</strong><small>{p.concessionaria} · {p.rodovia}{p.numero ? ` · ${p.numero}` : ''}</small></span><span className={badgeStatus(p.status)}>{rotuloStatus(p.status)}</span><span className={`gestao-deadline gestao-deadline-${p.status === 'concluido' ? 'normal' : classificarPrazo(p.previsao).prioridade}`}>{p.status === 'concluido' ? 'Concluído' : classificarPrazo(p.previsao).rotulo}<small>{(() => { const total = pontos.filter((item) => item.protocoloId === p.id).length; return `${total} ${total === 1 ? 'ponto' : 'pontos'} · ${rotuloEtapa(p.etapa)}` })()}</small></span><span aria-hidden="true">↗</span></Link><button type="button" className="gestao-button-secondary gestao-list-delete" onClick={() => setDeleting(p)}>Excluir</button></li>)}</ul> : <div className="gestao-empty"><h3>Nenhum protocolo neste recorte</h3><p>Cadastre um protocolo para reunir pontos deste contrato, inclusive de rodovias diferentes.</p></div>}
     <ModalGestao open={Boolean(deleting)} title="Excluir protocolo?" description="Os pontos permanecem no contrato, sem vínculo. As movimentações deste protocolo serão excluídas." labelledBy="gestao-excluir-protocolo-title" onClose={() => setDeleting(null)}>{deleting && <div className="gestao-delete-confirm"><strong>{deleting.titulo}</strong><p>{pontos.filter((item) => item.protocoloId === deleting.id).length} ponto(s) vinculado(s) continuam no contrato. Esta exclusão não pode ser desfeita.</p><div className="gestao-form-footer"><button type="button" className="gestao-button-secondary" onClick={() => setDeleting(null)}>Cancelar</button><button type="button" className="gestao-danger-button" onClick={() => void removeProtocolo()} disabled={saving}>{saving ? 'Excluindo…' : 'Excluir protocolo'}</button></div></div>}</ModalGestao>

@@ -159,30 +159,48 @@ export default function GestaoDashboardPersonalizarModal({
     lista: string[],
     onLista: (next: string[]) => void,
     mostrarRotulo = false,
-  ) => (
-    <li key={status} className={`gestao-dash-pref-row${mostrarRotulo ? ' gestao-dash-pref-row--status' : ''}`}>
-      <label className="gestao-dash-pref-check gestao-point-check">
-        <input
-          type="checkbox"
-          checked={lista.includes(status)}
-          onChange={() => onLista(toggleLista(lista, status))}
-        />
-        <span className="gestao-checkbox-icon" aria-hidden />
-        <span>{rotuloStatusDashboard(status, draft, statusDraft)}</span>
-      </label>
-      {mostrarRotulo && (
+  ) => {
+    const ativo = lista.includes(status)
+    const rotulo = rotuloStatusDashboard(status, draft, statusDraft)
+    if (!mostrarRotulo) {
+      return (
+        <li key={status}>
+          <label className={`gestao-dash-pref-chip gestao-point-check${ativo ? ' is-on' : ''}`}>
+            <input
+              type="checkbox"
+              checked={ativo}
+              onChange={() => onLista(toggleLista(lista, status))}
+            />
+            <span className="gestao-checkbox-icon" aria-hidden />
+            <span>{rotulo}</span>
+          </label>
+        </li>
+      )
+    }
+    return (
+      <li key={status} className={`gestao-dash-pref-status-item${ativo ? '' : ' is-off'}`}>
+        <label className="gestao-dash-pref-check gestao-point-check">
+          <input
+            type="checkbox"
+            checked={ativo}
+            onChange={() => onLista(toggleLista(lista, status))}
+          />
+          <span className="gestao-checkbox-icon" aria-hidden />
+          <span className="gestao-dash-pref-status-name">{rotulo}</span>
+        </label>
         <input
           type="text"
-          className="gestao-dash-pref-label"
+          className="gestao-dash-pref-label-input"
           placeholder="Rótulo no gráfico (opcional)"
           value={draft.rotulosStatus?.[status] ?? ''}
           onChange={(event) => atualizarRotulo(status, event.target.value)}
-          disabled={!lista.includes(status)}
+          disabled={!ativo}
           maxLength={80}
+          aria-label={`Rótulo personalizado para ${rotulo}`}
         />
-      )}
-    </li>
-  )
+      </li>
+    )
+  }
 
   return (
     <ModalGestao
@@ -190,6 +208,7 @@ export default function GestaoDashboardPersonalizarModal({
       title="Personalizar indicadores e rótulos"
       description="Ajuste status, etapas, legendas do mapa e o que entra no gráfico e no Previsto x realizado."
       labelledBy="gestao-dashboard-pref-title"
+      modalClassName="gestao-modal--dashboard-pref"
       onClose={onClose}
     >
       <form className="gestao-form gestao-dash-pref-form" onSubmit={(event) => void salvar(event)}>
@@ -225,7 +244,7 @@ export default function GestaoDashboardPersonalizarModal({
         <section className="gestao-dash-pref-section">
           <h3>Status no gráfico</h3>
           <p>Desmarque o que não é útil para este cliente. Você pode renomear o rótulo exibido.</p>
-          <ul className="gestao-dash-pref-list">
+          <ul className="gestao-dash-pref-list gestao-dash-pref-list-status">
             {todosStatus.map((status) =>
               linhaStatus(status, draft.statusVisiveis ?? [], (next) => setDraft((atual) => ({ ...atual, statusVisiveis: next })), true),
             )}
@@ -237,11 +256,11 @@ export default function GestaoDashboardPersonalizarModal({
           <p>Renomeie as fases do fluxo (stepper, filtros e movimentações). Deixe em branco para o padrão do sistema.</p>
           <ul className="gestao-dash-pref-list">
             {ETAPAS_ORDEM.map((etapa) => (
-              <li key={etapa} className="gestao-dash-pref-row">
+              <li key={etapa} className="gestao-dash-pref-split-row">
                 <span className="gestao-dash-pref-etapa-default">{rotuloEtapaDashboard(etapa, null)}</span>
                 <input
                   type="text"
-                  className="gestao-dash-pref-label"
+                  className="gestao-dash-pref-label-input"
                   placeholder={rotuloEtapaDashboard(etapa, null)}
                   value={draft.rotulosEtapa?.[etapa] ?? ''}
                   onChange={(event) => atualizarRotuloEtapa(etapa, event.target.value)}
@@ -258,18 +277,20 @@ export default function GestaoDashboardPersonalizarModal({
           <p>Personalize os rótulos exibidos ao lado das cores no mapa.</p>
           <ul className="gestao-dash-pref-list">
             {LEGENDA_MAPA_GESTAO.map((item) => (
-              <li key={item.id} className="gestao-dash-pref-row gestao-dash-pref-mapa-row">
-                <span className="gestao-dash-pref-swatch" style={{ background: item.color }} aria-hidden />
+              <li key={item.id} className="gestao-dash-pref-split-row gestao-dash-pref-mapa-row">
+                <div className="gestao-dash-pref-mapa-meta">
+                  <span className="gestao-dash-pref-swatch" style={{ background: item.color }} aria-hidden />
+                  <small>{rotuloLegendaMapaDashboard(item.id, draft, item.label)}</small>
+                </div>
                 <input
                   type="text"
-                  className="gestao-dash-pref-label"
+                  className="gestao-dash-pref-label-input"
                   placeholder={item.label}
                   value={draft.rotulosMapa?.[item.id] ?? ''}
                   onChange={(event) => atualizarRotuloMapa(item.id, event.target.value)}
                   maxLength={80}
                   aria-label={`Rótulo da legenda ${item.label}`}
                 />
-                <small>{rotuloLegendaMapaDashboard(item.id, draft, item.label)}</small>
               </li>
             ))}
           </ul>
@@ -301,7 +322,7 @@ export default function GestaoDashboardPersonalizarModal({
           <div className="gestao-dash-pref-columns">
             <div>
               <h4>Entram em “Previstas”</h4>
-              <ul className="gestao-dash-pref-list gestao-dash-pref-list-compact">
+              <ul className="gestao-dash-pref-chip-grid">
                 {todosStatus.map((status) =>
                   linhaStatus(status, draft.previstoStatus ?? [], (next) => setDraft((atual) => ({ ...atual, previstoStatus: next }))),
                 )}
@@ -309,7 +330,7 @@ export default function GestaoDashboardPersonalizarModal({
             </div>
             <div>
               <h4>Entram em “Realizadas”</h4>
-              <ul className="gestao-dash-pref-list gestao-dash-pref-list-compact">
+              <ul className="gestao-dash-pref-chip-grid">
                 {todosStatus.map((status) =>
                   linhaStatus(status, draft.realizadoStatus ?? [], (next) => setDraft((atual) => ({ ...atual, realizadoStatus: next }))),
                 )}
